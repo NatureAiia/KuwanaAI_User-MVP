@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------- */
+/* Kuwana design tokens — see KUWANA_MVP_BUILD_PLAN.md Section 5           */
+/* Dark = cinematic (Netflix-inflected). Light = energetic/gamified.       */
+/* ---------------------------------------------------------------------- */
+
+:root {
+  --bg-base: #fbf7f0;
+  --bg-surface: #ffffff;
+  --bg-surface-raised: #ffffff;
+  --border: #e7e0d4;
+  --accent-gold: #c9860b;
+  --accent-teal: #0f8a7a;
+  --accent-coral: #d14a3a;
+  --text-primary: #14181d;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+
+  --radius-card: 20px;
+  --radius-pill: 9999px;
+
+  /* --font-display / --font-body / --font-mono are supplied at runtime by
+     next/font (see layout.tsx) via CSS custom properties on <html> */
+}
+
+.dark {
+  --bg-base: #0b0f14;
+  --bg-surface: #131a22;
+  --bg-surface-raised: #1a222c;
+  --border: #232c37;
+  --accent-gold: #f2b134;
+  --accent-teal: #2dd4bf;
+  --accent-coral: #e1553d;
+  --text-primary: #f5f3ee;
+  --text-secondary: #b7bec7;
+  --text-muted: #8b93a0;
+}
+
+@theme inline {
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-surface-raised: var(--bg-surface-raised);
+  --color-border: var(--border);
+  --color-accent-gold: var(--accent-gold);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-coral: var(--accent-coral);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --radius-card: var(--radius-card);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent-gold) 35%, transparent);
+}
+
+/* 44x44 CSS-pixel minimum touch target (Section 9, WCAG 2.1 AA) */
+.tap-target {
+  min-height: 44px;
+  min-width: 44px;
+}

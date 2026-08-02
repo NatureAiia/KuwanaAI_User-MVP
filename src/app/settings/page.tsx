@@ -1,0 +1,109 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
+import { BottomTabBar } from "@/components/BottomTabBar";
+import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+
+export default function SettingsPage() {
+  const router = useRouter();
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
+  const [email, setEmail] = useState<string | null>(null);
+  const [consents, setConsents] = useState<{ research_use?: boolean; leaderboard_participation?: boolean }>(
+    {},
+  );
+
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null));
+    fetch("/api/settings/consents")
+      .then((r) => r.json())
+      .then((d) => setConsents(d.consents ?? {}));
+  }, []);
+
+  function toggleTheme() {
+    const next = !isDark;
+    setIsDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("kuwana-theme", next ? "dark" : "light");
+  }
+
+  async function updateConsent(key: "research_use" | "leaderboard_participation", value: boolean) {
+    setConsents((prev) => ({ ...prev, [key]: value }));
+    await fetch("/api/settings/consents", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [key]: value }),
+    });
+  }
+
+  async function logout() {
+    await createClient().auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
+  return (
+    <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
+      <h1 className="font-display text-[24px] font-bold">Settings</h1>
+
+      <div className="mt-6 space-y-2.5">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Appearance</h2>
+        <button
+          onClick={toggleTheme}
+          className="tap-target flex w-full items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
+        >
+          <span className="flex items-center gap-2 text-[14px] font-medium">
+            {isDark ? <Moon size={16} /> : <Sun size={16} />}
+            {isDark ? "Dark" : "Light"} mode
+          </span>
+          <span className="text-[12px] text-text-muted">Tap to switch</span>
+        </button>
+      </div>
+
+      <div className="mt-6 space-y-2.5">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Consents</h2>
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+          <input
+            type="checkbox"
+            checked={!!consents.research_use}
+            onChange={(e) => updateConsent("research_use", e.target.checked)}
+            className="mt-0.5 tap-target"
+          />
+          <span className="text-[13px] text-text-secondary">
+            Allow anonymized use of my comparison activity to improve recommendations.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+          <input
+            type="checkbox"
+            checked={!!consents.leaderboard_participation}
+            onChange={(e) => updateConsent("leaderboard_participation", e.target.checked)}
+            className="mt-0.5 tap-target"
+          />
+          <span className="text-[13px] text-text-secondary">
+            Join the opt-in XP leaderboard under a nickname.
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-6 space-y-2.5">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Account</h2>
+        <div className="rounded-xl border border-border bg-bg-surface px-4 py-3">
+          <p className="text-[13px] text-text-secondary">Email</p>
+          <p className="text-[14px] font-medium">{email ?? "…"}</p>
+        </div>
+        <Button variant="secondary" onClick={logout} className="w-full">
+          Log out
+        </Button>
+      </div>
+
+      <BottomTabBar />
+    </div>
+  );
+}

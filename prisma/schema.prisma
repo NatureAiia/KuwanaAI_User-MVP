@@ -1,0 +1,342 @@
+// Kuwana MVP — data model (see KUWANA_MVP_BUILD_PLAN.md Section 4 & 6)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model WaitlistSignup {
+  id        String   @id @default(uuid())
+  email     String
+  sector    String // 'healthcare' for MVP; kept generic for future coming-soon sectors
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email, sector])
+  @@map("waitlist_signups")
+}
+
+// ---------------------------------------------------------------------------
+// 4.1 Identity & onboarding
+// ---------------------------------------------------------------------------
+
+enum Role {
+  consumer
+  corporate
+  regulator
+  provider
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String?  @map("password_hash") // Supabase Auth owns real credentials; kept for local/dev fallback
+  role         Role     @default(consumer)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  profile         UserProfile?
+  footprints      SectorFootprint[]
+  consents        Consent[]
+  comparisons     Comparison[]
+  savedListings   SavedListing[]
+  recommendations Recommendation[]
+  events          UserEvent[]
+  xp              UserXp?
+  badges          UserBadge[]
+  questProgress   UserQuestProgress[]
+  streak          UserStreak?
+
+  @@map("users")
+}
+
+model UserProfile {
+  userId     String  @id @map("user_id")
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRange   String? @map("age_range")
+  occupation String?
+  location   String?
+  fullName   String? @map("full_name")
+  nickname   String?
+
+  @@map("user_profiles")
+}
+
+enum Sector {
+  telecom
+  banking
+  insurance
+  education
+  healthcare
+}
+
+model SectorFootprint {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector Sector
+  data   Json
+
+  @@unique([userId, sector])
+  @@map("sector_footprints")
+}
+
+model Consent {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType String   @map("consent_type") // 'research_use' | 'leaderboard_participation'
+  granted     Boolean
+  grantedAt   DateTime @default(now()) @map("granted_at")
+
+  @@unique([userId, consentType])
+  @@map("consents")
+}
+
+// ---------------------------------------------------------------------------
+// 4.2 Sector catalog (schema-driven)
+// ---------------------------------------------------------------------------
+
+enum SectorStatus {
+  live
+  coming_soon
+}
+
+model SectorConfig {
+  id     String       @id @default(uuid())
+  name   String
+  slug   String       @unique
+  status SectorStatus @default(live)
+
+  categories Category[]
+
+  @@map("sectors")
+}
+
+model Category {
+  id       String       @id @default(uuid())
+  sectorId String       @map("sector_id")
+  sector   SectorConfig @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  name     String
+  slug     String
+
+  attributeSchema AttributeSchemaField[]
+  listings        Listing[]
+  comparisons     Comparison[]
+
+  @@unique([sectorId, slug])
+  @@map("categories")
+}
+
+enum AttributeDataType {
+  number
+  string
+  enum
+  boolean
+}
+
+model AttributeSchemaField {
+  id           String            @id @default(uuid())
+  categoryId   String            @map("category_id")
+  category     Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  key          String
+  label        String
+  dataType     AttributeDataType @map("data_type")
+  unit         String?
+  isComparable Boolean           @default(true) @map("is_comparable")
+  sortOrder    Int               @default(0) @map("sort_order")
+
+  @@unique([categoryId, key])
+  @@map("attribute_schema")
+}
+
+model Provider {
+  id       String  @id @default(uuid())
+  name     String
+  logoUrl  String? @map("logo_url")
+  verified Boolean @default(true)
+
+  listings Listing[]
+
+  @@map("providers")
+}
+
+enum FreshnessStatus {
+  fresh
+  stale
+  unverified
+}
+
+model Listing {
+  id              String          @id @default(uuid())
+  categoryId      String          @map("category_id")
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  providerId      String          @map("provider_id")
+  provider        Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  name            String
+  attributes      Json
+  price           Decimal         @db.Decimal(12, 2)
+  currency        String          @default("USD")
+  sourceUrl       String?         @map("source_url")
+  lastVerifiedAt  DateTime        @default(now()) @map("last_verified_at")
+  freshnessStatus FreshnessStatus @default(fresh) @map("freshness_status")
+
+  priceHistory    ListingPriceHistory[]
+  savedBy         SavedListing[]
+  recommendations Recommendation[]
+
+  @@map("listings")
+}
+
+model ListingPriceHistory {
+  id         String   @id @default(uuid())
+  listingId  String   @map("listing_id")
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  price      Decimal  @db.Decimal(12, 2)
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  @@map("listing_price_history")
+}
+
+// ---------------------------------------------------------------------------
+// 4.3 User comparison activity
+// ---------------------------------------------------------------------------
+
+model Comparison {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String   @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  listingIds String[] @map("listing_ids")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("comparisons")
+}
+
+model SavedListing {
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String   @map("listing_id")
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  savedAt   DateTime @default(now()) @map("saved_at")
+
+  @@id([userId, listingId])
+  @@map("saved_listings")
+}
+
+model Recommendation {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId   String   @map("listing_id")
+  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  explanation String
+  confidence  Decimal  @db.Decimal(4, 3)
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  @@map("recommendations")
+}
+
+// ---------------------------------------------------------------------------
+// 6. Gamification
+// ---------------------------------------------------------------------------
+
+enum EventType {
+  profile_completed
+  comparison_viewed
+  comparison_completed
+  recommendation_viewed
+  item_saved
+  action_taken
+  daily_visit
+}
+
+model UserEvent {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector    Sector?
+  eventType EventType @map("event_type")
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("user_events")
+}
+
+model GamificationRule {
+  eventType    EventType @id @map("event_type")
+  xpValue      Int       @map("xp_value")
+  badgeTrigger Json?     @map("badge_trigger")
+  questTrigger Json?     @map("quest_trigger")
+
+  @@map("gamification_rules")
+}
+
+model UserXp {
+  userId  String @id @map("user_id")
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp Int    @default(0) @map("total_xp")
+  level   Int    @default(1)
+
+  @@map("user_xp")
+}
+
+model Badge {
+  id          String @id @default(uuid())
+  name        String @unique
+  description String
+  criteria    Json
+
+  users UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  userId   String   @map("user_id")
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId  String   @map("badge_id")
+  badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  earnedAt DateTime @default(now()) @map("earned_at")
+
+  @@id([userId, badgeId])
+  @@map("user_badges")
+}
+
+model Quest {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  criteria    Json
+  activeFrom  DateTime @map("active_from")
+  activeTo    DateTime @map("active_to")
+
+  progress UserQuestProgress[]
+
+  @@map("quests")
+}
+
+model UserQuestProgress {
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId     String    @map("quest_id")
+  quest       Quest     @relation(fields: [questId], references: [id], onDelete: Cascade)
+  progress    Int       @default(0)
+  completedAt DateTime? @map("completed_at")
+
+  @@id([userId, questId])
+  @@map("user_quest_progress")
+}
+
+model UserStreak {
+  userId         String    @id @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak  Int       @default(0) @map("current_streak")
+  longestStreak  Int       @default(0) @map("longest_streak")
+  lastActiveDate DateTime? @map("last_active_date") @db.Date
+
+  @@map("user_streaks")
+}
