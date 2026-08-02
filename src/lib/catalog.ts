@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { computeValueScores } from "@/lib/scoring";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
 function toListingDTO(listing: {
@@ -76,6 +77,23 @@ export async function getCategoryWithListings(
     })),
     listings: category.listings.map(toListingDTO),
   };
+}
+
+export async function getTopListings(
+  sectorSlug: string,
+  categorySlug: string,
+  limit = 4,
+): Promise<{ categoryName: string; listings: (ListingDTO & { score: number })[] }> {
+  const result = await getCategoryWithListings(sectorSlug, categorySlug);
+  if (!result) return { categoryName: "", listings: [] };
+
+  const scores = computeValueScores(result.listings, result.attributeSchema);
+  const sorted = [...result.listings]
+    .map((l) => ({ ...l, score: scores[l.id] ?? 0 }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit);
+
+  return { categoryName: result.name, listings: sorted };
 }
 
 export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {

@@ -1,7 +1,18 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Manrope, IBM_Plex_Mono } from "next/font/google";
+import Script from "next/script";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
 import "./globals.css";
+
+const THEME_INIT_SCRIPT = `
+(function () {
+  try {
+    var theme = localStorage.getItem("kuwana-theme");
+    if (theme === "light") document.documentElement.classList.remove("dark");
+    else document.documentElement.classList.add("dark");
+  } catch (e) {}
+})();
+`;
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-display",
@@ -37,6 +48,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-body">
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
         <GamificationToastHost />
         {children}
       </body>
