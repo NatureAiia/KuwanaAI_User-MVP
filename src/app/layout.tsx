@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Manrope, IBM_Plex_Mono } from "next/font/google";
+import { GamificationToastHost } from "@/components/GamificationToastHost";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -36,6 +37,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-body">
+        <GamificationToastHost />
         {children}
       </body>
     </html>

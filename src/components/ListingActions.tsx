@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Bookmark, BookmarkCheck, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { notifyGamification } from "@/lib/gamification/client";
 
 export function ListingActions({
   listingId,
@@ -25,15 +26,19 @@ export function ListingActions({
       body: JSON.stringify({ listingId }),
     });
     setSaving(false);
-    if (res.ok) setSaved(!saved);
+    if (res.ok) {
+      setSaved(!saved);
+      if (!saved) notifyGamification((await res.json())?.gamification);
+    }
   }
 
   async function takeAction() {
-    await fetch("/api/events", {
+    const res = await fetch("/api/events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventType: "action_taken", metadata: { listingId } }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (res?.ok) notifyGamification((await res.json())?.gamification);
   }
 
   return (

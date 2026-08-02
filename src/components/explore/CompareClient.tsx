@@ -5,6 +5,7 @@ import { Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SignalBloom } from "@/components/SignalBloom";
 import { computeValueScores } from "@/lib/scoring";
+import { notifyGamification } from "@/lib/gamification/client";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null) {
@@ -45,17 +46,24 @@ export function CompareClient({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ categoryId, listingIds: listings.map((l) => l.id) }),
-    }).catch(() => {});
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => notifyGamification(data?.gamification))
+      .catch(() => {});
   }, [categoryId, listings]);
 
   async function toggleSave(listingId: string) {
     const isSaved = savedIds.has(listingId);
     const method = isSaved ? "DELETE" : "POST";
-    await fetch("/api/saved", {
+    const res = await fetch("/api/saved", {
       method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (res?.ok && method === "POST") {
+      const data = await res.json();
+      notifyGamification(data?.gamification);
+    }
     setSavedIds((prev) => {
       const next = new Set(prev);
       if (isSaved) next.delete(listingId);
