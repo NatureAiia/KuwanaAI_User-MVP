@@ -119,6 +119,31 @@ export async function recordEvent(
     if (distinctSectors.filter((s) => s.sector).length >= 2) {
       await awardBadgeIfNew(tx, userId, "Multi-sector explorer", newBadges);
     }
+
+    const categoryId = metadata?.categoryId as string | undefined;
+    if (categoryId) {
+      const activeQuests = await tx.quest.findMany({
+        where: { activeFrom: { lte: now }, activeTo: { gte: now } },
+      });
+      for (const quest of activeQuests) {
+        const criteria = quest.criteria as { type?: string; target?: number };
+        if (criteria.type !== "category_count") continue;
+
+        const comparisonsInWindow = await tx.comparison.findMany({
+          where: { userId, createdAt: { gte: quest.activeFrom, lte: quest.activeTo } },
+          distinct: ["categoryId"],
+          select: { categoryId: true },
+        });
+        const progress = comparisonsInWindow.length;
+        const completed = criteria.target != null && progress >= criteria.target;
+
+        await tx.userQuestProgress.upsert({
+          where: { userId_questId: { userId, questId: quest.id } },
+          update: { progress, completedAt: completed ? new Date() : undefined },
+          create: { userId, questId: quest.id, progress, completedAt: completed ? new Date() : null },
+        });
+      }
+    }
   }
 
   return {

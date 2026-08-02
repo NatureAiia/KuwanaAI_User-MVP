@@ -1,0 +1,142 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { clsx } from "clsx";
+import { ArrowUpDown } from "lucide-react";
+import { ListingCard } from "@/components/ListingCard";
+import { Button } from "@/components/ui/Button";
+import { computeValueScores } from "@/lib/scoring";
+import { createClient } from "@/lib/supabase/client";
+import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
+
+type SortMode = "value" | "price_asc" | "price_desc";
+
+export function ExploreClient({
+  sectorSlug,
+  categories,
+}: {
+  sectorSlug: string;
+  categories: CategoryDTO[];
+}) {
+  const router = useRouter();
+  const [activeCategorySlug, setActiveCategorySlug] = useState(categories[0]?.slug ?? "");
+  const [data, setData] = useState<CategoryWithListingsDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState<SortMode>("value");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => setIsAuthed(!!data.user));
+  }, []);
+
+  useEffect(() => {
+    if (!activeCategorySlug) return;
+    setLoading(true);
+    setSelected([]);
+    fetch(`/api/listings?sector=${sectorSlug}&category=${activeCategorySlug}`)
+      .then((r) => r.json())
+      .then((d: CategoryWithListingsDTO) => setData(d))
+      .finally(() => setLoading(false));
+
+    if (isAuthed) {
+      fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType: "comparison_viewed", sector: sectorSlug }),
+      }).catch(() => {});
+    }
+  }, [activeCategorySlug, sectorSlug, isAuthed]);
+
+  const scores = useMemo(
+    () => (data ? computeValueScores(data.listings, data.attributeSchema) : {}),
+    [data],
+  );
+
+  const sortedListings = useMemo(() => {
+    if (!data) return [];
+    const listings = [...data.listings];
+    if (sort === "price_asc") listings.sort((a, b) => a.price - b.price);
+    else if (sort === "price_desc") listings.sort((a, b) => b.price - a.price);
+    else listings.sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
+    return listings;
+  }, [data, sort, scores]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function goCompare() {
+    if (!data) return;
+    if (isAuthed === false) {
+      router.push(`/signup?next=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+    router.push(
+      `/explore/${sectorSlug}/compare?category=${data.id}&ids=${selected.join(",")}`,
+    );
+  }
+
+  return (
+    <div className="pb-28">
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {categories.map((cat) => (
+          <button
+            key={cat.slug}
+            onClick={() => setActiveCategorySlug(cat.slug)}
+            className={clsx(
+              "tap-target shrink-0 rounded-full border px-4 py-2 text-[13px] font-medium",
+              activeCategorySlug === cat.slug
+                ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
+                : "border-border text-text-secondary",
+            )}
+          >
+            {cat.name}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-[13px] text-text-muted">
+          {loading ? "Loading…" : `${sortedListings.length} listings`}
+        </p>
+        <button
+          onClick={() =>
+            setSort((s) => (s === "value" ? "price_asc" : s === "price_asc" ? "price_desc" : "value"))
+          }
+          className="tap-target flex items-center gap-1.5 text-[13px] font-medium text-text-secondary"
+        >
+          <ArrowUpDown size={14} />
+          {sort === "value" ? "Best value" : sort === "price_asc" ? "Price: low to high" : "Price: high to low"}
+        </button>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {sortedListings.map((listing) => (
+          <ListingCard
+            key={listing.id}
+            listing={listing}
+            score={scores[listing.id] ?? 0}
+            sectorSlug={sectorSlug}
+            selected={selected.includes(listing.id)}
+            onToggleSelect={toggleSelect}
+          />
+        ))}
+      </div>
+
+      {selected.length >= 2 && (
+        <div className="fixed bottom-16 left-0 right-0 z-40 flex justify-center px-5 md:bottom-6">
+          <div className="flex items-center gap-4 rounded-full border border-accent-gold bg-bg-surface px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+            <span className="text-[13px] font-medium">{selected.length} selected</span>
+            <Button size="md" onClick={goCompare}>
+              Compare
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

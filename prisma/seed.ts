@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { BADGE_DEFS } from "../src/lib/gamification/rules";
 
 const prisma = new PrismaClient();
@@ -276,7 +276,7 @@ async function main() {
           categoryId: category.id,
           providerId,
           name: listing.name,
-          attributes: listing.attrs,
+          attributes: listing.attrs as Prisma.InputJsonValue,
           price: listing.price,
           currency: "USD",
           freshnessStatus: "fresh" as const,

@@ -9,6 +9,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model WaitlistSignup {
+  id        String   @id @default(uuid())
+  email     String
+  sector    String // 'healthcare' for MVP; kept generic for future coming-soon sectors
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email, sector])
+  @@map("waitlist_signups")
+}
+
 // ---------------------------------------------------------------------------
 // 4.1 Identity & onboarding
 // ---------------------------------------------------------------------------

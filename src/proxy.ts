@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // read-only (Section 7.1); compare/save/action routes gate client-side.
 const PROTECTED_PREFIXES = ["/dashboard", "/profile", "/leaderboard", "/settings"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
