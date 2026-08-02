@@ -80,7 +80,11 @@ export function CompareClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ listingIds: listings.map((l) => l.id), categoryName }),
       });
-      if (res.ok) setRecommendation(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendation(data);
+        notifyGamification(data?.gamification);
+      }
     } finally {
       setLoadingRecommendation(false);
     }
