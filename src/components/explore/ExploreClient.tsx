@@ -35,6 +35,7 @@ export function ExploreClient({
 
   useEffect(() => {
     if (!activeCategorySlug) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting view state for the incoming fetch, not deriving render output
     setLoading(true);
     setSelected([]);
     fetch(`/api/listings?sector=${sectorSlug}&category=${activeCategorySlug}`)

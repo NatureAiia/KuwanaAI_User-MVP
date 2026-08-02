@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { SignalBloom } from "@/components/SignalBloom";
@@ -100,10 +101,10 @@ export function CompareClient({
               {listings.map((l) => (
                 <th key={l.id} className="p-3 text-left">
                   <div className="flex items-center justify-between gap-2">
-                    <div>
+                    <Link href={`/listing/${l.id}?sector=${sectorSlug}`} className="hover:text-accent-gold">
                       <p className="font-display font-semibold">{l.name}</p>
                       <p className="text-[11px] font-normal text-text-muted">{l.provider.name}</p>
-                    </div>
+                    </Link>
                     <button
                       onClick={() => toggleSave(l.id)}
                       aria-label={savedIds.has(l.id) ? "Unsave" : "Save"}

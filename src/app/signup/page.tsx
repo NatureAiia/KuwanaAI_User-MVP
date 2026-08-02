@@ -163,10 +163,10 @@ export default function SignupPage() {
 
         {step === "role" && (
           <div className="mt-8">
-            <h1 className="font-display text-[24px] font-bold">You're signing up as a Consumer</h1>
+            <h1 className="font-display text-[24px] font-bold">You&apos;re signing up as a Consumer</h1>
             <p className="mt-2 text-[14px] text-text-secondary">
               Kuwana also supports Corporate, Regulator and Provider accounts — coming after MVP.
-              For now, you'll get the full consumer comparison experience.
+              For now, you&apos;ll get the full consumer comparison experience.
             </p>
             <Button onClick={next} size="lg" className="mt-8 w-full">
               Continue
@@ -222,7 +222,7 @@ export default function SignupPage() {
 
         {step === "network" && (
           <div className="mt-8 space-y-4">
-            <h1 className="font-display text-[24px] font-bold">Who's your primary network?</h1>
+            <h1 className="font-display text-[24px] font-bold">Who&apos;s your primary network?</h1>
             <p className="text-[13px] text-text-secondary">
               This personalizes your telecom comparisons from day one.
             </p>
@@ -281,7 +281,7 @@ export default function SignupPage() {
                 className="mt-0.5 tap-target"
               />
               <span className="text-[13px] text-text-secondary">
-                Allow anonymized use of my comparison activity to improve Kuwana's recommendations.
+                Allow anonymized use of my comparison activity to improve Kuwana&apos;s recommendations.
               </span>
             </label>
             <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">

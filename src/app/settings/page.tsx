@@ -9,14 +9,15 @@ import { Button } from "@/components/ui/Button";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark"),
+  );
   const [email, setEmail] = useState<string | null>(null);
   const [consents, setConsents] = useState<{ research_use?: boolean; leaderboard_participation?: boolean }>(
     {},
   );
 
   useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
     createClient()
       .auth.getUser()
       .then(({ data }) => setEmail(data.user?.email ?? null));

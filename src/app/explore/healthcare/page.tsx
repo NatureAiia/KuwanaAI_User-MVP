@@ -27,7 +27,7 @@ export default function HealthcareComingSoonPage() {
       <HeartPulse size={40} className="text-accent-teal" />
       <h1 className="mt-4 font-display text-[26px] font-bold">Healthcare is coming to Kuwana</h1>
       <p className="mt-2 max-w-[42ch] text-[14px] text-text-secondary">
-        We're building explainable comparisons for medical aid, clinics and pharmacies next.
+        We&apos;re building explainable comparisons for medical aid, clinics and pharmacies next.
         Join the waitlist to be first to know.
       </p>
 
