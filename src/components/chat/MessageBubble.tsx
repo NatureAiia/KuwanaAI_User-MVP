@@ -13,7 +13,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={clsx("flex items-end gap-2", isUser ? "justify-end" : "justify-start")}>
       {!isUser && (
-        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-gold/15 text-accent-gold">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
           <Sparkles size={12} />
         </div>
       )}
@@ -21,7 +21,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
         className={clsx(
           "max-w-[78%] whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-[1.5]",
           isUser
-            ? "rounded-br-md bg-accent-gold text-[#14181d]"
+            ? "rounded-br-md bg-accent-sky text-[var(--text-on-accent-sky)]"
             : "rounded-bl-md border border-border bg-bg-surface-raised text-text-primary",
         )}
       >

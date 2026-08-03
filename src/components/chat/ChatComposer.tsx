@@ -41,7 +41,7 @@ export function ChatComposer({
           onClick={submit}
           disabled={disabled || !value.trim()}
           aria-label="Send message"
-          className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-gold text-[#14181d] disabled:opacity-40"
+          className="tap-target flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-sky text-[var(--text-on-accent-sky)] disabled:opacity-40"
         >
           <Send size={16} />
         </button>

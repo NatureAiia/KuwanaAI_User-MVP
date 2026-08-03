@@ -1,12 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
-import { CheckCircle2, ShieldCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { Badge } from "@/components/ui/Card";
 import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { notifyGamification } from "@/lib/gamification/client";
 import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
@@ -25,6 +27,24 @@ export function ListingCard({
   selected: boolean;
   onToggleSelect: (id: string) => void;
 }) {
+  const [saved, setSaved] = useState(false);
+
+  async function toggleSaved() {
+    const nextSaved = !saved;
+    setSaved(nextSaved);
+    const res = await fetch("/api/saved", {
+      method: nextSaved ? "POST" : "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ listingId: listing.id }),
+    }).catch(() => null);
+    if (res?.ok && nextSaved) {
+      const data = await res.json();
+      notifyGamification(data?.gamification);
+    }
+  }
+
+  const hasSavings = trend && trend.direction === "down" && trend.earliestPrice > trend.currentPrice;
+
   return (
     <div
       className={clsx(
@@ -32,20 +52,31 @@ export function ListingCard({
         selected ? "border-accent-sky shadow-[0_0_0_1px_var(--accent-sky)]" : "border-border",
       )}
     >
-      <button
-        type="button"
-        onClick={() => onToggleSelect(listing.id)}
-        aria-pressed={selected}
-        aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
-        className={clsx(
-          "tap-target absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border",
-          selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface-raised",
-        )}
-      >
-        {selected && <CheckCircle2 size={16} />}
-      </button>
+      <div className="absolute right-3 top-3 flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={toggleSaved}
+          aria-pressed={saved}
+          aria-label={saved ? `Remove ${listing.name} from saved` : `Save ${listing.name}`}
+          className="tap-target flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-surface-raised text-accent-sky"
+        >
+          {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggleSelect(listing.id)}
+          aria-pressed={selected}
+          aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
+          className={clsx(
+            "tap-target flex h-7 w-7 items-center justify-center rounded-full border",
+            selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface-raised",
+          )}
+        >
+          {selected && <CheckCircle2 size={16} />}
+        </button>
+      </div>
 
-      <div className="flex items-start justify-between gap-3 pr-8">
+      <div className="flex items-start justify-between gap-3 pr-16">
         <div className="flex items-start gap-2.5">
           <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={32} />
           <div>
@@ -60,17 +91,26 @@ export function ListingCard({
 
       <div className="mt-3 flex items-end justify-between">
         <div>
-          <p className="font-mono text-[22px] font-semibold text-text-primary">
-            {listing.currency} {listing.price.toFixed(2)}
-          </p>
-          <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]} className="mt-2">
-            {listing.freshnessStatus}
-          </Badge>
-          {trend && trend.direction !== "flat" && (
-            <Badge tone={TREND_TONE[trend.direction]} className="mt-2">
-              {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}%
-            </Badge>
-          )}
+          <div className="flex items-baseline gap-1.5">
+            <p className="font-mono text-[22px] font-semibold text-text-primary">
+              {listing.currency} {listing.price.toFixed(2)}
+            </p>
+            {hasSavings && (
+              <p className="font-mono text-[13px] text-text-muted line-through">
+                {listing.currency} {trend!.earliestPrice.toFixed(2)}
+              </p>
+            )}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]}>{listing.freshnessStatus}</Badge>
+            {trend && trend.direction !== "flat" && (
+              <Badge tone={TREND_TONE[trend.direction]}>
+                {hasSavings
+                  ? `Save ${Math.abs(trend.changePercent)}%`
+                  : `${TREND_ARROW[trend.direction]} ${Math.abs(trend.changePercent)}%`}
+              </Badge>
+            )}
+          </div>
         </div>
         <SignalBloom value={score} size={56} />
       </div>

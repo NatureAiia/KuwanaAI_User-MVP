@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 export function ChatHeader() {
   return (
     <div className="flex items-center gap-3 border-b border-border pb-4">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-gold/15 text-accent-gold">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
         <Sparkles size={20} />
       </div>
       <div>

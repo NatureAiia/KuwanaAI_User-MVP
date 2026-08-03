@@ -10,7 +10,7 @@ const SUGGESTED_PROMPTS = [
 export function ChatGreeting({ onPick }: { onPick: (prompt: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-gold/15 text-accent-gold">
+      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
         <Bot size={26} />
       </div>
       <p className="mt-4 font-display text-[17px] font-bold">Hey there!</p>
@@ -24,7 +24,7 @@ export function ChatGreeting({ onPick }: { onPick: (prompt: string) => void }) {
             key={label}
             type="button"
             onClick={() => onPick(label)}
-            className="tap-target flex items-center gap-2 rounded-xl border border-border bg-bg-surface p-3 text-left text-[12.5px] font-medium text-text-secondary hover:border-accent-gold/50 hover:text-accent-gold"
+            className="tap-target flex items-center gap-2 rounded-xl border border-border bg-bg-surface p-3 text-left text-[12.5px] font-medium text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
           >
             <Icon size={15} className="shrink-0 text-accent-teal" />
             {label}
