@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { SignalBloom } from "@/components/SignalBloom";
+import { Badge } from "@/components/ui/Card";
 import type { ListingDTO } from "@/types/catalog";
+import type { PriceTrend } from "@/lib/priceTrend";
+
+const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
+const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
 
 export function HeroCarousel({
   title,
@@ -9,7 +14,7 @@ export function HeroCarousel({
 }: {
   title: string;
   sectorSlug: string;
-  listings: (ListingDTO & { score: number })[];
+  listings: (ListingDTO & { score: number; trend?: PriceTrend | null })[];
 }) {
   if (listings.length === 0) return null;
 
@@ -35,6 +40,11 @@ export function HeroCarousel({
             <p className="mt-3 font-mono text-[18px] font-semibold">
               {listing.currency} {listing.price.toFixed(2)}
             </p>
+            {listing.trend && listing.trend.direction !== "flat" && (
+              <Badge tone={TREND_TONE[listing.trend.direction]} className="mt-2">
+                {TREND_ARROW[listing.trend.direction]} {Math.abs(listing.trend.changePercent)}%
+              </Badge>
+            )}
           </Link>
         ))}
       </div>

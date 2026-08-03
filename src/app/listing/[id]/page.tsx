@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends } from "@/lib/catalog";
+import { computePriceForecast } from "@/lib/priceTrend";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { Badge } from "@/components/ui/Card";
@@ -27,6 +28,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const attributes = listing.attributes as Record<string, unknown>;
   const trends = await getListingPriceTrends([listing.id]);
   const trend = trends[listing.id];
+  const forecast = trend ? computePriceForecast(trend) : null;
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
@@ -64,6 +66,13 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           </div>
           <PriceSparkline points={trend.points} direction={trend.direction} />
         </div>
+      )}
+
+      {forecast && (
+        <p className="mt-2 text-[11px] text-text-muted">
+          At this rate, expect ~{listing.currency} {forecast.projectedPrice.toFixed(2)} in {forecast.projectionDays}{" "}
+          days. Estimate based on the recent trend, not a guarantee.
+        </p>
       )}
 
       <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">

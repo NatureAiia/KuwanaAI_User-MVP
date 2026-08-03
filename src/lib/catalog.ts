@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { computeValueScores } from "@/lib/scoring";
+import { computeDecisionScores } from "@/lib/scoring";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
@@ -85,13 +85,14 @@ export async function getTopListings(
   categorySlug: string,
   limit = 4,
   priceWeight = 0.5,
-): Promise<{ categoryName: string; listings: (ListingDTO & { score: number })[] }> {
+): Promise<{ categoryName: string; listings: (ListingDTO & { score: number; trend: PriceTrend | null })[] }> {
   const result = await getCategoryWithListings(sectorSlug, categorySlug);
   if (!result) return { categoryName: "", listings: [] };
 
-  const scores = computeValueScores(result.listings, result.attributeSchema, priceWeight);
+  const trends = await getListingPriceTrends(result.listings.map((l) => l.id));
+  const scores = computeDecisionScores(result.listings, result.attributeSchema, trends, priceWeight);
   const sorted = [...result.listings]
-    .map((l) => ({ ...l, score: scores[l.id] ?? 0 }))
+    .map((l) => ({ ...l, score: scores[l.id]?.total ?? 0, trend: trends[l.id] ?? null }))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
@@ -100,7 +101,7 @@ export async function getTopListings(
 
 /**
  * Reads a user's SectorFootprint for the given sector and derives a price
- * weight for computeValueScores — a footprint indicating low spend biases
+ * weight for computeDecisionScores — a footprint indicating low spend biases
  * the score toward price-sensitivity rather than the default 50/50 split.
  * Falls back to 0.5 when there's no footprint or no recognizable spend field.
  *
@@ -131,15 +132,28 @@ export async function getFootprintPriceWeight(userId: string, sectorSlug: string
 /**
  * "Specials for you" (KUWANA_DECISION_INTELLIGENCE_PLAN.md Section 4): joins
  * the user's footprint and comparison/saved-listing engagement against
- * current listings, filtered to categories they actually engage with, sorted
- * by a footprint-biased value score — instead of the same generic "best
- * value this week" shown to everyone.
+ * current listings, sorted by a footprint-biased, trend-aware Decision Score
+ * — instead of the same generic "best value this week" shown to everyone.
+ *
+ * Candidate categories come from two sources, in priority order: categories
+ * the user has actually compared/saved (explicit signal), then — to avoid an
+ * empty feed for a user who onboarded but hasn't compared anything yet — the
+ * first category of each sector in their onboarding footprint (implicit
+ * signal). Categories with no listings yet (e.g. a coming-soon sector) are
+ * dropped by the final filter.
  */
 export async function getPersonalizedSpecials(
   userId: string,
   limit = 4,
-): Promise<{ sectorSlug: string; categorySlug: string; categoryName: string; listings: (ListingDTO & { score: number })[] }[]> {
-  const [comparisons, saved] = await Promise.all([
+): Promise<
+  {
+    sectorSlug: string;
+    categorySlug: string;
+    categoryName: string;
+    listings: (ListingDTO & { score: number; trend: PriceTrend | null })[];
+  }[]
+> {
+  const [comparisons, saved, footprints] = await Promise.all([
     prisma.comparison.findMany({
       where: { userId },
       include: { category: { include: { sector: true } } },
@@ -151,23 +165,31 @@ export async function getPersonalizedSpecials(
       include: { listing: { include: { category: { include: { sector: true } } } } },
       take: 10,
     }),
+    prisma.sectorFootprint.findMany({ where: { userId } }),
   ]);
 
-  const engaged = new Map<string, { sectorSlug: string; categorySlug: string }>();
+  const candidates = new Map<string, { sectorSlug: string; categorySlug: string }>();
   for (const c of comparisons) {
-    engaged.set(c.category.id, { sectorSlug: c.category.sector.slug, categorySlug: c.category.slug });
+    candidates.set(c.category.id, { sectorSlug: c.category.sector.slug, categorySlug: c.category.slug });
   }
   for (const s of saved) {
-    engaged.set(s.listing.category.id, {
+    candidates.set(s.listing.category.id, {
       sectorSlug: s.listing.category.sector.slug,
       categorySlug: s.listing.category.slug,
     });
   }
 
-  if (engaged.size === 0) return [];
+  const engagedSectors = new Set([...candidates.values()].map((c) => c.sectorSlug));
+  for (const footprint of footprints) {
+    if (engagedSectors.has(footprint.sector)) continue;
+    const [firstCategory] = await getSectorCategories(footprint.sector);
+    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug: footprint.sector, categorySlug: firstCategory.slug });
+  }
+
+  if (candidates.size === 0) return [];
 
   const results = await Promise.all(
-    [...engaged.values()].slice(0, 3).map(async ({ sectorSlug, categorySlug }) => {
+    [...candidates.values()].slice(0, 3).map(async ({ sectorSlug, categorySlug }) => {
       const priceWeight = await getFootprintPriceWeight(userId, sectorSlug);
       const { categoryName, listings } = await getTopListings(sectorSlug, categorySlug, limit, priceWeight);
       return { sectorSlug, categorySlug, categoryName, listings };

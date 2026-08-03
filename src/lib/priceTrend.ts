@@ -42,3 +42,39 @@ export function computePriceTrend(
     points: sorted.map((p) => ({ price: Number(p.price), recordedAt: p.recordedAt.toISOString() })),
   };
 }
+
+export type PriceForecast = {
+  projectedPrice: number;
+  projectionDays: number;
+};
+
+/**
+ * Projects the price forward by fitting a least-squares line through the
+ * recorded history and extrapolating — a plain linear projection of what
+ * already happened, not a predictive model. Returns null when there aren't
+ * enough points to fit a line, or the line is flat (no meaningful slope).
+ */
+export function computePriceForecast(trend: PriceTrend, projectionDays = 14): PriceForecast | null {
+  if (trend.points.length < 3) return null;
+
+  const firstMs = new Date(trend.points[0].recordedAt).getTime();
+  const xs = trend.points.map((p) => (new Date(p.recordedAt).getTime() - firstMs) / 86_400_000);
+  const ys = trend.points.map((p) => p.price);
+  const n = xs.length;
+
+  const sumX = xs.reduce((a, b) => a + b, 0);
+  const sumY = ys.reduce((a, b) => a + b, 0);
+  const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
+  const sumXX = xs.reduce((a, x) => a + x * x, 0);
+  const denom = n * sumXX - sumX * sumX;
+  if (denom === 0) return null;
+
+  const slope = (n * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / n;
+  const projectedX = xs[xs.length - 1] + projectionDays;
+  const projectedPrice = Math.max(0, intercept + slope * projectedX);
+
+  if (Math.abs(projectedPrice - trend.currentPrice) < trend.currentPrice * 0.01) return null;
+
+  return { projectedPrice: Math.round(projectedPrice * 100) / 100, projectionDays };
+}
