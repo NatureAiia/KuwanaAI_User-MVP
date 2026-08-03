@@ -14,6 +14,9 @@ import type { PriceTrend } from "@/lib/priceTrend";
 type SortMode = "value" | "price_asc" | "price_desc";
 type CategoryWithTrendsDTO = CategoryWithListingsDTO & { trends: Record<string, PriceTrend | null> };
 
+const MIN_COMPARE = 2;
+const MAX_COMPARE = 4;
+
 export function ExploreClient({
   sectorSlug,
   categories,
@@ -69,11 +72,15 @@ export function ExploreClient({
   }, [data, sort, scores]);
 
   function toggleSelect(id: string) {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelected((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= MAX_COMPARE) return prev;
+      return [...prev, id];
+    });
   }
 
   function goCompare() {
-    if (!data) return;
+    if (!data || selected.length < MIN_COMPARE) return;
     if (isAuthed === false) {
       router.push(`/signup?next=${encodeURIComponent(window.location.pathname)}`);
       return;
@@ -131,11 +138,15 @@ export function ExploreClient({
         ))}
       </div>
 
-      {selected.length >= 2 && (
+      {selected.length >= 1 && (
         <div className="fixed bottom-16 left-0 right-0 z-40 flex justify-center px-5 md:bottom-6">
           <div className="flex items-center gap-4 rounded-full border border-accent-sky bg-bg-surface px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
-            <span className="text-[13px] font-medium">{selected.length} selected</span>
-            <Button size="md" onClick={goCompare}>
+            <span className="text-[13px] font-medium">
+              {selected.length < MIN_COMPARE
+                ? `Select ${MIN_COMPARE - selected.length} more to compare`
+                : `${selected.length} selected${selected.length >= MAX_COMPARE ? ` (max ${MAX_COMPARE})` : ""}`}
+            </span>
+            <Button size="md" onClick={goCompare} disabled={selected.length < MIN_COMPARE}>
               Compare
             </Button>
           </div>

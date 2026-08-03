@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -11,7 +12,9 @@ export default async function ChatPage() {
   return (
     <div className="flex flex-1 flex-col px-5 pt-6 md:px-10">
       <Header />
-      <ChatClient />
+      <Suspense fallback={null}>
+        <ChatClient />
+      </Suspense>
       <BottomTabBar />
     </div>
   );

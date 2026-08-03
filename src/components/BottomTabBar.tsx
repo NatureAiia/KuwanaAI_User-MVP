@@ -26,7 +26,14 @@ export function BottomTabBar() {
                   active ? "text-accent-sky" : "text-text-muted",
                 )}
               >
-                <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+                <span
+                  className={clsx(
+                    "flex items-center justify-center rounded-full px-3.5 py-1 transition-colors",
+                    active && "bg-accent-sky/15",
+                  )}
+                >
+                  <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+                </span>
                 {label}
               </Link>
             </li>

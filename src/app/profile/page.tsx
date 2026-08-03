@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Award, Bookmark, Settings, Trophy } from "lucide-react";
+import { Flame, Award, Bookmark, ChevronRight, Settings, Trophy } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { SignalBloom } from "@/components/SignalBloom";
@@ -11,11 +11,12 @@ export default async function ProfilePage() {
   const user = await requireUser();
   if (!user) return null;
 
-  const [profile, xp, streak, badges] = await Promise.all([
+  const [profile, xp, streak, badges, savedCount] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
     prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
     prisma.userBadge.findMany({ where: { userId: user.id }, include: { badge: true } }),
+    prisma.savedListing.count({ where: { userId: user.id } }),
   ]);
 
   const totalXp = xp?.totalXp ?? 0;
@@ -66,31 +67,46 @@ export default async function ProfilePage() {
       <div className="mt-6 space-y-2.5">
         <Link
           href="/profile/quests"
-          className="tap-target flex items-center gap-3 rounded-xl border border-border bg-bg-surface px-4"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
         >
-          <Trophy size={18} className="text-accent-teal" />
-          <span className="text-[14px] font-medium">Quests</span>
+          <div className="flex items-center gap-3">
+            <Trophy size={18} className="text-accent-teal" />
+            <span className="text-[14px] font-medium">Quests</span>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
         </Link>
         <Link
           href="/profile/saved"
-          className="tap-target flex items-center gap-3 rounded-xl border border-border bg-bg-surface px-4"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
         >
-          <Bookmark size={18} className="text-accent-teal" />
-          <span className="text-[14px] font-medium">Saved & comparison history</span>
+          <div className="flex items-center gap-3">
+            <Bookmark size={18} className="text-accent-teal" />
+            <div>
+              <p className="text-[14px] font-medium">Saved & comparison history</p>
+              <p className="text-[12px] text-text-muted">{savedCount} saved</p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
         </Link>
         <Link
           href="/leaderboard"
-          className="tap-target flex items-center gap-3 rounded-xl border border-border bg-bg-surface px-4"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
         >
-          <Trophy size={18} className="text-accent-sky" />
-          <span className="text-[14px] font-medium">Leaderboard</span>
+          <div className="flex items-center gap-3">
+            <Trophy size={18} className="text-accent-sky" />
+            <span className="text-[14px] font-medium">Leaderboard</span>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
         </Link>
         <Link
           href="/settings"
-          className="tap-target flex items-center gap-3 rounded-xl border border-border bg-bg-surface px-4"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
         >
-          <Settings size={18} className="text-text-secondary" />
-          <span className="text-[14px] font-medium">Settings</span>
+          <div className="flex items-center gap-3">
+            <Settings size={18} className="text-text-secondary" />
+            <span className="text-[14px] font-medium">Settings</span>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
         </Link>
       </div>
 

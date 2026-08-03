@@ -24,6 +24,23 @@ const postSchema = z.object({
   listingIds: z.array(z.string()).max(6).optional(),
 });
 
+async function listingSummaries(listingIds: string[]) {
+  if (listingIds.length === 0) return [];
+  const listings = await prisma.listing.findMany({
+    where: { id: { in: listingIds } },
+    include: { provider: true, category: { include: { sector: true } } },
+  });
+  return listings.map((l) => ({
+    id: l.id,
+    name: l.name,
+    price: Number(l.price),
+    currency: l.currency,
+    provider: l.provider.name,
+    categoryId: l.categoryId,
+    sectorSlug: l.category.sector.slug,
+  }));
+}
+
 export async function GET() {
   const user = await requireUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -34,6 +51,10 @@ export async function GET() {
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
 
+  const distinctListingIds = [...new Set(conversation?.messages.flatMap((m) => m.listingIds) ?? [])];
+  const summaries = await listingSummaries(distinctListingIds);
+  const summaryById = new Map(summaries.map((s) => [s.id, s]));
+
   return NextResponse.json({
     conversationId: conversation?.id ?? null,
     messages:
@@ -42,6 +63,7 @@ export async function GET() {
         role: m.role,
         content: m.content,
         createdAt: m.createdAt.toISOString(),
+        listings: m.listingIds.map((id) => summaryById.get(id)).filter((s) => !!s),
       })) ?? [],
   });
 }
@@ -151,6 +173,8 @@ export async function POST(req: Request) {
     return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
   });
 
+  const listings = await listingSummaries(listingIds ?? []);
+
   return NextResponse.json({
     conversationId,
     message: {
@@ -158,6 +182,7 @@ export async function POST(req: Request) {
       role: "assistant",
       content: assistantMessage.content,
       createdAt: assistantMessage.createdAt.toISOString(),
+      listings,
     },
     gamification,
   });

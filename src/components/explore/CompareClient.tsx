@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Bookmark, BookmarkCheck, MessageCircle, Sparkles } from "lucide-react";
+import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
+import { ProviderLogo } from "@/components/ProviderLogo";
 import { SignalBloom } from "@/components/SignalBloom";
 import { computeDecisionScores } from "@/lib/scoring";
 import { notifyGamification } from "@/lib/gamification/client";
@@ -98,7 +99,25 @@ export function CompareClient({
 
   return (
     <div className="mt-4">
-      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
+      <div className="flex flex-wrap items-center gap-2">
+        {listings.map((l) => (
+          <span
+            key={l.id}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-bg-surface py-1 pl-1.5 pr-3 text-[12px] font-medium"
+          >
+            <ProviderLogo name={l.provider.name} logoUrl={l.provider.logoUrl} size={18} />
+            {l.name}
+          </span>
+        ))}
+        <Link
+          href={`/explore/${sectorSlug}`}
+          className="tap-target text-[12px] font-semibold text-accent-sky hover:underline"
+        >
+          Change selection
+        </Link>
+      </div>
+
+      <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[560px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border bg-bg-surface-raised">
@@ -193,11 +212,33 @@ export function CompareClient({
       </div>
 
       <div className="mt-5">
-        {!recommendation && (
-          <Button onClick={getRecommendation} disabled={loadingRecommendation} size="lg">
-            <Sparkles size={16} />
-            {loadingRecommendation ? "Thinking…" : "Get AI recommendation"}
-          </Button>
+        {!recommendation && !loadingRecommendation && (
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={getRecommendation} size="lg">
+              <Sparkles size={16} />
+              Get AI recommendation
+            </Button>
+            <LinkButton
+              variant="secondary"
+              size="lg"
+              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+            >
+              <MessageCircle size={16} />
+              Ask in chat
+            </LinkButton>
+          </div>
+        )}
+
+        {loadingRecommendation && (
+          <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
+            <div className="h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-accent-sky border-t-transparent" />
+            <div>
+              <p className="font-display text-[14px] font-semibold">Comparing decision scores…</p>
+              <p className="text-[12px] text-text-muted">
+                Weighing price, fit, freshness, and trend across {listings.length} listings
+              </p>
+            </div>
+          </div>
         )}
 
         {recommendation && (
@@ -230,6 +271,13 @@ export function CompareClient({
             <p className="mt-3 text-[11px] text-text-muted">
               AI-assisted recommendation based on the decision score and price trend above. Not financial advice.
             </p>
+            <Link
+              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+              className="tap-target mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-sky hover:underline"
+            >
+              <MessageCircle size={14} />
+              Ask a follow-up in chat
+            </Link>
           </div>
         )}
       </div>
