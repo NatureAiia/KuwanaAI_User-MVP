@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
 export default function ExploreHubPage() {
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
-      <h1 className="font-display text-[24px] font-bold">Explore</h1>
+      <Header />
+      <h1 className="mt-4 font-display text-[24px] font-bold">Explore</h1>
       <p className="mt-1 text-[13px] text-text-secondary">Pick a sector to browse and compare.</p>
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -1,7 +1,15 @@
-import { Smartphone, Landmark, ShieldCheck, GraduationCap, HeartPulse } from "lucide-react";
+import { Smartphone, Landmark, ShieldCheck, GraduationCap, HeartPulse, Car, Zap, Pill } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type SectorSlug = "telecom" | "banking" | "insurance" | "education" | "healthcare";
+export type SectorSlug =
+  | "telecom"
+  | "banking"
+  | "insurance"
+  | "education"
+  | "healthcare"
+  | "transport"
+  | "utilities"
+  | "pharmacy";
 
 export const SECTORS: Record<
   SectorSlug,
@@ -42,6 +50,35 @@ export const SECTORS: Record<
     status: "coming_soon",
     blurb: "Coming soon",
   },
+  transport: {
+    name: "Transport",
+    slug: "transport",
+    icon: Car,
+    status: "live",
+    blurb: "Ride & kombi fares",
+  },
+  utilities: {
+    name: "Utilities",
+    slug: "utilities",
+    icon: Zap,
+    status: "live",
+    blurb: "Prepaid token fees",
+  },
+  pharmacy: {
+    name: "Pharmacy",
+    slug: "pharmacy",
+    icon: Pill,
+    status: "live",
+    blurb: "Health essentials",
+  },
 };
 
-export const LIVE_SECTORS: SectorSlug[] = ["telecom", "banking", "insurance", "education"];
+export const LIVE_SECTORS: SectorSlug[] = [
+  "telecom",
+  "banking",
+  "insurance",
+  "education",
+  "transport",
+  "utilities",
+  "pharmacy",
+];

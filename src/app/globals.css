@@ -8,15 +8,16 @@
 /* ---------------------------------------------------------------------- */
 
 :root {
-  --bg-base: #fbf7f0;
+  --bg-base: #f8fafc;
   --bg-surface: #ffffff;
   --bg-surface-raised: #ffffff;
-  --border: #e7e0d4;
-  --accent-gold: #c9860b;
+  --border: #334155;
+  --accent-primary: #1e3a8a;
+  --accent-gold: #fbbf24;
   --accent-teal: #0f8a7a;
   --accent-coral: #d14a3a;
   --text-primary: #14181d;
-  --text-secondary: #4b5563;
+  --text-secondary: #334155;
   --text-muted: #6b7280;
 
   --radius-card: 20px;
@@ -27,11 +28,12 @@
 }
 
 .dark {
-  --bg-base: #0b0f14;
+  --bg-base: #0f172a;
   --bg-surface: #131a22;
   --bg-surface-raised: #1a222c;
-  --border: #232c37;
-  --accent-gold: #f2b134;
+  --border: #334155;
+  --accent-primary: #1e3a8a;
+  --accent-gold: #fbbf24;
   --accent-teal: #2dd4bf;
   --accent-coral: #e1553d;
   --text-primary: #f5f3ee;
@@ -44,6 +46,7 @@
   --color-bg-surface: var(--bg-surface);
   --color-bg-surface-raised: var(--bg-surface-raised);
   --color-border: var(--border);
+  --color-accent-primary: var(--accent-primary);
   --color-accent-gold: var(--accent-gold);
   --color-accent-teal: var(--accent-teal);
   --color-accent-coral: var(--accent-coral);

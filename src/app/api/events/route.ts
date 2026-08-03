@@ -14,7 +14,9 @@ const bodySchema = z.object({
     "action_taken",
     "daily_visit",
   ]),
-  sector: z.enum(["telecom", "banking", "insurance", "education", "healthcare"]).optional(),
+  sector: z
+    .enum(["telecom", "banking", "insurance", "education", "healthcare", "transport", "utilities", "pharmacy"])
+    .optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

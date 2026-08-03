@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { SignalBloom } from "@/components/SignalBloom";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { XP_PER_LEVEL, xpIntoLevel } from "@/lib/gamification/rules";
 
 export default async function ProfilePage() {
@@ -21,7 +22,8 @@ export default async function ProfilePage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
-      <h1 className="font-display text-[24px] font-bold">
+      <Header />
+      <h1 className="mt-4 font-display text-[24px] font-bold">
         {profile?.fullName ?? "Your profile"}
       </h1>
       <p className="text-[13px] text-text-secondary">{user.email}</p>

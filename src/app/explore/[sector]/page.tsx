@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { ExploreClient } from "@/components/explore/ExploreClient";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
@@ -20,7 +21,8 @@ export default async function ExploreSectorPage({
 
   return (
     <div className="flex flex-1 flex-col px-5 pt-5 md:px-10">
-      <h1 className="font-display text-[24px] font-bold">{meta.name}</h1>
+      <Header />
+      <h1 className="mt-4 font-display text-[24px] font-bold">{meta.name}</h1>
       <p className="mt-1 text-[13px] text-text-secondary">{meta.blurb}</p>
 
       {categories.length === 0 ? (

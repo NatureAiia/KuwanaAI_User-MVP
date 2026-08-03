@@ -3,6 +3,31 @@ import { BADGE_DEFS } from "../src/lib/gamification/rules";
 
 const prisma = new PrismaClient();
 
+// Deterministic PRNG so re-seeding produces the same synthetic history every time.
+function seededRandom(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return function next() {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    return h / 4294967296;
+  };
+}
+
+// Synthetic 90-day price history ending exactly at the listing's current price,
+// so listing/compare pages have a real trend to compute and display.
+function buildPriceHistory(currentPrice: number, seedKey: string) {
+  const rand = seededRandom(seedKey);
+  const daysAgo = [90, 60, 45, 30, 15, 7, 2];
+  const now = new Date("2026-08-03T00:00:00.000Z").getTime();
+  let price = currentPrice * (0.85 + rand() * 0.3);
+  const points = daysAgo.map((d) => {
+    price = price * (1 + (rand() - 0.5) * 0.08);
+    return { price: Math.round(price * 100) / 100, recordedAt: new Date(now - d * 86_400_000) };
+  });
+  points.push({ price: currentPrice, recordedAt: new Date(now) });
+  return points;
+}
+
 const XP_RULES: Record<string, number> = {
   profile_completed: 50,
   comparison_viewed: 2,
@@ -224,6 +249,74 @@ const SECTORS: SectorSeed[] = [
     ],
   },
   { slug: "healthcare", name: "Healthcare", status: "coming_soon", categories: [] },
+  {
+    slug: "transport",
+    name: "Transport",
+    status: "live",
+    categories: [
+      {
+        slug: "ride-fares",
+        name: "Ride fares",
+        attributes: [
+          { key: "fare_estimate", label: "Fare estimate", dataType: "number", unit: "USD" },
+          { key: "wait_time", label: "Wait time", dataType: "number", unit: "min" },
+          { key: "vehicle_type", label: "Vehicle type", dataType: "enum" },
+          { key: "safety_rating", label: "Safety rating", dataType: "number", unit: "/5" },
+        ],
+        providers: ["Vaya", "inDrive", "Hwindi"],
+        listings: [
+          { name: "Vaya Standard (5km, CBD)", provider: "Vaya", price: 3.5, attrs: { fare_estimate: 3.5, wait_time: 6, vehicle_type: "Sedan", safety_rating: 4.5 } },
+          { name: "Vaya Comfort (5km, CBD)", provider: "Vaya", price: 5, attrs: { fare_estimate: 5, wait_time: 8, vehicle_type: "SUV", safety_rating: 4.7 } },
+          { name: "inDrive Negotiated (5km, CBD)", provider: "inDrive", price: 2.8, attrs: { fare_estimate: 2.8, wait_time: 10, vehicle_type: "Sedan", safety_rating: 4.1 } },
+          { name: "Hwindi Kombi Seat (5km, CBD)", provider: "Hwindi", price: 1, attrs: { fare_estimate: 1, wait_time: 12, vehicle_type: "Kombi", safety_rating: 3.6 } },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "utilities",
+    name: "Utilities",
+    status: "live",
+    categories: [
+      {
+        slug: "prepaid-tokens",
+        name: "Prepaid tokens",
+        attributes: [
+          { key: "fee_per_transaction", label: "Fee per transaction", dataType: "number", unit: "USD" },
+          { key: "processing_time", label: "Processing time", dataType: "number", unit: "min" },
+          { key: "channel", label: "Channel", dataType: "enum" },
+        ],
+        providers: ["ZESA ZETDC", "EcoCash", "OneMoney"],
+        listings: [
+          { name: "ZESA Token via ZETDC USSD", provider: "ZESA ZETDC", price: 0.5, attrs: { fee_per_transaction: 0.5, processing_time: 2, channel: "USSD" } },
+          { name: "ZESA Token via EcoCash", provider: "EcoCash", price: 0.3, attrs: { fee_per_transaction: 0.3, processing_time: 1, channel: "App" } },
+          { name: "ZESA Token via OneMoney Agent", provider: "OneMoney", price: 1, attrs: { fee_per_transaction: 1, processing_time: 5, channel: "Agent" } },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "pharmacy",
+    name: "Pharmacy",
+    status: "live",
+    categories: [
+      {
+        slug: "otc-essentials",
+        name: "OTC & health essentials",
+        attributes: [
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "stock_status", label: "Stock status", dataType: "enum" },
+        ],
+        providers: ["TM Pharmacy", "Greens Pharmacy", "Clicks"],
+        listings: [
+          { name: "Paracetamol 500mg (20 tabs)", provider: "TM Pharmacy", price: 1.5, attrs: { pack_size: "20 tabs", stock_status: "In stock" } },
+          { name: "Paracetamol 500mg (20 tabs)", provider: "Greens Pharmacy", price: 1.8, attrs: { pack_size: "20 tabs", stock_status: "In stock" } },
+          { name: "Oral Rehydration Salts (1 sachet)", provider: "Clicks", price: 0.6, attrs: { pack_size: "1 sachet", stock_status: "In stock" } },
+          { name: "Multivitamin (30 tabs)", provider: "TM Pharmacy", price: 4.5, attrs: { pack_size: "30 tabs", stock_status: "Low stock" } },
+        ],
+      },
+    ],
+  },
 ];
 
 async function main() {
@@ -282,11 +375,15 @@ async function main() {
           freshnessStatus: "fresh" as const,
           lastVerifiedAt: new Date(),
         };
-        if (existing) {
-          await prisma.listing.update({ where: { id: existing.id }, data });
-        } else {
-          await prisma.listing.create({ data });
-        }
+        const listingRecord = existing
+          ? await prisma.listing.update({ where: { id: existing.id }, data })
+          : await prisma.listing.create({ data });
+
+        await prisma.listingPriceHistory.deleteMany({ where: { listingId: listingRecord.id } });
+        const history = buildPriceHistory(listing.price, `${category.slug}-${listing.provider}-${listing.name}`);
+        await prisma.listingPriceHistory.createMany({
+          data: history.map((h) => ({ listingId: listingRecord.id, price: h.price, recordedAt: h.recordedAt })),
+        });
       }
     }
   }

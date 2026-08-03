@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getListingsByIds } from "@/lib/catalog";
+import { getListingsByIds, getListingPriceTrends } from "@/lib/catalog";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { CompareClient } from "@/components/explore/CompareClient";
 import type { AttributeSchemaFieldDTO } from "@/types/catalog";
 
@@ -29,6 +30,8 @@ export default async function ComparePage({
   const listings = await getListingsByIds(listingIds);
   if (listings.length < 2) notFound();
 
+  const trends = await getListingPriceTrends(listingIds);
+
   const attributeSchema: AttributeSchemaFieldDTO[] = category.attributeSchema.map((a) => ({
     key: a.key,
     label: a.label,
@@ -40,13 +43,15 @@ export default async function ComparePage({
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
-      <h1 className="font-display text-[22px] font-bold">Compare {category.name}</h1>
+      <Header />
+      <h1 className="mt-4 font-display text-[22px] font-bold">Compare {category.name}</h1>
       <CompareClient
         sectorSlug={sector}
         categoryId={categoryId}
         categoryName={category.name}
         listings={listings}
         attributeSchema={attributeSchema}
+        trends={trends}
       />
       <BottomTabBar />
     </div>

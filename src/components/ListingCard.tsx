@@ -4,6 +4,7 @@ import Link from "next/link";
 import { clsx } from "clsx";
 import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
+import { ProviderLogo } from "@/components/ProviderLogo";
 import { Badge } from "@/components/ui/Card";
 import type { ListingDTO } from "@/types/catalog";
 
@@ -47,12 +48,15 @@ export function ListingCard({
       </button>
 
       <div className="flex items-start justify-between gap-3 pr-8">
-        <div>
-          <p className="font-display text-[15px] font-semibold leading-tight">{listing.name}</p>
-          <p className="mt-1 flex items-center gap-1 text-[12px] text-text-muted">
-            {listing.provider.verified && <ShieldCheck size={12} className="text-accent-teal" />}
-            {listing.provider.name}
-          </p>
+        <div className="flex items-start gap-2.5">
+          <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={32} />
+          <div>
+            <p className="font-display text-[15px] font-semibold leading-tight">{listing.name}</p>
+            <p className="mt-1 flex items-center gap-1 text-[12px] text-text-muted">
+              {listing.provider.verified && <ShieldCheck size={12} className="text-accent-teal" />}
+              {listing.provider.name}
+            </p>
+          </div>
         </div>
       </div>
 

@@ -48,18 +48,20 @@ model User {
   badges          UserBadge[]
   questProgress   UserQuestProgress[]
   streak          UserStreak?
+  notifications   Notification[]
 
   @@map("users")
 }
 
 model UserProfile {
-  userId     String  @id @map("user_id")
-  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  ageRange   String? @map("age_range")
-  occupation String?
-  location   String?
-  fullName   String? @map("full_name")
-  nickname   String?
+  userId          String   @id @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRange        String?  @map("age_range")
+  occupation      String?
+  location        String?
+  fullName        String?  @map("full_name")
+  nickname        String?
+  socialPlatforms String[] @default([]) @map("social_platforms")
 
   @@map("user_profiles")
 }
@@ -70,6 +72,9 @@ enum Sector {
   insurance
   education
   healthcare
+  transport
+  utilities
+  pharmacy
 }
 
 model SectorFootprint {
@@ -186,6 +191,7 @@ model Listing {
   priceHistory    ListingPriceHistory[]
   savedBy         SavedListing[]
   recommendations Recommendation[]
+  notifications   Notification[]
 
   @@map("listings")
 }
@@ -238,6 +244,26 @@ model Recommendation {
   generatedAt DateTime @default(now()) @map("generated_at")
 
   @@map("recommendations")
+}
+
+enum NotificationType {
+  price_drop
+}
+
+model Notification {
+  id            String           @id @default(uuid())
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId     String           @map("listing_id")
+  listing       Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  type          NotificationType @default(price_drop)
+  message       String
+  changePercent Float            @map("change_percent")
+  read          Boolean          @default(false)
+  createdAt     DateTime         @default(now()) @map("created_at")
+
+  @@unique([userId, listingId, type])
+  @@map("notifications")
 }
 
 // ---------------------------------------------------------------------------

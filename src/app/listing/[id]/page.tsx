@@ -1,10 +1,16 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getListingPriceTrends } from "@/lib/catalog";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { Badge } from "@/components/ui/Card";
+import { ProviderLogo } from "@/components/ProviderLogo";
 import { ListingActions } from "@/components/ListingActions";
+import { PriceSparkline } from "@/components/PriceSparkline";
 
 const FRESHNESS_TONE = { fresh: "teal", stale: "gold", unverified: "coral" } as const;
+const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
+const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,14 +25,20 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   if (!listing) notFound();
 
   const attributes = listing.attributes as Record<string, unknown>;
+  const trends = await getListingPriceTrends([listing.id]);
+  const trend = trends[listing.id];
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
-      <p className="text-[12px] uppercase tracking-widest text-text-muted">
+      <Header />
+      <p className="mt-4 text-[12px] uppercase tracking-widest text-text-muted">
         {listing.category.sector.name} · {listing.category.name}
       </p>
       <h1 className="mt-1 font-display text-[24px] font-bold">{listing.name}</h1>
-      <p className="mt-1 text-[14px] text-text-secondary">{listing.provider.name}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={22} />
+        <p className="text-[14px] text-text-secondary">{listing.provider.name}</p>
+      </div>
 
       <div className="mt-4 flex items-center gap-3">
         <p className="font-mono text-[28px] font-semibold">
@@ -37,6 +49,22 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       <p className="mt-1 text-[11px] text-text-muted">
         Last verified {listing.lastVerifiedAt.toLocaleDateString()}
       </p>
+
+      {trend && (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4">
+          <div>
+            <Badge tone={TREND_TONE[trend.direction]}>
+              {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}% / {trend.periodDays}d
+            </Badge>
+            <p className="mt-2 text-[11px] text-text-muted">
+              {trend.direction === "down" && "Price has been trending down."}
+              {trend.direction === "up" && "Price has been trending up."}
+              {trend.direction === "flat" && "Price has been stable."}
+            </p>
+          </div>
+          <PriceSparkline points={trend.points} direction={trend.direction} />
+        </div>
+      )}
 
       <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
         <h2 className="font-display text-[15px] font-semibold">Specifications</h2>

@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Card";
 import { SignalBloom } from "@/components/SignalBloom";
-import { computeValueScores } from "@/lib/scoring";
+import { computeDecisionScores } from "@/lib/scoring";
 import { notifyGamification } from "@/lib/gamification/client";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
+import type { PriceTrend } from "@/lib/priceTrend";
+
+const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
+const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null) {
   if (value === undefined || value === null) return "—";
@@ -22,12 +27,14 @@ export function CompareClient({
   categoryName,
   listings,
   attributeSchema,
+  trends,
 }: {
   sectorSlug: string;
   categoryId: string;
   categoryName: string;
   listings: ListingDTO[];
   attributeSchema: AttributeSchemaFieldDTO[];
+  trends: Record<string, PriceTrend | null>;
 }) {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [recommendation, setRecommendation] = useState<{
@@ -38,7 +45,7 @@ export function CompareClient({
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
   const loggedComparison = useRef(false);
 
-  const scores = computeValueScores(listings, attributeSchema);
+  const scores = computeDecisionScores(listings, attributeSchema, trends);
 
   useEffect(() => {
     if (loggedComparison.current) return;
@@ -127,12 +134,45 @@ export function CompareClient({
               ))}
             </tr>
             <tr className="border-b border-border">
-              <td className="p-3 font-medium text-text-secondary">Value score</td>
-              {listings.map((l) => (
-                <td key={l.id} className="p-3">
-                  <SignalBloom value={scores[l.id] ?? 0} size={44} />
-                </td>
-              ))}
+              <td className="p-3 font-medium text-text-secondary">Price trend</td>
+              {listings.map((l) => {
+                const trend = trends[l.id];
+                if (!trend) {
+                  return (
+                    <td key={l.id} className="p-3 text-text-muted">
+                      —
+                    </td>
+                  );
+                }
+                return (
+                  <td key={l.id} className="p-3">
+                    <Badge tone={TREND_TONE[trend.direction]}>
+                      {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}% / {trend.periodDays}d
+                    </Badge>
+                  </td>
+                );
+              })}
+            </tr>
+            <tr className="border-b border-border">
+              <td className="p-3 font-medium text-text-secondary">Decision score</td>
+              {listings.map((l) => {
+                const breakdown = scores[l.id];
+                return (
+                  <td key={l.id} className="p-3">
+                    <SignalBloom value={breakdown?.total ?? 0} size={44} />
+                    <p className="mt-1 text-[10px] leading-tight text-text-muted">
+                      Price {breakdown?.priceScore ?? 0}
+                      {breakdown?.benefitScore !== null && breakdown?.benefitScore !== undefined
+                        ? ` · Fit ${breakdown.benefitScore}`
+                        : ""}
+                      {breakdown?.freshnessAdjustment ? ` · Fresh ${breakdown.freshnessAdjustment}` : ""}
+                      {breakdown?.trendAdjustment
+                        ? ` · Trend ${breakdown.trendAdjustment > 0 ? "+" : ""}${breakdown.trendAdjustment}`
+                        : ""}
+                    </p>
+                  </td>
+                );
+              })}
             </tr>
             {attributeSchema
               .filter((a) => a.isComparable)
@@ -167,8 +207,25 @@ export function CompareClient({
             <p className="mt-3 text-[14px] leading-[1.6] text-text-secondary">
               {recommendation.explanation}
             </p>
+            {(() => {
+              const breakdown = scores[recommendation.listingId];
+              const trend = trends[recommendation.listingId];
+              if (!breakdown) return null;
+              return (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Badge tone="gold">Decision score {breakdown.total}</Badge>
+                  <Badge tone="neutral">Price {breakdown.priceScore}</Badge>
+                  {breakdown.benefitScore !== null && <Badge tone="neutral">Fit {breakdown.benefitScore}</Badge>}
+                  {trend && (
+                    <Badge tone={TREND_TONE[trend.direction]}>
+                      {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}% / {trend.periodDays}d
+                    </Badge>
+                  )}
+                </div>
+              );
+            })()}
             <p className="mt-3 text-[11px] text-text-muted">
-              AI-assisted recommendation based on the listings above. Not financial advice.
+              AI-assisted recommendation based on the decision score and price trend above. Not financial advice.
             </p>
           </div>
         )}

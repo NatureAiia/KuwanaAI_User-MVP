@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTopListings } from "@/lib/catalog";
+import { getTopListings, getPersonalizedSpecials } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
@@ -12,7 +13,7 @@ export default async function DashboardPage() {
   const user = await requireUser();
   if (!user) return null;
 
-  const [profile, xp, streak, activeQuest, telecomHero, bankingHero] = await Promise.all([
+  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
     prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
@@ -22,6 +23,7 @@ export default async function DashboardPage() {
     }),
     getTopListings("telecom", "data-bundles", 4),
     getTopListings("banking", "savings-accounts", 4),
+    getPersonalizedSpecials(user.id, 4),
   ]);
 
   const firstName = profile?.fullName?.split(" ")[0];
@@ -29,8 +31,9 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <DailyVisitPing />
+      <Header />
 
-      <div className="flex items-center justify-between">
+      <div className="mt-4 flex items-center justify-between">
         <div>
           <p className="text-[13px] text-text-secondary">Welcome back{firstName ? "," : ""}</p>
           <h1 className="font-display text-[24px] font-bold">{firstName ?? "there"}</h1>
@@ -47,16 +50,29 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6 space-y-6">
-        <HeroCarousel
-          title="Best value data bundles this week"
-          sectorSlug="telecom"
-          listings={telecomHero.listings}
-        />
-        <HeroCarousel
-          title="Savings accounts with the lowest fees"
-          sectorSlug="banking"
-          listings={bankingHero.listings}
-        />
+        {specials.length > 0 ? (
+          specials.map((s) => (
+            <HeroCarousel
+              key={s.categorySlug}
+              title={`Specials for you: ${s.categoryName}`}
+              sectorSlug={s.sectorSlug}
+              listings={s.listings}
+            />
+          ))
+        ) : (
+          <>
+            <HeroCarousel
+              title="Best value data bundles this week"
+              sectorSlug="telecom"
+              listings={telecomHero.listings}
+            />
+            <HeroCarousel
+              title="Savings accounts with the lowest fees"
+              sectorSlug="banking"
+              listings={bankingHero.listings}
+            />
+          </>
+        )}
       </div>
 
       <section className="mt-8">

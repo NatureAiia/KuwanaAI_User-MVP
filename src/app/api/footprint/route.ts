@@ -5,7 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 
 const bodySchema = z.object({
-  sector: z.enum(["banking", "insurance", "education"]),
+  sector: z.enum([
+    "telecom",
+    "banking",
+    "insurance",
+    "education",
+    "healthcare",
+    "transport",
+    "utilities",
+    "pharmacy",
+  ]),
   data: z.record(z.string(), z.unknown()),
 });
 

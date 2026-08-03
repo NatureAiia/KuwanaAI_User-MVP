@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
-import { computeValueScores } from "@/lib/scoring";
+import { computeDecisionScores } from "@/lib/scoring";
+import { getListingPriceTrends } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { Sector } from "@prisma/client";
@@ -71,16 +72,24 @@ export async function POST(req: Request) {
     isComparable: a.isComparable,
     sortOrder: a.sortOrder,
   }));
-  const scores = computeValueScores(listingDTOs, attributeSchema);
+  const trends = await getListingPriceTrends(listingIds);
+  const scores = computeDecisionScores(listingDTOs, attributeSchema, trends);
 
-  const dataForModel = listingDTOs.map((l) => ({
-    name: l.name,
-    provider: l.provider.name,
-    price: l.price,
-    currency: l.currency,
-    attributes: l.attributes,
-    value_score: scores[l.id],
-  }));
+  const dataForModel = listingDTOs.map((l) => {
+    const trend = trends[l.id];
+    return {
+      name: l.name,
+      provider: l.provider.name,
+      price: l.price,
+      currency: l.currency,
+      attributes: l.attributes,
+      freshness: l.freshnessStatus,
+      decision_score: scores[l.id],
+      price_trend: trend
+        ? { direction: trend.direction, change_percent: trend.changePercent, period_days: trend.periodDays }
+        : null,
+    };
+  });
 
   const message = await anthropic.messages.create({
     model: RECOMMENDATION_MODEL,
@@ -92,8 +101,12 @@ export async function POST(req: Request) {
     system:
       "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
       "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
-      "overall fit for value and needs. Only reference data present in the listings provided; never " +
-      "invent statistics. Always make clear this is an AI-assisted recommendation.",
+      "overall fit for value and needs. Each listing includes a decision_score breakdown " +
+      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, total) and a price_trend " +
+      "— use these as your primary evidence, and reference them concretely in your explanation " +
+      "(e.g. its price trend or freshness) rather than restating the raw price. Only reference data " +
+      "present in the listings provided; never invent statistics. Always make clear this is an " +
+      "AI-assisted recommendation.",
     messages: [
       {
         role: "user",

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
+import { Header } from "@/components/Header";
 import { SECTORS } from "@/lib/sectors";
 
 export default async function SavedPage() {
@@ -24,7 +25,8 @@ export default async function SavedPage() {
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
-      <h1 className="font-display text-[24px] font-bold">Saved & history</h1>
+      <Header />
+      <h1 className="mt-4 font-display text-[24px] font-bold">Saved & history</h1>
 
       <h2 className="mt-6 font-display text-[15px] font-semibold">Saved listings</h2>
       {saved.length === 0 ? (
