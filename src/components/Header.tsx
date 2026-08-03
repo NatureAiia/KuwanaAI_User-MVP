@@ -2,9 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, Moon, Sun } from "lucide-react";
+import { clsx } from "clsx";
+import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 
 export function Header() {
+  const pathname = usePathname();
   // Default matches layout.tsx's hardcoded `className="dark"` and its
   // pre-hydration theme-init script, whose default is also dark — this must
   // stay in sync with that SSR default, or this button's aria-label/icon
@@ -38,6 +42,26 @@ export function Header() {
   return (
     <header className="flex items-center justify-between">
       <span className="font-display text-[16px] font-bold text-accent-primary">Kuwana</span>
+
+      <nav aria-label="Primary" className="hidden items-center gap-6 md:flex">
+        {NAV_ITEMS.map(({ href, label }) => {
+          const active = isNavItemActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={clsx(
+                "text-[13px] font-medium",
+                active ? "text-accent-sky" : "text-text-secondary hover:text-text-primary",
+              )}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+
       <div className="flex items-center gap-2">
         <Link
           href="/notifications"
