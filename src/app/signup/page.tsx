@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Card";
 import { buildFactQueue } from "@/lib/onboarding-facts";
+import { Building2, Check, Landmark, User, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
   OCCUPATIONS,
@@ -22,6 +24,40 @@ import { clsx } from "clsx";
 
 type Role = "consumer" | "regulator" | "corporate";
 
+const ROLE_OPTIONS: {
+  id: Role;
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  bullet: string;
+  meta: string;
+}[] = [
+  {
+    id: "consumer",
+    icon: User,
+    title: "Consumer",
+    desc: "Track your personal data footprint across telecoms, banking, insurance & health providers.",
+    bullet: "For data subjects",
+    meta: "5-step profile",
+  },
+  {
+    id: "regulator",
+    icon: Landmark,
+    title: "Regulator",
+    desc: "POTRAZ, RBZ, IPEC and other oversight bodies — monitor compliance & complaints.",
+    bullet: "Public domain email required",
+    meta: "Verified access",
+  },
+  {
+    id: "corporate",
+    icon: Building2,
+    title: "Corporate",
+    desc: "Banks, telcos, insurers & hospitals — manage your compliance obligations.",
+    bullet: "Corporate domain required",
+    meta: "Team account",
+  },
+];
+
 const CONSUMER_STEPS = [
   "account",
   "personal",
@@ -32,7 +68,7 @@ const CONSUMER_STEPS = [
   "consent",
 ] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | "comingSoon" | ConsumerStep | "processing";
+type Step = "role" | ConsumerStep | "processing";
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -40,7 +76,7 @@ function ProgressBar({ step }: { step: ConsumerStep }) {
   return (
     <div className="h-1.5 w-full rounded-full bg-bg-surface-raised">
       <div
-        className="h-1.5 rounded-full bg-accent-gold transition-all duration-300"
+        className="h-1.5 rounded-full bg-accent-sky transition-all duration-300"
         style={{ width: `${Math.min(pct, 100)}%` }}
       />
     </div>
@@ -66,8 +102,8 @@ function ChipGroup({
           className={clsx(
             "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             value === opt
-              ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
-              : "border-border bg-bg-surface text-text-secondary hover:border-accent-gold/40",
+              ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
+              : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
           {opt}
@@ -96,8 +132,8 @@ function MultiChipGroup({
           className={clsx(
             "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             values.includes(opt)
-              ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
-              : "border-border bg-bg-surface text-text-secondary hover:border-accent-gold/40",
+              ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
+              : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
           {opt}
@@ -182,27 +218,30 @@ export default function SignupPage() {
       const bankSelected = bank && bank !== "I don't bank";
       const insuranceSelected = insurer && insurer !== "I don't have insurance";
 
+      const isConsumer = role === "consumer";
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          role: role ?? "consumer",
           fullName,
           ageRange,
           occupation,
           socialPlatforms,
-          telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
-          bankingFootprint: bankSelected
-            ? { bank_name: bank, account_types: accountTypes }
+          telecomFootprint: isConsumer
+            ? { primary_network: network, plan_type: planType, monthly_spend_range: spend }
             : undefined,
-          insuranceFootprint: {
-            provider: insurer,
-            policy_types: insuranceSelected ? policyTypes : [],
-            has_insurance: !!insuranceSelected,
-          },
-          healthcareFootprint: {
-            medical_aid_provider: medicalAid,
-            chronic_condition_disclosure_opt_in: chronicOptIn,
-          },
+          bankingFootprint: isConsumer && bankSelected ? { bank_name: bank, account_types: accountTypes } : undefined,
+          insuranceFootprint: isConsumer
+            ? {
+                provider: insurer,
+                policy_types: insuranceSelected ? policyTypes : [],
+                has_insurance: !!insuranceSelected,
+              }
+            : undefined,
+          healthcareFootprint: isConsumer
+            ? { medical_aid_provider: medicalAid, chronic_condition_disclosure_opt_in: chronicOptIn }
+            : undefined,
           consents: {
             research_use: researchConsent,
             leaderboard_participation: leaderboardConsent,
@@ -225,6 +264,7 @@ export default function SignupPage() {
     })();
   }, [
     step,
+    role,
     email,
     password,
     fullName,
@@ -279,7 +319,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex flex-1 items-center justify-center px-5 py-10">
-      <div className="w-full max-w-[460px]">
+      <div className={clsx("w-full", step === "role" ? "max-w-[820px]" : "max-w-[460px]")}>
         <span className="font-display text-xl font-bold">kuwana</span>
 
         {(CONSUMER_STEPS as readonly string[]).includes(step) && (
@@ -290,48 +330,61 @@ export default function SignupPage() {
 
         {step === "role" && (
           <div className="mt-8">
-            <h1 className="font-display text-[24px] font-bold">Get started with Kuwana</h1>
+            <h1 className="font-display text-[24px] font-bold">How will you use Kuwana?</h1>
             <p className="mt-2 text-[14px] text-text-secondary">
-              Choose the account type that fits you. You can always reach out to switch later.
+              This helps us personalize your experience and dashboard. You can change this later
+              in settings.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              {(
-                [
-                  { id: "consumer", label: "Consumer", blurb: "Compare & track your data footprint" },
-                  { id: "regulator", label: "Regulator", blurb: "Compliance oversight tools" },
-                  { id: "corporate", label: "Corporate", blurb: "Manage your data obligations" },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => {
-                    setRole(option.id);
-                    if (option.id === "consumer") go("account");
-                    else go("comingSoon");
-                  }}
-                  className="tap-target flex-1 min-w-[130px] rounded-xl border border-border bg-bg-surface p-4 text-left transition-all hover:border-accent-gold/40"
-                >
-                  <div className="text-[14px] font-semibold">{option.label}</div>
-                  <div className="mt-1 text-[12px] text-text-secondary">{option.blurb}</div>
-                </button>
-              ))}
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {ROLE_OPTIONS.map((option) => {
+                const selected = role === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setRole(option.id)}
+                    className={clsx(
+                      "tap-target relative rounded-[var(--radius-card)] border p-5 text-left transition-all",
+                      selected
+                        ? "border-accent-teal bg-accent-teal/[0.08] ring-1 ring-accent-teal/30"
+                        : "border-border bg-bg-surface hover:border-accent-teal/40 hover:shadow-sm",
+                    )}
+                  >
+                    {selected && (
+                      <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-accent-teal text-[#0b1512]">
+                        <Check size={14} strokeWidth={3} />
+                      </span>
+                    )}
+                    <div
+                      className={clsx(
+                        "flex h-10 w-10 items-center justify-center rounded-xl",
+                        selected ? "bg-accent-teal/15 text-accent-teal" : "bg-bg-surface-raised text-text-secondary",
+                      )}
+                    >
+                      <option.icon size={20} strokeWidth={1.75} />
+                    </div>
+                    <div className="mt-4 text-[15px] font-semibold">{option.title}</div>
+                    <p className="mt-1.5 text-[12px] leading-[1.6] text-text-secondary">
+                      {option.desc}
+                    </p>
+                    <Badge tone={selected ? "teal" : "neutral"} className="mt-4">
+                      {option.bullet}
+                    </Badge>
+                    <p className="mt-3 text-[11px] font-medium text-text-muted">{option.meta}</p>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-        )}
-
-        {step === "comingSoon" && (
-          <div className="mt-16 flex flex-col items-center text-center">
-            <h1 className="font-display text-[20px] font-bold">
-              {role === "regulator" ? "Regulator" : "Corporate"} onboarding is under development
-            </h1>
-            <p className="mt-3 max-w-[36ch] text-[13px] text-text-secondary">
-              We&apos;re still building this experience. For now, Kuwana&apos;s full comparison
-              journey is available to Consumer accounts.
-            </p>
-            <Button variant="secondary" onClick={back} className="mt-8">
-              Back to account type
-            </Button>
+            <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+              <span className="text-[12px] text-text-secondary">
+                {role
+                  ? `Selected: ${ROLE_OPTIONS.find((r) => r.id === role)?.title}`
+                  : "Select a role to continue"}
+              </span>
+              <Button onClick={() => go("account")} disabled={!role}>
+                Continue →
+              </Button>
+            </div>
           </div>
         )}
 
@@ -343,7 +396,7 @@ export default function SignupPage() {
               <input
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-gold"
+                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
             </label>
             <label className="block">
@@ -352,7 +405,7 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-gold"
+                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
             </label>
             <label className="block">
@@ -363,7 +416,7 @@ export default function SignupPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-gold"
+                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
             </label>
             <p className="text-[12px] text-text-muted">
@@ -375,7 +428,7 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go("personal")}
+                onClick={() => go(role === "consumer" ? "personal" : "consent")}
                 disabled={!canContinue("account")}
                 className="flex-1"
               >
@@ -601,7 +654,7 @@ export default function SignupPage() {
 
         {step === "processing" && (
           <div className="mt-16 flex flex-col items-center text-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent-gold border-t-transparent" />
+            <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent-sky border-t-transparent" />
             <h1 className="mt-6 font-display text-[20px] font-bold">Saving your profile…</h1>
             <p className="mt-3 max-w-[36ch] text-[13px] text-text-secondary">
               {factQueue[factIndex]}

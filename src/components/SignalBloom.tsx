@@ -4,7 +4,7 @@ type SignalBloomProps = {
   /** 0–100 */
   value: number;
   size?: number;
-  color?: "gold" | "teal";
+  color?: "sky" | "teal";
   segments?: number;
   strokeWidth?: number;
   label?: string;
@@ -13,14 +13,14 @@ type SignalBloomProps = {
 
 /**
  * The "Signal Bloom" — a segmented radial arc meter (Section 5.3).
- * Reused for value score (gold), XP progress (gold, larger), and AI
+ * Reused for value score (sky), XP progress (sky, larger), and AI
  * confidence (teal) so the same shape reinforces brand recognition
  * across telecom signal bars, gamification fill, and "gain" (Kuwana).
  */
 export function SignalBloom({
   value,
   size = 72,
-  color = "gold",
+  color = "sky",
   segments = 12,
   strokeWidth = 6,
   label,
@@ -33,7 +33,7 @@ export function SignalBloom({
   const dash = circumference / segments - gap;
   const filledSegments = Math.round((clamped / 100) * segments);
 
-  const accent = color === "teal" ? "var(--accent-teal)" : "var(--accent-gold)";
+  const accent = color === "teal" ? "var(--accent-teal)" : "var(--accent-sky)";
 
   return (
     <div

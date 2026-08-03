@@ -53,9 +53,9 @@ export default async function ProfilePage() {
             {badges.map((b) => (
               <div
                 key={b.badgeId}
-                className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-accent-gold/30 bg-accent-gold/5 p-4 text-center"
+                className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-accent-sky/30 bg-accent-sky/5 p-4 text-center"
               >
-                <Award size={24} className="text-accent-gold" />
+                <Award size={24} className="text-accent-sky" />
                 <span className="text-[12px] font-semibold">{b.badge.name}</span>
               </div>
             ))}
@@ -82,7 +82,7 @@ export default async function ProfilePage() {
           href="/leaderboard"
           className="tap-target flex items-center gap-3 rounded-xl border border-border bg-bg-surface px-4"
         >
-          <Trophy size={18} className="text-accent-gold" />
+          <Trophy size={18} className="text-accent-sky" />
           <span className="text-[14px] font-medium">Leaderboard</span>
         </Link>
         <Link

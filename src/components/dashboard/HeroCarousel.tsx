@@ -3,9 +3,7 @@ import { SignalBloom } from "@/components/SignalBloom";
 import { Badge } from "@/components/ui/Card";
 import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
-
-const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
-const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
+import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 
 export function HeroCarousel({
   title,

@@ -9,6 +9,7 @@ export const XP_RULES: Record<EventType, number> = {
   item_saved: 5,
   action_taken: 25,
   daily_visit: 5,
+  chat_started: 5,
 };
 
 export const XP_PER_LEVEL = 100;

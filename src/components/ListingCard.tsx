@@ -6,23 +6,21 @@ import { CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { Badge } from "@/components/ui/Card";
+import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 import type { ListingDTO } from "@/types/catalog";
-
-const FRESHNESS_TONE = {
-  fresh: "teal",
-  stale: "gold",
-  unverified: "coral",
-} as const;
+import type { PriceTrend } from "@/lib/priceTrend";
 
 export function ListingCard({
   listing,
   score,
+  trend,
   sectorSlug,
   selected,
   onToggleSelect,
 }: {
   listing: ListingDTO;
   score: number;
+  trend?: PriceTrend | null;
   sectorSlug: string;
   selected: boolean;
   onToggleSelect: (id: string) => void;
@@ -31,7 +29,7 @@ export function ListingCard({
     <div
       className={clsx(
         "relative flex flex-col rounded-[var(--radius-card)] border bg-bg-surface p-4 transition-all",
-        selected ? "border-accent-gold shadow-[0_0_0_1px_var(--accent-gold)]" : "border-border",
+        selected ? "border-accent-sky shadow-[0_0_0_1px_var(--accent-sky)]" : "border-border",
       )}
     >
       <button
@@ -41,7 +39,7 @@ export function ListingCard({
         aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
         className={clsx(
           "tap-target absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full border",
-          selected ? "border-accent-gold bg-accent-gold text-[#14181d]" : "border-border bg-bg-surface-raised",
+          selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface-raised",
         )}
       >
         {selected && <CheckCircle2 size={16} />}
@@ -68,13 +66,18 @@ export function ListingCard({
           <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]} className="mt-2">
             {listing.freshnessStatus}
           </Badge>
+          {trend && trend.direction !== "flat" && (
+            <Badge tone={TREND_TONE[trend.direction]} className="mt-2">
+              {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}%
+            </Badge>
+          )}
         </div>
         <SignalBloom value={score} size={56} />
       </div>
 
       <Link
         href={`/listing/${listing.id}?sector=${sectorSlug}`}
-        className="tap-target mt-4 flex items-center justify-center rounded-xl border border-border text-[13px] font-semibold text-text-secondary hover:border-accent-gold/50 hover:text-accent-gold"
+        className="tap-target mt-4 flex items-center justify-center rounded-xl border border-border text-[13px] font-semibold text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
       >
         View details
       </Link>

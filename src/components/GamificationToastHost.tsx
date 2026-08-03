@@ -34,12 +34,12 @@ export function GamificationToastHost() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className="flex items-center gap-2 rounded-full border border-accent-gold bg-bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-primary shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
+          className="flex items-center gap-2 rounded-full border border-accent-sky bg-bg-surface px-4 py-2.5 text-[13px] font-semibold text-text-primary shadow-[0_8px_30px_rgba(0,0,0,0.3)]"
         >
           {t.kind === "badge" ? (
-            <Award size={16} className="text-accent-gold" />
+            <Award size={16} className="text-accent-sky" />
           ) : (
-            <Sparkles size={16} className="text-accent-gold" />
+            <Sparkles size={16} className="text-accent-sky" />
           )}
           {t.text}
         </div>

@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, Trophy, CircleUser } from "lucide-react";
+import { Home, Compass, MessageCircle, Trophy, CircleUser } from "lucide-react";
 import { clsx } from "clsx";
 
 const TABS = [
   { href: "/dashboard", label: "Home", icon: Home },
   { href: "/explore", label: "Explore", icon: Compass },
+  { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/profile/quests", label: "Quests", icon: Trophy },
   { href: "/profile", label: "Profile", icon: CircleUser },
 ];
@@ -30,7 +31,7 @@ export function BottomTabBar() {
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "tap-target flex flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium",
-                  active ? "text-accent-gold" : "text-text-muted",
+                  active ? "text-accent-sky" : "text-text-muted",
                 )}
               >
                 <Icon size={22} strokeWidth={active ? 2.5 : 2} />

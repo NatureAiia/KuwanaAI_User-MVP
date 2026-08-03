@@ -10,9 +10,7 @@ import { computeDecisionScores } from "@/lib/scoring";
 import { notifyGamification } from "@/lib/gamification/client";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
-
-const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
-const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
+import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null) {
   if (value === undefined || value === null) return "—";
@@ -108,14 +106,17 @@ export function CompareClient({
               {listings.map((l) => (
                 <th key={l.id} className="p-3 text-left">
                   <div className="flex items-center justify-between gap-2">
-                    <Link href={`/listing/${l.id}?sector=${sectorSlug}`} className="hover:text-accent-gold">
+                    <Link href={`/listing/${l.id}?sector=${sectorSlug}`} className="hover:text-accent-sky">
                       <p className="font-display font-semibold">{l.name}</p>
-                      <p className="text-[11px] font-normal text-text-muted">{l.provider.name}</p>
+                      <p className="text-[11px] font-normal text-text-muted">
+                        {l.provider.name}
+                        {!l.provider.verified && <span className="text-accent-coral"> · Unverified</span>}
+                      </p>
                     </Link>
                     <button
                       onClick={() => toggleSave(l.id)}
                       aria-label={savedIds.has(l.id) ? "Unsave" : "Save"}
-                      className="tap-target text-accent-gold"
+                      className="tap-target text-accent-sky"
                     >
                       {savedIds.has(l.id) ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
                     </button>
@@ -169,6 +170,7 @@ export function CompareClient({
                       {breakdown?.trendAdjustment
                         ? ` · Trend ${breakdown.trendAdjustment > 0 ? "+" : ""}${breakdown.trendAdjustment}`
                         : ""}
+                      {breakdown?.trustAdjustment ? ` · Trust ${breakdown.trustAdjustment}` : ""}
                     </p>
                   </td>
                 );
@@ -213,9 +215,10 @@ export function CompareClient({
               if (!breakdown) return null;
               return (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Badge tone="gold">Decision score {breakdown.total}</Badge>
+                  <Badge tone="sky">Decision score {breakdown.total}</Badge>
                   <Badge tone="neutral">Price {breakdown.priceScore}</Badge>
                   {breakdown.benefitScore !== null && <Badge tone="neutral">Fit {breakdown.benefitScore}</Badge>}
+                  {breakdown.trustAdjustment !== 0 && <Badge tone="coral">Unverified provider</Badge>}
                   {trend && (
                     <Badge tone={TREND_TONE[trend.direction]}>
                       {TREND_ARROW[trend.direction]} {Math.abs(trend.changePercent)}% / {trend.periodDays}d

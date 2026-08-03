@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getTopListings, getPersonalizedSpecials } from "@/lib/catalog";
@@ -9,9 +10,15 @@ import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
 
+const ROLE_DASHBOARD: Partial<Record<string, string>> = { corporate: "/corporate", regulator: "/regulator" };
+
 export default async function DashboardPage() {
   const user = await requireUser();
   if (!user) return null;
+
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+  const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
+  if (roleRedirect) redirect(roleRedirect);
 
   const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
@@ -85,7 +92,7 @@ export default async function DashboardPage() {
               <Link
                 key={sector.slug}
                 href={live ? `/explore/${sector.slug}` : "/explore/healthcare"}
-                className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center hover:border-accent-gold/50"
+                className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center hover:border-accent-sky/50"
               >
                 <Icon size={26} className="text-accent-teal" />
                 <span className="font-medium text-[13px]">{sector.name}</span>

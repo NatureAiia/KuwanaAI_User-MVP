@@ -29,8 +29,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const gamification = await prisma.$transaction((tx) =>
-    recordEvent(tx, { userId: user.id, ...parsed.data }),
+  const gamification = await prisma.$transaction(
+    (tx) => recordEvent(tx, { userId: user.id, ...parsed.data }),
+    { timeout: 15_000 },
   );
 
   return NextResponse.json({ gamification });

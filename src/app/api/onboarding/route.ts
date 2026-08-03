@@ -6,6 +6,7 @@ import { recordEvent } from "@/lib/gamification/process-event";
 import type { Sector } from "@prisma/client";
 
 const bodySchema = z.object({
+  role: z.enum(["consumer", "corporate", "regulator"]).default("consumer"),
   fullName: z.string().min(1),
   ageRange: z.string().optional(),
   occupation: z.string().optional(),
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const {
+    role,
     fullName,
     ageRange,
     occupation,
@@ -80,8 +82,8 @@ export async function POST(req: Request) {
   const gamification = await prisma.$transaction(async (tx) => {
     await tx.user.upsert({
       where: { id: authUser.id },
-      update: { email: authUser.email! },
-      create: { id: authUser.id, email: authUser.email!, role: "consumer" },
+      update: { email: authUser.email!, role },
+      create: { id: authUser.id, email: authUser.email!, role },
     });
 
     await tx.userProfile.upsert({

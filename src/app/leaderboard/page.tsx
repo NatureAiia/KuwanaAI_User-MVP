@@ -42,7 +42,7 @@ export default function LeaderboardPage() {
         <p className="mt-6 text-text-muted">Loading…</p>
       ) : !data.optedIn ? (
         <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-6 text-center">
-          <Trophy size={28} className="mx-auto text-accent-gold" />
+          <Trophy size={28} className="mx-auto text-accent-sky" />
           <p className="mt-3 font-display text-[16px] font-semibold">Join the leaderboard</p>
           <p className="mt-1 text-[13px] text-text-secondary">
             Compare your XP with other Kuwana users under a chosen nickname.
@@ -57,7 +57,7 @@ export default function LeaderboardPage() {
             <div
               key={e.rank}
               className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
-                e.isYou ? "border-accent-gold bg-accent-gold/10" : "border-border bg-bg-surface"
+                e.isYou ? "border-accent-sky bg-accent-sky/10" : "border-border bg-bg-surface"
               }`}
             >
               <div className="flex items-center gap-3">

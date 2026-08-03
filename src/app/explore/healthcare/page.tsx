@@ -34,7 +34,7 @@ export default function HealthcareComingSoonPage() {
       </p>
 
       {submitted ? (
-        <p className="mt-6 text-[14px] font-medium text-accent-gold">
+        <p className="mt-6 text-[14px] font-medium text-accent-sky">
           You&apos;re on the list — we&apos;ll email you when Healthcare launches.
         </p>
       ) : (
@@ -45,7 +45,7 @@ export default function HealthcareComingSoonPage() {
             placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 rounded-xl border border-border bg-bg-surface px-4 py-3 text-[14px] outline-none focus:border-accent-gold"
+            className="flex-1 rounded-xl border border-border bg-bg-surface px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
           />
           <Button type="submit" disabled={loading}>
             {loading ? "Joining…" : "Join waitlist"}

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
-import { computeDecisionScores } from "@/lib/scoring";
+import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
@@ -77,14 +77,23 @@ export async function POST(req: Request) {
 
   const dataForModel = listingDTOs.map((l) => {
     const trend = trends[l.id];
+    const score = scores[l.id];
     return {
       name: l.name,
       provider: l.provider.name,
+      provider_verified: l.provider.verified,
       price: l.price,
       currency: l.currency,
       attributes: l.attributes,
       freshness: l.freshnessStatus,
-      decision_score: scores[l.id],
+      decision_score: score && {
+        total: score.total,
+        price_score: score.priceScore,
+        benefit_score: score.benefitScore,
+        freshness_adjustment: score.freshnessAdjustment,
+        trend_adjustment: score.trendAdjustment,
+        trust_adjustment: score.trustAdjustment,
+      },
       price_trend: trend
         ? { direction: trend.direction, change_percent: trend.changePercent, period_days: trend.periodDays }
         : null,
@@ -102,11 +111,11 @@ export async function POST(req: Request) {
       "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
       "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
       "overall fit for value and needs. Each listing includes a decision_score breakdown " +
-      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, total) and a price_trend " +
-      "— use these as your primary evidence, and reference them concretely in your explanation " +
-      "(e.g. its price trend or freshness) rather than restating the raw price. Only reference data " +
-      "present in the listings provided; never invent statistics. Always make clear this is an " +
-      "AI-assisted recommendation.",
+      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total) " +
+      "and a price_trend — use these as your primary evidence, and reference them concretely in your " +
+      "explanation (e.g. its price trend, freshness, or provider trust) rather than restating the raw " +
+      "price. Only reference data present in the listings provided; never invent statistics. Always " +
+      "make clear this is an AI-assisted recommendation.",
     messages: [
       {
         role: "user",
@@ -137,6 +146,7 @@ export async function POST(req: Request) {
         listingId: recommendedListing.id,
         explanation: result.explanation,
         confidence,
+        scoreVersion: CURRENT_DECISION_SCORE_VERSION,
       },
     });
     return recordEvent(tx, {

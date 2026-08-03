@@ -8,57 +8,26 @@ function normalize(value: number, min: number, max: number, invert: boolean) {
 }
 
 /**
- * Derives a 0–100 "value score" per listing from real seeded attributes —
- * price (lower is better) blended with the first comparable numeric
- * "benefit" attribute (higher is better), when the category has one.
- * This is a simple, transparent heuristic, not an invented statistic: it
- * only ever combines fields already on the listing record (Section 9).
- *
- * `priceWeight` (default 0.5) lets callers bias the price/benefit split —
- * e.g. a footprint indicating low spend weights price higher than the
- * default 50/50 split (see getPersonalizedSpecials in catalog.ts).
+ * Decision Score config registry — every tunable constant the scoring
+ * formula uses, named and versioned in one place. Bumping the formula (new
+ * adjustment, changed weight) means adding a new version key here, not
+ * hunting for magic numbers across routes/components. Recommendations store
+ * the version that produced them (see Recommendation.scoreVersion) so past
+ * results stay attributable even after the formula changes.
  */
-export function computeValueScores(
-  listings: ListingDTO[],
-  attributeSchema: AttributeSchemaFieldDTO[],
-  priceWeight = 0.5,
-): Record<string, number> {
-  if (listings.length === 0) return {};
+export const DECISION_SCORE_VERSIONS = {
+  v1: {
+    defaultPriceWeight: 0.5,
+    freshnessAdjustment: { fresh: 0, stale: -6, unverified: -12 } as Record<ListingDTO["freshnessStatus"], number>,
+    maxTrendAdjustment: 5,
+    unverifiedProviderAdjustment: -8,
+  },
+} as const;
 
-  const prices = listings.map((l) => l.price);
-  const priceMin = Math.min(...prices);
-  const priceMax = Math.max(...prices);
-
-  const benefitField = attributeSchema.find(
-    (a) => a.dataType === "number" && a.isComparable && a.key !== "price",
-  );
-
-  const scores: Record<string, number> = {};
-  for (const listing of listings) {
-    const priceScore = normalize(listing.price, priceMin, priceMax, true);
-
-    if (!benefitField) {
-      scores[listing.id] = priceScore;
-      continue;
-    }
-
-    const benefitValues = listings
-      .map((l) => Number(l.attributes[benefitField.key]))
-      .filter((v) => !Number.isNaN(v));
-    const benefitMin = Math.min(...benefitValues);
-    const benefitMax = Math.max(...benefitValues);
-    const benefitValue = Number(listing.attributes[benefitField.key]);
-    const benefitScore = Number.isNaN(benefitValue)
-      ? priceScore
-      : normalize(benefitValue, benefitMin, benefitMax, false);
-
-    scores[listing.id] = Math.round(priceScore * priceWeight + benefitScore * (1 - priceWeight));
-  }
-  return scores;
-}
+export const CURRENT_DECISION_SCORE_VERSION: keyof typeof DECISION_SCORE_VERSIONS = "v1";
 
 export type DecisionScoreBreakdown = {
-  /** 0-100 final score: price/benefit blend plus freshness and trend adjustments, clamped. */
+  /** 0-100 final score: price/benefit blend plus freshness, trend, and trust adjustments, clamped. */
   total: number;
   priceScore: number;
   benefitScore: number | null;
@@ -66,29 +35,31 @@ export type DecisionScoreBreakdown = {
   freshnessAdjustment: number;
   /** Small bonus if the price has been trending down, penalty if trending up; 0 if flat/unknown. */
   trendAdjustment: number;
+  /** Small penalty if the listing's provider isn't verified; 0 if verified. */
+  trustAdjustment: number;
+  /** Which DECISION_SCORE_VERSIONS entry produced this breakdown. */
+  version: string;
 };
-
-const FRESHNESS_ADJUSTMENT: Record<ListingDTO["freshnessStatus"], number> = {
-  fresh: 0,
-  stale: -6,
-  unverified: -12,
-};
-
-const MAX_TREND_ADJUSTMENT = 5;
 
 /**
- * Decision Score: the same transparent price/benefit blend as
- * computeValueScores, broken into named components plus two extra signals —
- * listing freshness and recent price trend — so the "why" behind a number
- * is inspectable rather than a single opaque figure.
+ * Decision Score: a transparent price/benefit blend — price (lower is
+ * better) blended with the first comparable numeric "benefit" attribute
+ * (higher is better), when the category has one — broken into named
+ * components plus three extra signals: listing freshness, recent price
+ * trend, and provider trust. Only ever combines fields already on the
+ * listing record; not an invented statistic.
  */
 export function computeDecisionScores(
   listings: ListingDTO[],
   attributeSchema: AttributeSchemaFieldDTO[],
   trends: Record<string, PriceTrend | null> = {},
-  priceWeight = 0.5,
+  priceWeight?: number,
+  version: keyof typeof DECISION_SCORE_VERSIONS = CURRENT_DECISION_SCORE_VERSION,
 ): Record<string, DecisionScoreBreakdown> {
   if (listings.length === 0) return {};
+
+  const config = DECISION_SCORE_VERSIONS[version];
+  const effectivePriceWeight = priceWeight ?? config.defaultPriceWeight;
 
   const prices = listings.map((l) => l.price);
   const priceMin = Math.min(...prices);
@@ -114,23 +85,31 @@ export function computeDecisionScores(
     }
 
     const baseScore =
-      benefitScore === null ? priceScore : priceScore * priceWeight + benefitScore * (1 - priceWeight);
+      benefitScore === null
+        ? priceScore
+        : priceScore * effectivePriceWeight + benefitScore * (1 - effectivePriceWeight);
 
-    const freshnessAdjustment = FRESHNESS_ADJUSTMENT[listing.freshnessStatus] ?? 0;
+    const freshnessAdjustment = config.freshnessAdjustment[listing.freshnessStatus] ?? 0;
+    const trustAdjustment = listing.provider.verified ? 0 : config.unverifiedProviderAdjustment;
 
     const trend = trends[listing.id];
     const trendAdjustment =
       !trend || trend.direction === "flat"
         ? 0
-        : Math.min(MAX_TREND_ADJUSTMENT, Math.round(Math.abs(trend.changePercent) / 4)) *
+        : Math.min(config.maxTrendAdjustment, Math.round(Math.abs(trend.changePercent) / 4)) *
           (trend.direction === "down" ? 1 : -1);
 
     breakdowns[listing.id] = {
-      total: Math.max(0, Math.min(100, Math.round(baseScore + freshnessAdjustment + trendAdjustment))),
+      total: Math.max(
+        0,
+        Math.min(100, Math.round(baseScore + freshnessAdjustment + trendAdjustment + trustAdjustment)),
+      ),
       priceScore: Math.round(priceScore),
       benefitScore: benefitScore === null ? null : Math.round(benefitScore),
       freshnessAdjustment,
       trendAdjustment,
+      trustAdjustment,
+      version,
     };
   }
   return breakdowns;

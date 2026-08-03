@@ -17,10 +17,10 @@ export function Badge({
   className,
   tone = "neutral",
   ...props
-}: HTMLAttributes<HTMLSpanElement> & { tone?: "neutral" | "gold" | "teal" | "coral" }) {
+}: HTMLAttributes<HTMLSpanElement> & { tone?: "neutral" | "sky" | "teal" | "coral" }) {
   const toneClasses = {
     neutral: "bg-bg-surface-raised text-text-secondary border-border",
-    gold: "bg-accent-gold/15 text-accent-gold border-accent-gold/30",
+    sky: "bg-accent-sky/15 text-accent-sky border-accent-sky/30",
     teal: "bg-accent-teal/15 text-accent-teal border-accent-teal/30",
     coral: "bg-accent-coral/15 text-accent-coral border-accent-coral/30",
   }[tone];

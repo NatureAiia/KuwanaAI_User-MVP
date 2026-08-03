@@ -27,7 +27,7 @@ export default function LandingPage() {
       <main className="flex-1 px-5 md:px-10">
         <section className="mx-auto max-w-[1120px] pt-6 md:pt-12">
           <h1 className="font-display text-[32px] leading-[1.05] font-bold tracking-tight md:text-[48px] max-w-[16ch]">
-            Compare smarter. <span className="text-accent-gold">Gain</span> more.
+            Compare smarter. <span className="text-accent-sky">Gain</span> more.
           </h1>
           <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-text-secondary">
             Explainable, total-cost, eligibility-aware comparisons across telecom, banking,
@@ -64,7 +64,7 @@ export default function LandingPage() {
                 <Link
                   key={sector.slug}
                   href={live ? `/explore/${sector.slug}` : `/explore/healthcare`}
-                  className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center hover:border-accent-gold/50 transition-all"
+                  className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center hover:border-accent-sky/50 transition-all"
                 >
                   <Icon size={28} className="text-accent-teal" />
                   <span className="font-medium text-[13px]">{sector.name}</span>

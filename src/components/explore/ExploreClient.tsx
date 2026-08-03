@@ -6,11 +6,13 @@ import { clsx } from "clsx";
 import { ArrowUpDown } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { Button } from "@/components/ui/Button";
-import { computeValueScores } from "@/lib/scoring";
+import { computeDecisionScores } from "@/lib/scoring";
 import { createClient } from "@/lib/supabase/client";
 import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
+import type { PriceTrend } from "@/lib/priceTrend";
 
 type SortMode = "value" | "price_asc" | "price_desc";
+type CategoryWithTrendsDTO = CategoryWithListingsDTO & { trends: Record<string, PriceTrend | null> };
 
 export function ExploreClient({
   sectorSlug,
@@ -21,7 +23,7 @@ export function ExploreClient({
 }) {
   const router = useRouter();
   const [activeCategorySlug, setActiveCategorySlug] = useState(categories[0]?.slug ?? "");
-  const [data, setData] = useState<CategoryWithListingsDTO | null>(null);
+  const [data, setData] = useState<CategoryWithTrendsDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("value");
   const [selected, setSelected] = useState<string[]>([]);
@@ -40,7 +42,7 @@ export function ExploreClient({
     setSelected([]);
     fetch(`/api/listings?sector=${sectorSlug}&category=${activeCategorySlug}`)
       .then((r) => r.json())
-      .then((d: CategoryWithListingsDTO) => setData(d))
+      .then((d: CategoryWithTrendsDTO) => setData(d))
       .finally(() => setLoading(false));
 
     if (isAuthed) {
@@ -53,7 +55,7 @@ export function ExploreClient({
   }, [activeCategorySlug, sectorSlug, isAuthed]);
 
   const scores = useMemo(
-    () => (data ? computeValueScores(data.listings, data.attributeSchema) : {}),
+    () => (data ? computeDecisionScores(data.listings, data.attributeSchema, data.trends) : {}),
     [data],
   );
 
@@ -62,7 +64,7 @@ export function ExploreClient({
     const listings = [...data.listings];
     if (sort === "price_asc") listings.sort((a, b) => a.price - b.price);
     else if (sort === "price_desc") listings.sort((a, b) => b.price - a.price);
-    else listings.sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
+    else listings.sort((a, b) => (scores[b.id]?.total ?? 0) - (scores[a.id]?.total ?? 0));
     return listings;
   }, [data, sort, scores]);
 
@@ -91,7 +93,7 @@ export function ExploreClient({
             className={clsx(
               "tap-target shrink-0 rounded-full border px-4 py-2 text-[13px] font-medium",
               activeCategorySlug === cat.slug
-                ? "border-accent-gold bg-accent-gold/15 text-accent-gold"
+                ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
                 : "border-border text-text-secondary",
             )}
           >
@@ -120,7 +122,8 @@ export function ExploreClient({
           <ListingCard
             key={listing.id}
             listing={listing}
-            score={scores[listing.id] ?? 0}
+            score={scores[listing.id]?.total ?? 0}
+            trend={data?.trends[listing.id] ?? null}
             sectorSlug={sectorSlug}
             selected={selected.includes(listing.id)}
             onToggleSelect={toggleSelect}
@@ -130,7 +133,7 @@ export function ExploreClient({
 
       {selected.length >= 2 && (
         <div className="fixed bottom-16 left-0 right-0 z-40 flex justify-center px-5 md:bottom-6">
-          <div className="flex items-center gap-4 rounded-full border border-accent-gold bg-bg-surface px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
+          <div className="flex items-center gap-4 rounded-full border border-accent-sky bg-bg-surface px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
             <span className="text-[13px] font-medium">{selected.length} selected</span>
             <Button size="md" onClick={goCompare}>
               Compare

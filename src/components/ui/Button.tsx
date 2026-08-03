@@ -13,7 +13,7 @@ type BaseProps = {
 
 const VARIANT_CLASSES: Record<Variant, string> = {
   primary:
-    "bg-accent-gold text-[#14181d] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed",
+    "bg-accent-sky text-[var(--text-on-accent-sky)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed",
   secondary:
     "bg-transparent border border-border text-text-primary hover:bg-bg-surface-raised disabled:opacity-50",
   ghost: "bg-transparent text-text-secondary hover:text-text-primary disabled:opacity-50",

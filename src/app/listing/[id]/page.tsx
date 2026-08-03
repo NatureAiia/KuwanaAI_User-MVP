@@ -8,10 +8,7 @@ import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { ListingActions } from "@/components/ListingActions";
 import { PriceSparkline } from "@/components/PriceSparkline";
-
-const FRESHNESS_TONE = { fresh: "teal", stale: "gold", unverified: "coral" } as const;
-const TREND_TONE = { down: "teal", up: "coral", flat: "neutral" } as const;
-const TREND_ARROW = { down: "↓", up: "↑", flat: "→" } as const;
+import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

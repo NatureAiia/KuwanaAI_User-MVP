@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSectorCategories, getCategoryWithListings } from "@/lib/catalog";
+import { getSectorCategories, getCategoryWithListings, getListingPriceTrends } from "@/lib/catalog";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -13,7 +13,8 @@ export async function GET(req: Request) {
   if (category) {
     const result = await getCategoryWithListings(sector, category);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(result);
+    const trends = await getListingPriceTrends(result.listings.map((l) => l.id));
+    return NextResponse.json({ ...result, trends });
   }
 
   const categories = await getSectorCategories(sector);

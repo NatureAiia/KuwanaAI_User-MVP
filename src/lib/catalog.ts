@@ -233,3 +233,77 @@ export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   });
   return listings.map(toListingDTO);
 }
+
+export type MarketOverview = {
+  bySector: {
+    sectorSlug: string;
+    sectorName: string;
+    listingCount: number;
+    avgPrice: number;
+    trendingDown: number;
+    trendingUp: number;
+    unverifiedCount: number;
+  }[];
+  anomalies: { listing: ListingDTO; sectorName: string; categoryName: string; trend: PriceTrend }[];
+  unverifiedListings: { listing: ListingDTO; sectorName: string; categoryName: string }[];
+};
+
+/**
+ * Aggregates every live listing into a market-wide view — per-sector
+ * pricing/trend/trust rollups, the biggest recent price swings, and
+ * unverified-provider listings. Shared root for the Corporate ("Market
+ * Intelligence") and Regulator ("Compliance & Market Monitoring")
+ * dashboards, computed entirely from existing listing/price-history data —
+ * no separate aggregation tables.
+ */
+export async function getMarketOverview(): Promise<MarketOverview> {
+  const rows = await prisma.listing.findMany({
+    where: { category: { sector: { status: "live" } } },
+    include: { provider: true, category: { include: { sector: true } } },
+  });
+  const trends = await getListingPriceTrends(rows.map((r) => r.id));
+
+  const bySector = new Map<string, MarketOverview["bySector"][number]>();
+  const anomalies: MarketOverview["anomalies"] = [];
+  const unverifiedListings: MarketOverview["unverifiedListings"] = [];
+
+  for (const row of rows) {
+    const sectorSlug = row.category.sector.slug;
+    const entry = bySector.get(sectorSlug) ?? {
+      sectorSlug,
+      sectorName: row.category.sector.name,
+      listingCount: 0,
+      avgPrice: 0,
+      trendingDown: 0,
+      trendingUp: 0,
+      unverifiedCount: 0,
+    };
+    const price = Number(row.price);
+    entry.avgPrice = (entry.avgPrice * entry.listingCount + price) / (entry.listingCount + 1);
+    entry.listingCount += 1;
+    if (!row.provider.verified) entry.unverifiedCount += 1;
+
+    const trend = trends[row.id];
+    if (trend) {
+      if (trend.direction === "down") entry.trendingDown += 1;
+      if (trend.direction === "up") entry.trendingUp += 1;
+    }
+    bySector.set(sectorSlug, entry);
+
+    const listing = toListingDTO(row);
+    if (trend && trend.direction !== "flat") {
+      anomalies.push({ listing, sectorName: row.category.sector.name, categoryName: row.category.name, trend });
+    }
+    if (!row.provider.verified) {
+      unverifiedListings.push({ listing, sectorName: row.category.sector.name, categoryName: row.category.name });
+    }
+  }
+
+  anomalies.sort((a, b) => Math.abs(b.trend.changePercent) - Math.abs(a.trend.changePercent));
+
+  return {
+    bySector: [...bySector.values()].map((s) => ({ ...s, avgPrice: Math.round(s.avgPrice * 100) / 100 })),
+    anomalies: anomalies.slice(0, 10),
+    unverifiedListings,
+  };
+}

@@ -317,6 +317,79 @@ const SECTORS: SectorSeed[] = [
       },
     ],
   },
+  {
+    slug: "electronics",
+    name: "Tech & Electronics",
+    status: "live",
+    categories: [
+      {
+        slug: "tech-gadgets",
+        name: "Tech & Gadgets",
+        attributes: [
+          { key: "device_type", label: "Type", dataType: "enum" },
+          { key: "storage_gb", label: "Storage", dataType: "number", unit: "GB" },
+          { key: "warranty_months", label: "Warranty", dataType: "number", unit: "months" },
+          { key: "condition", label: "Condition", dataType: "enum" },
+        ],
+        providers: ["TechZone", "Electromart", "HiFi Corp"],
+        listings: [
+          { name: "Samsung Galaxy A15 128GB", provider: "TechZone", price: 189, attrs: { device_type: "Phone", storage_gb: 128, warranty_months: 12, condition: "New" } },
+          { name: "Xiaomi Redmi Note 13 128GB", provider: "Electromart", price: 165, attrs: { device_type: "Phone", storage_gb: 128, warranty_months: 12, condition: "New" } },
+          { name: "iPhone 12 64GB Refurbished", provider: "Electromart", price: 320, attrs: { device_type: "Phone", storage_gb: 64, warranty_months: 6, condition: "Refurbished" } },
+          { name: "HP Pavilion 15 Laptop 512GB", provider: "HiFi Corp", price: 650, attrs: { device_type: "Laptop", storage_gb: 512, warranty_months: 24, condition: "New" } },
+          { name: "Lenovo IdeaPad 3 256GB", provider: "TechZone", price: 480, attrs: { device_type: "Laptop", storage_gb: 256, warranty_months: 12, condition: "New" } },
+          { name: "Samsung Galaxy Tab A9 64GB", provider: "Electromart", price: 210, attrs: { device_type: "Tablet", storage_gb: 64, warranty_months: 12, condition: "New" } },
+          { name: "JBL Bluetooth Speaker", provider: "HiFi Corp", price: 35, attrs: { device_type: "Accessory", storage_gb: 0, warranty_months: 6, condition: "New" } },
+          { name: "Anker Power Bank 20000mAh", provider: "TechZone", price: 28, attrs: { device_type: "Accessory", storage_gb: 0, warranty_months: 6, condition: "New" } },
+        ],
+      },
+      {
+        slug: "ai-tools",
+        name: "AI Tools & Subscriptions",
+        attributes: [
+          { key: "plan_type", label: "Plan", dataType: "enum" },
+          { key: "context_window_k", label: "Context window", dataType: "number", unit: "K tokens" },
+          { key: "platform", label: "Platform", dataType: "enum" },
+        ],
+        providers: ["OpenAI", "Anthropic", "Google", "Microsoft", "Perplexity"],
+        listings: [
+          { name: "ChatGPT Plus", provider: "OpenAI", price: 20, attrs: { plan_type: "Plus", context_window_k: 128, platform: "All" } },
+          { name: "ChatGPT Team", provider: "OpenAI", price: 30, attrs: { plan_type: "Team", context_window_k: 128, platform: "All" } },
+          { name: "Claude Pro", provider: "Anthropic", price: 20, attrs: { plan_type: "Pro", context_window_k: 200, platform: "All" } },
+          { name: "Gemini Advanced", provider: "Google", price: 20, attrs: { plan_type: "Pro", context_window_k: 1000, platform: "All" } },
+          { name: "Copilot Pro", provider: "Microsoft", price: 20, attrs: { plan_type: "Pro", context_window_k: 128, platform: "All" } },
+          { name: "Perplexity Pro", provider: "Perplexity", price: 20, attrs: { plan_type: "Pro", context_window_k: 128, platform: "All" } },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "fashion",
+    name: "Clothes",
+    status: "live",
+    categories: [
+      {
+        slug: "clothing",
+        name: "Clothing",
+        attributes: [
+          { key: "garment_type", label: "Type", dataType: "enum" },
+          { key: "size_range", label: "Sizes", dataType: "string" },
+          { key: "material", label: "Material", dataType: "string" },
+        ],
+        providers: ["Edgars", "Truworths", "Bata", "Topics"],
+        listings: [
+          { name: "Edgars Men's Basic Tee", provider: "Edgars", price: 8, attrs: { garment_type: "T-Shirt", size_range: "S-XXL", material: "Cotton" } },
+          { name: "Truworths Women's Summer Dress", provider: "Truworths", price: 22, attrs: { garment_type: "Dress", size_range: "S-XL", material: "Polyester blend" } },
+          { name: "Edgars Slim Fit Jeans", provider: "Edgars", price: 25, attrs: { garment_type: "Jeans", size_range: "28-38", material: "Denim" } },
+          { name: "Truworths Men's Chinos", provider: "Truworths", price: 20, attrs: { garment_type: "Jeans", size_range: "30-40", material: "Cotton twill" } },
+          { name: "Bata Men's Formal Shoes", provider: "Bata", price: 32, attrs: { garment_type: "Shoes", size_range: "6-11", material: "Leather" } },
+          { name: "Bata Women's Sandals", provider: "Bata", price: 15, attrs: { garment_type: "Shoes", size_range: "4-9", material: "Synthetic" } },
+          { name: "Topics Kids Hoodie", provider: "Topics", price: 12, attrs: { garment_type: "Jacket", size_range: "4-12yrs", material: "Fleece" } },
+          { name: "Edgars Winter Jacket", provider: "Edgars", price: 40, attrs: { garment_type: "Jacket", size_range: "S-XXL", material: "Polyester fill" } },
+        ],
+      },
+    ],
+  },
 ];
 
 async function main() {
@@ -387,6 +460,11 @@ async function main() {
       }
     }
   }
+
+  // Electromart is seeded as an unverified reseller (grey-market/parallel-import electronics are
+  // common in this market) so the provider-trust signal (Decision Score, compare/regulator views)
+  // has a real example to surface instead of every seeded provider being verified.
+  await prisma.provider.update({ where: { id: "electronics-Electromart" }, data: { verified: false } });
 
   for (const [eventType, xpValue] of Object.entries(XP_RULES)) {
     await prisma.gamificationRule.upsert({

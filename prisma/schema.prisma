@@ -49,6 +49,7 @@ model User {
   questProgress   UserQuestProgress[]
   streak          UserStreak?
   notifications   Notification[]
+  conversations   Conversation[]
 
   @@map("users")
 }
@@ -75,6 +76,8 @@ enum Sector {
   transport
   utilities
   pharmacy
+  electronics
+  fashion
 }
 
 model SectorFootprint {
@@ -234,14 +237,15 @@ model SavedListing {
 }
 
 model Recommendation {
-  id          String   @id @default(uuid())
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listingId   String   @map("listing_id")
-  listing     Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  explanation String
-  confidence  Decimal  @db.Decimal(4, 3)
-  generatedAt DateTime @default(now()) @map("generated_at")
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId    String   @map("listing_id")
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  explanation  String
+  confidence   Decimal  @db.Decimal(4, 3)
+  scoreVersion String   @default("v1") @map("score_version")
+  generatedAt  DateTime @default(now()) @map("generated_at")
 
   @@map("recommendations")
 }
@@ -267,6 +271,39 @@ model Notification {
 }
 
 // ---------------------------------------------------------------------------
+// 4.4 AI chat assistant
+// ---------------------------------------------------------------------------
+
+enum ChatRole {
+  user
+  assistant
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
+
+  messages Message[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatRole
+  content        String
+  listingIds     String[]     @default([]) @map("listing_ids")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("messages")
+}
+
+// ---------------------------------------------------------------------------
 // 6. Gamification
 // ---------------------------------------------------------------------------
 
@@ -278,6 +315,7 @@ enum EventType {
   item_saved
   action_taken
   daily_visit
+  chat_started
 }
 
 model UserEvent {

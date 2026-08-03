@@ -18,7 +18,7 @@ export default function ExploreHubPage() {
             <Link
               key={sector.slug}
               href={live ? `/explore/${sector.slug}` : "/explore/healthcare"}
-              className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 text-center hover:border-accent-gold/50"
+              className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 text-center hover:border-accent-sky/50"
             >
               <Icon size={30} className="text-accent-teal" />
               <span className="font-medium text-[14px]">{sector.name}</span>

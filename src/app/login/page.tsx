@@ -43,7 +43,7 @@ function LoginForm() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-gold"
+            className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
           />
         </label>
         <label className="block">
@@ -53,7 +53,7 @@ function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-gold"
+            className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
           />
         </label>
 
@@ -66,7 +66,7 @@ function LoginForm() {
 
       <p className="mt-6 text-center text-[13px] text-text-secondary">
         New to Kuwana?{" "}
-        <Link href="/signup" className="font-semibold text-accent-gold">
+        <Link href="/signup" className="font-semibold text-accent-sky">
           Create an account
         </Link>
       </p>

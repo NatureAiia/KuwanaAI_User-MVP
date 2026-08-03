@@ -13,7 +13,8 @@
   --bg-surface-raised: #ffffff;
   --border: #334155;
   --accent-primary: #1e3a8a;
-  --accent-gold: #fbbf24;
+  --accent-sky: #0369a1;
+  --text-on-accent-sky: #ffffff;
   --accent-teal: #0f8a7a;
   --accent-coral: #d14a3a;
   --text-primary: #14181d;
@@ -33,7 +34,8 @@
   --bg-surface-raised: #1a222c;
   --border: #334155;
   --accent-primary: #1e3a8a;
-  --accent-gold: #fbbf24;
+  --accent-sky: #38bdf8;
+  --text-on-accent-sky: #0b1512;
   --accent-teal: #2dd4bf;
   --accent-coral: #e1553d;
   --text-primary: #f5f3ee;
@@ -47,7 +49,7 @@
   --color-bg-surface-raised: var(--bg-surface-raised);
   --color-border: var(--border);
   --color-accent-primary: var(--accent-primary);
-  --color-accent-gold: var(--accent-gold);
+  --color-accent-sky: var(--accent-sky);
   --color-accent-teal: var(--accent-teal);
   --color-accent-coral: var(--accent-coral);
   --color-text-primary: var(--text-primary);
@@ -72,7 +74,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent-gold) 35%, transparent);
+  background: color-mix(in srgb, var(--accent-sky) 35%, transparent);
 }
 
 /* 44x44 CSS-pixel minimum touch target (Section 9, WCAG 2.1 AA) */
