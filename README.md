@@ -74,3 +74,78 @@ Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Supabase Auth �
 - Leaderboard is opt-in only and always shows a nickname, never a real name.
 - All comparison data is mock/seed data, clearly out of scope for live scraping/provider
   integrations at this stage.
+
+## Design brief: decision intelligence, not comparison
+
+Kuwana's own design brief (`Kuwana_AI4I_Proposal_Design`) is explicit that this is **not** a
+price-comparison or e-commerce platform — it's a decision-intelligence system following
+**Need → Context → Eligible Options → Total-Cost Comparison → Recommendation → Explanation →
+Action**, with hard constraints: every recommendation must be explainable, eligibility-aware,
+and traceable to real data (no invented statistics, no recommendation when data is insufficient).
+Keep this in mind before adding "comparison platform" UX patterns (compare-trays, checkout
+simulations, gimmicky AI-chat bolt-ons) ported from earlier prototypes — evaluate them against
+this brief first.
+
+## 2026-08 session: what changed and what's deliberately deferred
+
+A single unattended session made the following changes, prioritized around strengthening the
+decision-intelligence core over porting more comparison-platform features from older prototypes:
+
+**Fixed:**
+
+- `proxy.ts` middleware wasn't guarding `/corporate`, `/regulator`, `/notifications` at the edge
+  (only page-level `requireUser()` checks did) — added to `PROTECTED_PREFIXES`.
+- `ADMIN_EMAILS` was entirely unset in `.env`, so the admin account had no way to pass
+  `requireAdmin()` even once its email was confirmed. Added `.env.example` (referenced by this
+  README but missing).
+- Added `CRON_SECRET` and wired `refresh:freshness` / `rotate:quests` / `refresh:fx` (previously
+  manual-only scripts) to Vercel Cron via `src/app/api/cron/*` + `vercel.json` (conservative
+  once-daily schedule — safe on Vercel's Hobby tier; `fx-refresh` could move to a shorter
+  interval on a paid plan).
+
+**Added (decision-intelligence core):**
+
+- `src/lib/eligibility.ts` — surfaces a listing's real requirement attributes (e.g. `min_balance`)
+  as a distinct "To qualify" signal in the compare view and the AI recommendation prompt,
+  answering the brief's "Eligible Options" stage. Deliberately does **not** attempt to infer
+  personal affordability against a user's footprint — onboarding only captures a monthly-spend
+  *range*, not income/savings, and comparing that to a lump-sum balance requirement isn't a sound
+  inference; building it anyway would be exactly the kind of invented statistic the brief forbids.
+- `NeedIntake` (already built for `/explore`) now also leads the dashboard, so a returning user's
+  first move is expressing a need in plain language, not browsing a sector grid.
+- `/admin/catalog` — the admin listings/providers API existed with no UI at all (hand-editing
+  `prisma/seed.ts` was the only path). Added list/edit/delete for listings and create forms for
+  both listings and providers, over the existing API routes.
+- `/corporate` and `/regulator` — both stopped at a raw "Overview" data dump. Added the brief's
+  remaining stages: a sector filter (Explore/drill-down), a Key Insights section, and a
+  Recommended Actions section, all templated directly from `getMarketOverview()`'s existing
+  rollup — never a separately invented figure.
+- Vitest + 27 tests over `computeDecisionScores`, the new eligibility helpers,
+  `computePriceTrend`/`computePriceForecast`, and XP/level math — there was no test framework at
+  all beforehand, and this is a regression net for the highest-stakes pure logic.
+
+**Deliberately deferred (flagging for a real decision, not silently done):**
+
+- **`ANTHROPIC_API_KEY` is still a placeholder** (10 chars) — `/api/chat` and
+  `/api/recommendations` will fail end-to-end until a real key is set. This is the single highest-
+  leverage remaining blocker and isn't something that can be resolved without the account holder.
+- **Three disagreeing color palettes exist** (`src/app/globals.css`'s shipped
+  sky/teal/coral, an all-blue "v2" in an external `tokens.css`, and a third navy/gold in a
+  reference PNG). Left the shipped palette alone rather than a mass find-and-replace across ~40
+  files with no product sign-off on which is current.
+- **9 sectors are seeded "live"** (beyond the original 4-sector MVP scope). Left as-is rather than
+  rolling back real seeded work — worth an explicit product conversation, not a unilateral scope
+  cut.
+- **Corporate/Regulator/Provider portals stay intentionally thin** relative to the older
+  `zim-compare-ui-redesign` prototype's full 13-vertical, four-portal build — that breadth is
+  explicitly "backlog, not current scope" per the build plan; this session prioritized depth on
+  the Consumer decision-intelligence loop instead.
+- **Auth-guard/gamification-engine tests weren't added** — `requireConsumer`/`requireAdmin` and
+  `process-event.ts` all depend on live Prisma/Supabase clients; mocking those properly is a
+  separate, larger piece of work than this pass covers.
+- **`onboarding-facts.ts`'s historical trivia** (provider founding dates, membership counts) is
+  unsourced/unverified by this session — worth a fact-check pass since the brief's "no invented
+  statistics" bar arguably extends to onboarding copy, not just computed recommendations.
+- **A `next`/`postcss`/`sharp` transitive dependency audit warning** (3 high-severity, fixed only
+  by bumping `next` to 16.3.0, outside the currently pinned range) — a framework version bump is
+  a deliberate call for someone to make, not a silent side effect of a session.
