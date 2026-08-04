@@ -140,9 +140,10 @@ decision-intelligence core over porting more comparison-platform features from o
   `zim-compare-ui-redesign` prototype's full 13-vertical, four-portal build — that breadth is
   explicitly "backlog, not current scope" per the build plan; this session prioritized depth on
   the Consumer decision-intelligence loop instead.
-- **Auth-guard/gamification-engine tests weren't added** — `requireConsumer`/`requireAdmin` and
-  `process-event.ts` all depend on live Prisma/Supabase clients; mocking those properly is a
-  separate, larger piece of work than this pass covers.
+- **`process-event.ts` gamification-engine tests weren't added** — it takes a live Prisma
+  transaction client and mocking a multi-step `tx.*` interaction properly is a separate, larger
+  piece of work than this pass covers. (`requireConsumer`/`requireAdmin` *are* now covered, with
+  mocked Supabase/Prisma — see `src/lib/auth.test.ts`.)
 - **`onboarding-facts.ts`'s historical trivia** (provider founding dates, membership counts) is
   unsourced/unverified by this session — worth a fact-check pass since the brief's "no invented
   statistics" bar arguably extends to onboarding copy, not just computed recommendations.
