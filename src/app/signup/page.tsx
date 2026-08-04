@@ -165,6 +165,7 @@ export default function SignupPage() {
 
   const [medicalAid, setMedicalAid] = useState("");
   const [chronicOptIn, setChronicOptIn] = useState(false);
+  const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
@@ -239,6 +240,7 @@ export default function SignupPage() {
           consents: {
             research_use: researchConsent,
             leaderboard_participation: leaderboardConsent,
+            health_data_sharing: healthDataConsent,
           },
         }),
       });
@@ -274,6 +276,7 @@ export default function SignupPage() {
     policyTypes,
     medicalAid,
     chronicOptIn,
+    healthDataConsent,
     researchConsent,
     leaderboardConsent,
     router,
@@ -589,6 +592,19 @@ export default function SignupPage() {
               <span className="text-[13px] text-text-secondary">
                 Opt in to disclose chronic conditions — helps calculate a more accurate sensitivity
                 score. Stored securely and never shown publicly.
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={healthDataConsent}
+                onChange={(e) => setHealthDataConsent(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                Separately, allow anonymized use of my health data to improve Kuwana&apos;s
+                healthcare comparisons — distinct from the general research consent on the next
+                screen, since health data deserves its own opt-in.
               </span>
             </label>
             <div className="flex gap-3 pt-2">

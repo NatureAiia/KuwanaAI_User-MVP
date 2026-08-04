@@ -14,9 +14,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [consents, setConsents] = useState<{ research_use?: boolean; leaderboard_participation?: boolean }>(
-    {},
-  );
+  const [consents, setConsents] = useState<{
+    research_use?: boolean;
+    leaderboard_participation?: boolean;
+    health_data_sharing?: boolean;
+  }>({});
 
   useEffect(() => {
     createClient()
@@ -31,7 +33,10 @@ export default function SettingsPage() {
       .catch(() => {});
   }, []);
 
-  async function updateConsent(key: "research_use" | "leaderboard_participation", value: boolean) {
+  async function updateConsent(
+    key: "research_use" | "leaderboard_participation" | "health_data_sharing",
+    value: boolean,
+  ) {
     setConsents((prev) => ({ ...prev, [key]: value }));
     await fetch("/api/settings/consents", {
       method: "POST",
@@ -99,6 +104,18 @@ export default function SettingsPage() {
           />
           <span className="text-[13px] text-text-secondary">
             Join the opt-in XP leaderboard under a nickname.
+          </span>
+        </label>
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+          <input
+            type="checkbox"
+            checked={!!consents.health_data_sharing}
+            onChange={(e) => updateConsent("health_data_sharing", e.target.checked)}
+            className="mt-0.5 tap-target"
+          />
+          <span className="text-[13px] text-text-secondary">
+            Allow anonymized use of my health data to improve healthcare comparisons — separate
+            from the general research consent above.
           </span>
         </label>
       </div>

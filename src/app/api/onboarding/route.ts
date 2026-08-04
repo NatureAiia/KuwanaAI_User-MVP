@@ -41,6 +41,11 @@ const bodySchema = z.object({
   consents: z.object({
     research_use: z.boolean(),
     leaderboard_participation: z.boolean(),
+    // Separate from research_use — health data warrants its own opt-in,
+    // matching the granular consent split from the original wireframes
+    // (only meaningful for consumers who submit a healthcareFootprint, but
+    // harmless to store either way, same as the other two consent types).
+    health_data_sharing: z.boolean().optional(),
   }),
 });
 

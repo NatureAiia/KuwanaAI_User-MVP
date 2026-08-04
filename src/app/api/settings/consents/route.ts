@@ -6,6 +6,7 @@ import { requireConsumer } from "@/lib/auth";
 const bodySchema = z.object({
   research_use: z.boolean().optional(),
   leaderboard_participation: z.boolean().optional(),
+  health_data_sharing: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
