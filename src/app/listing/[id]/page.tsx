@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { getListingPriceTrends } from "@/lib/catalog";
+import { getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
 import { computePriceForecast } from "@/lib/priceTrend";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
@@ -27,6 +28,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const trends = await getListingPriceTrends([listing.id]);
   const trend = trends[listing.id];
   const forecast = trend ? computePriceForecast(trend) : null;
+  const alsoCompared = await getAlsoCompared(listing.id);
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
@@ -90,6 +92,29 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           ))}
         </dl>
       </div>
+
+      {alsoCompared.length > 0 && (
+        <div className="mt-6">
+          <h2 className="font-display text-[15px] font-semibold">Others also compared</h2>
+          <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
+            {alsoCompared.map((other) => (
+              <Link
+                key={other.id}
+                href={`/listing/${other.id}`}
+                className="flex min-w-[200px] shrink-0 flex-col gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-3.5 hover:border-accent-sky/50"
+              >
+                <div className="flex items-center gap-2">
+                  <ProviderLogo name={other.provider.name} logoUrl={other.provider.logoUrl} size={22} />
+                  <p className="truncate text-[13px] font-medium">{other.name}</p>
+                </div>
+                <p className="font-mono text-[15px] font-semibold">
+                  <FormattedPrice amount={other.price} currency={other.currency} />
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ListingActions listingId={listing.id} sourceUrl={listing.sourceUrl} providerName={listing.provider.name} />
 

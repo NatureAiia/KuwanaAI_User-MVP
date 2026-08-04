@@ -234,6 +234,37 @@ export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   return listings.map(toListingDTO);
 }
 
+/**
+ * "Others also compared" — the Amazon-style social-proof pattern named in
+ * the build plan but never implemented. Scans recent Comparison rows that
+ * included this listing, tallies which other listings showed up alongside
+ * it most often, and returns the top few in rank order. No separate
+ * aggregation table — computed from Comparison rows that already exist.
+ */
+export async function getAlsoCompared(listingId: string, limit = 4): Promise<ListingDTO[]> {
+  const comparisons = await prisma.comparison.findMany({
+    where: { listingIds: { has: listingId } },
+    select: { listingIds: true },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  const counts = new Map<string, number>();
+  for (const comparison of comparisons) {
+    for (const otherId of comparison.listingIds) {
+      if (otherId === listingId) continue;
+      counts.set(otherId, (counts.get(otherId) ?? 0) + 1);
+    }
+  }
+
+  const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+  if (rankedIds.length === 0) return [];
+
+  const listings = await getListingsByIds(rankedIds);
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
+}
+
 export type MarketOverview = {
   bySector: {
     sectorSlug: string;

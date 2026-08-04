@@ -1,5 +1,5 @@
 import type { EventType, Sector, Prisma, PrismaClient, Quest, UserStreak } from "@prisma/client";
-import { levelForXp, xpIntoLevel, XP_PER_LEVEL } from "./rules";
+import { levelForXp, xpIntoLevel, XP_PER_LEVEL, STREAK_GRACE_DAYS } from "./rules";
 import type { BadgeTrigger, QuestCriteria } from "./rules";
 
 type Tx = PrismaClient | Prisma.TransactionClient;
@@ -39,6 +39,18 @@ async function awardBadgeIfNew(tx: Tx, userId: string, name: string, newBadges: 
 
 function isSameDay(a: Date, b: Date) {
   return a.toISOString().slice(0, 10) === b.toISOString().slice(0, 10);
+}
+
+function addDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 86_400_000);
+}
+
+/** True if `now` falls within the grace window after `lastActiveDate` — i.e. the streak should continue. */
+function isWithinStreakGrace(lastActiveDate: Date, now: Date) {
+  for (let daysAgo = 1; daysAgo <= STREAK_GRACE_DAYS + 1; daysAgo += 1) {
+    if (isSameDay(addDays(lastActiveDate, daysAgo), now)) return true;
+  }
+  return false;
 }
 
 /** Evaluates one badge trigger spec (from GamificationRule.badgeTrigger) against current state. */
@@ -149,10 +161,8 @@ export async function recordEvent(
     if (alreadyVisitedToday) {
       awardXp = 0;
     } else {
-      const wasYesterday =
-        streak.lastActiveDate &&
-        isSameDay(new Date(streak.lastActiveDate.getTime() + 86_400_000), now);
-      const nextStreak = wasYesterday ? streak.currentStreak + 1 : 1;
+      const continuesStreak = streak.lastActiveDate && isWithinStreakGrace(streak.lastActiveDate, now);
+      const nextStreak = continuesStreak ? streak.currentStreak + 1 : 1;
       streak = await tx.userStreak.update({
         where: { userId },
         data: {

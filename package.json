@@ -10,7 +10,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "prisma migrate dev",
     "scan:social": "tsx scripts/social-scan/run.ts",
-    "scan:social:telegram-login": "tsx scripts/social-scan/telegram-login.ts"
+    "scan:social:telegram-login": "tsx scripts/social-scan/telegram-login.ts",
+    "refresh:freshness": "tsx scripts/freshness-decay/run.ts",
+    "rotate:quests": "tsx scripts/quest-rotation/run.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -17,6 +17,9 @@ export const XP_RULES: Record<EventType, number> = {
 
 export const XP_PER_LEVEL = 100;
 
+/** Missing this many consecutive days still continues the streak (forgiving one lapse, not resetting to 1). */
+export const STREAK_GRACE_DAYS = 1;
+
 export function levelForXp(totalXp: number) {
   return Math.floor(totalXp / XP_PER_LEVEL) + 1;
 }
