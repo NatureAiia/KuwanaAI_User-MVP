@@ -285,11 +285,14 @@ export type MarketOverview = {
  * unverified-provider listings. Shared root for the Corporate ("Market
  * Intelligence") and Regulator ("Compliance & Market Monitoring")
  * dashboards, computed entirely from existing listing/price-history data —
- * no separate aggregation tables.
+ * no separate aggregation tables. Pass sectorSlug to drill down into a
+ * single sector (the "Explore" stage) instead of the full market.
  */
-export async function getMarketOverview(): Promise<MarketOverview> {
+export async function getMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
   const rows = await prisma.listing.findMany({
-    where: { category: { sector: { status: "live" } } },
+    where: {
+      category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
+    },
     include: { provider: true, category: { include: { sector: true } } },
   });
   const trends = await getListingPriceTrends(rows.map((r) => r.id));
