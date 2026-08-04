@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { ArrowUpDown } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
@@ -25,7 +25,13 @@ export function ExploreClient({
   categories: CategoryDTO[];
 }) {
   const router = useRouter();
-  const [activeCategorySlug, setActiveCategorySlug] = useState(categories[0]?.slug ?? "");
+  const searchParams = useSearchParams();
+  const requestedCategorySlug = searchParams.get("category");
+  const initialCategorySlug =
+    (requestedCategorySlug && categories.some((c) => c.slug === requestedCategorySlug)
+      ? requestedCategorySlug
+      : categories[0]?.slug) ?? "";
+  const [activeCategorySlug, setActiveCategorySlug] = useState(initialCategorySlug);
   const [data, setData] = useState<CategoryWithTrendsDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("value");

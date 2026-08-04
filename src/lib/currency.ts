@@ -21,13 +21,28 @@ export const CURRENCIES: CurrencyDef[] = [
 
 const BY_CODE = new Map(CURRENCIES.map((c) => [c.code, c]));
 
+/** The static table as a plain code->rate map — the fallback wherever a live rate isn't available. */
+export function getDefaultPerUsdMap(): Record<CurrencyCode, number> {
+  return Object.fromEntries(CURRENCIES.map((c) => [c.code, c.perUsd])) as Record<CurrencyCode, number>;
+}
+
+/** Layers live rates (from FxRate, via /api/fx-rates) over the static defaults — never drops below full coverage. */
+export function getPerUsdMap(liveOverrides: Partial<Record<string, number>> = {}): Record<string, number> {
+  return { ...getDefaultPerUsdMap(), ...liveOverrides };
+}
+
 /** Converts an amount from its own listing currency into the target display currency, via USD as the pivot. */
-export function convertCurrency(amount: number, from: string, to: CurrencyCode): number {
-  const fromDef = BY_CODE.get(from as CurrencyCode);
-  const toDef = BY_CODE.get(to);
-  if (!fromDef || !toDef) return amount;
-  const usd = amount / fromDef.perUsd;
-  return usd * toDef.perUsd;
+export function convertCurrency(
+  amount: number,
+  from: string,
+  to: CurrencyCode,
+  perUsdMap: Record<string, number> = getDefaultPerUsdMap(),
+): number {
+  const fromRate = perUsdMap[from];
+  const toRate = perUsdMap[to];
+  if (fromRate == null || toRate == null) return amount;
+  const usd = amount / fromRate;
+  return usd * toRate;
 }
 
 export function formatCurrency(amount: number, code: CurrencyCode): string {

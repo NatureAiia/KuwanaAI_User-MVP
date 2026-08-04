@@ -12,7 +12,8 @@
     "scan:social": "tsx scripts/social-scan/run.ts",
     "scan:social:telegram-login": "tsx scripts/social-scan/telegram-login.ts",
     "refresh:freshness": "tsx scripts/freshness-decay/run.ts",
-    "rotate:quests": "tsx scripts/quest-rotation/run.ts"
+    "rotate:quests": "tsx scripts/quest-rotation/run.ts",
+    "refresh:fx": "tsx scripts/fx-refresh/run.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

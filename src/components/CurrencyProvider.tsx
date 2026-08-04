@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { CURRENCIES, convertCurrency, formatCurrency, type CurrencyCode } from "@/lib/currency";
+import { CURRENCIES, convertCurrency, formatCurrency, getPerUsdMap, type CurrencyCode } from "@/lib/currency";
 
 const STORAGE_KEY = "kuwana-currency";
 
@@ -16,6 +16,7 @@ const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   const [currency, setCurrencyState] = useState<CurrencyCode>("USD");
+  const [liveRates, setLiveRates] = useState<Partial<Record<string, number>>>({});
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
@@ -23,6 +24,16 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a one-time user preference from localStorage, not deriving render output
       setCurrencyState(stored);
     }
+
+    fetch("/api/fx-rates")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.rates) setLiveRates(data.rates);
+      })
+      .catch(() => {
+        // Static defaults in lib/currency.ts already cover every currency —
+        // a failed fetch here just means we stay on those, not a broken app.
+      });
   }, []);
 
   function setCurrency(code: CurrencyCode) {
@@ -31,7 +42,8 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
   }
 
   function display(amount: number, listingCurrency: string) {
-    return formatCurrency(convertCurrency(amount, listingCurrency, currency), currency);
+    const perUsdMap = getPerUsdMap(liveRates);
+    return formatCurrency(convertCurrency(amount, listingCurrency, currency, perUsdMap), currency);
   }
 
   return (
