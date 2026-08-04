@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireConsumer } from "@/lib/auth";
 import { recordEvent } from "@/lib/gamification/process-event";
 import type { Sector } from "@prisma/client";
 
