@@ -7,6 +7,7 @@ import { ArrowUpDown } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { Button } from "@/components/ui/Button";
 import { computeDecisionScores } from "@/lib/scoring";
+import { getListingRequirements } from "@/lib/eligibility";
 import { createClient } from "@/lib/supabase/client";
 import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
@@ -140,6 +141,7 @@ export function ExploreClient({
             sectorSlug={sectorSlug}
             selected={selected.includes(listing.id)}
             onToggleSelect={toggleSelect}
+            requirements={data ? getListingRequirements(listing, data.attributeSchema) : undefined}
           />
         ))}
       </div>

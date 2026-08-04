@@ -12,6 +12,7 @@ import { notifyGamification } from "@/lib/gamification/client";
 import { useCurrency } from "@/components/CurrencyProvider";
 import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
+import type { Requirement } from "@/lib/eligibility";
 
 export function ListingCard({
   listing,
@@ -20,6 +21,7 @@ export function ListingCard({
   sectorSlug,
   selected,
   onToggleSelect,
+  requirements,
 }: {
   listing: ListingDTO;
   score: number;
@@ -27,6 +29,7 @@ export function ListingCard({
   sectorSlug: string;
   selected: boolean;
   onToggleSelect: (id: string) => void;
+  requirements?: Requirement[];
 }) {
   const [saved, setSaved] = useState(false);
   const { display } = useCurrency();
@@ -112,6 +115,12 @@ export function ListingCard({
                   : `${TREND_ARROW[trend.direction]} ${Math.abs(trend.changePercent)}%`}
               </Badge>
             )}
+            {requirements?.map((r) => (
+              <Badge key={r.key} tone="sky">
+                {r.label} {String(r.value)}
+                {r.unit ? ` ${r.unit}` : ""}
+              </Badge>
+            ))}
           </div>
         </div>
         <SignalBloom value={score} size={56} />

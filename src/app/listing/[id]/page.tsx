@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
 import { computePriceForecast } from "@/lib/priceTrend";
+import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { Badge } from "@/components/ui/Card";
@@ -25,6 +26,15 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   if (!listing) notFound();
 
   const attributes = listing.attributes as Record<string, unknown>;
+  const attributeSchema = listing.category.attributeSchema.map((a) => ({
+    key: a.key,
+    label: a.label,
+    dataType: a.dataType as "number" | "string" | "enum" | "boolean",
+    unit: a.unit,
+    isComparable: a.isComparable,
+    sortOrder: a.sortOrder,
+  }));
+  const requirements = getListingRequirements({ attributes }, attributeSchema);
   const trends = await getListingPriceTrends([listing.id]);
   const trend = trends[listing.id];
   const forecast = trend ? computePriceForecast(trend) : null;
@@ -75,21 +85,37 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         </p>
       )}
 
+      {requirements.length > 0 && (
+        <div className="mt-6 rounded-[var(--radius-card)] border border-accent-sky/40 bg-accent-sky/5 p-5">
+          <h2 className="font-display text-[15px] font-semibold">To qualify</h2>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {requirements.map((r) => (
+              <Badge key={r.key} tone="sky">
+                {r.label} {String(r.value)}
+                {r.unit ? ` ${r.unit}` : ""}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
         <h2 className="font-display text-[15px] font-semibold">Specifications</h2>
         <dl className="mt-3 space-y-2.5">
-          {listing.category.attributeSchema.map((attr) => (
-            <div key={attr.key} className="flex justify-between text-[13px]">
-              <dt className="text-text-secondary">{attr.label}</dt>
-              <dd className="font-medium">
-                {typeof attributes[attr.key] === "boolean"
-                  ? attributes[attr.key]
-                    ? "Yes"
-                    : "No"
-                  : `${attributes[attr.key] ?? "—"}${attr.unit ? ` ${attr.unit}` : ""}`}
-              </dd>
-            </div>
-          ))}
+          {listing.category.attributeSchema
+            .filter((attr) => !isRequirementAttribute(attr.key))
+            .map((attr) => (
+              <div key={attr.key} className="flex justify-between text-[13px]">
+                <dt className="text-text-secondary">{attr.label}</dt>
+                <dd className="font-medium">
+                  {typeof attributes[attr.key] === "boolean"
+                    ? attributes[attr.key]
+                      ? "Yes"
+                      : "No"
+                    : `${attributes[attr.key] ?? "—"}${attr.unit ? ` ${attr.unit}` : ""}`}
+                </dd>
+              </div>
+            ))}
         </dl>
       </div>
 
