@@ -8,10 +8,12 @@
  *   npx tsx scripts/quest-rotation/run.ts
  */
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { prisma } from "@/lib/prisma";
 import { QUEST_TEMPLATES } from "@/lib/gamification/questTemplates";
 
-async function main() {
+/** Shared by the CLI entrypoint below and src/app/api/cron/quest-rotation/route.ts. */
+export async function runQuestRotation() {
   const now = new Date();
 
   const active = await prisma.quest.findFirst({
@@ -19,7 +21,7 @@ async function main() {
   });
   if (active) {
     console.log(`[quest-rotation] "${active.name}" is still active until ${active.activeTo.toISOString()} — nothing to do.`);
-    return;
+    return { started: false, activeQuest: active.name, activeUntil: active.activeTo.toISOString() };
   }
 
   // Pick the next template so it doesn't repeat whatever ran last.
@@ -33,11 +35,14 @@ async function main() {
   });
 
   console.log(`[quest-rotation] started "${quest.name}" (${quest.id}), active until ${activeTo.toISOString()}.`);
+  return { started: true, activeQuest: quest.name, activeUntil: activeTo.toISOString() };
 }
 
-main()
-  .catch((err) => {
-    console.error("[quest-rotation] failed:", err);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  runQuestRotation()
+    .catch((err) => {
+      console.error("[quest-rotation] failed:", err);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

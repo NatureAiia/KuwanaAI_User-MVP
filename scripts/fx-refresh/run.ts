@@ -9,6 +9,7 @@
  *   npx tsx scripts/fx-refresh/run.ts
  */
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { prisma } from "@/lib/prisma";
 import { CURRENCIES } from "@/lib/currency";
 
@@ -19,7 +20,8 @@ const API_URL = "https://open.er-api.com/v6/latest/USD";
 // "ZiG" in the app (matching local usage) but "ZWG" upstream.
 const ISO_CODE_OVERRIDES: Partial<Record<string, string>> = { ZiG: "ZWG" };
 
-async function main() {
+/** Shared by the CLI entrypoint below and src/app/api/cron/fx-refresh/route.ts. */
+export async function runFxRefresh() {
   const res = await fetch(API_URL);
   if (!res.ok) throw new Error(`FX API request failed: HTTP ${res.status}`);
   const body = await res.json();
@@ -49,11 +51,14 @@ async function main() {
 
   const trackedNonUsd = CURRENCIES.length - 1;
   console.log(`\n[fx-refresh] updated ${updated}/${trackedNonUsd} live currencies.`);
+  return { updated, trackedNonUsd };
 }
 
-main()
-  .catch((err) => {
-    console.error("[fx-refresh] failed:", err);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  runFxRefresh()
+    .catch((err) => {
+      console.error("[fx-refresh] failed:", err);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}

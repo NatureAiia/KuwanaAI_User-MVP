@@ -9,10 +9,12 @@
  *   npx tsx scripts/freshness-decay/run.ts
  */
 import "dotenv/config";
+import { fileURLToPath } from "node:url";
 import { prisma } from "@/lib/prisma";
 import { computeFreshnessStatus } from "@/lib/freshness";
 
-async function main() {
+/** Shared by the CLI entrypoint below and src/app/api/cron/freshness/route.ts. */
+export async function runFreshnessDecay() {
   const listings = await prisma.listing.findMany({
     select: { id: true, name: true, freshnessStatus: true, lastVerifiedAt: true },
   });
@@ -29,11 +31,16 @@ async function main() {
   }
 
   console.log(`\n[freshness] checked ${listings.length} listings, updated ${updated}.`);
+  return { checked: listings.length, updated };
 }
 
-main()
-  .catch((err) => {
-    console.error("[freshness] failed:", err);
-    process.exitCode = 1;
-  })
-  .finally(() => prisma.$disconnect());
+// Only auto-run when executed directly (`npx tsx scripts/freshness-decay/run.ts`)
+// — not when the API cron route imports runFreshnessDecay as a function.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  runFreshnessDecay()
+    .catch((err) => {
+      console.error("[freshness] failed:", err);
+      process.exitCode = 1;
+    })
+    .finally(() => prisma.$disconnect());
+}
