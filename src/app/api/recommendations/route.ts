@@ -5,6 +5,7 @@ import { requireConsumer } from "@/lib/auth";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
+import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { recordEvent } from "@/lib/gamification/process-event";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { Sector } from "@prisma/client";
@@ -79,6 +80,7 @@ export async function POST(req: Request) {
   const dataForModel = listingDTOs.map((l) => {
     const trend = trends[l.id];
     const score = scores[l.id];
+    const requirements = getListingRequirements(l, attributeSchema).map(formatRequirement);
     return {
       name: l.name,
       provider: l.provider.name,
@@ -86,6 +88,7 @@ export async function POST(req: Request) {
       price: l.price,
       currency: l.currency,
       attributes: l.attributes,
+      requirements_to_qualify: requirements.length > 0 ? requirements : "none stated",
       freshness: l.freshnessStatus,
       decision_score: score && {
         total: score.total,
@@ -112,11 +115,14 @@ export async function POST(req: Request) {
       "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
       "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
       "overall fit for value and needs. Each listing includes a decision_score breakdown " +
-      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total) " +
-      "and a price_trend — use these as your primary evidence, and reference them concretely in your " +
-      "explanation (e.g. its price trend, freshness, or provider trust) rather than restating the raw " +
-      "price. Only reference data present in the listings provided; never invent statistics. Always " +
-      "make clear this is an AI-assisted recommendation.",
+      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
+      "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
+      "access it) — use these as your primary evidence, and reference them concretely in your " +
+      "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
+      "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
+      "materially higher requirement than the others, say so explicitly — this is an eligibility " +
+      "signal, not just a spec difference. Only reference data present in the listings provided; " +
+      "never invent statistics. Always make clear this is an AI-assisted recommendation.",
     messages: [
       {
         role: "user",

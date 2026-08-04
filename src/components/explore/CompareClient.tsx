@@ -13,6 +13,7 @@ import { notifyGamification } from "@/lib/gamification/client";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null) {
   if (value === undefined || value === null) return "—";
@@ -146,6 +147,31 @@ export function CompareClient({
             </tr>
           </thead>
           <tbody>
+            {attributeSchema.some((a) => isRequirementAttribute(a.key)) && (
+              <tr className="border-b border-border bg-accent-sky/5">
+                <td className="p-3 font-medium text-text-secondary">To qualify</td>
+                {listings.map((l) => {
+                  const requirements = getListingRequirements(l, attributeSchema);
+                  if (requirements.length === 0) {
+                    return (
+                      <td key={l.id} className="p-3 text-text-muted">
+                        No stated requirement
+                      </td>
+                    );
+                  }
+                  return (
+                    <td key={l.id} className="p-3">
+                      {requirements.map((r) => (
+                        <Badge key={r.key} tone="sky">
+                          {r.label} {String(r.value)}
+                          {r.unit ? ` ${r.unit}` : ""}
+                        </Badge>
+                      ))}
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
             <tr className="border-b border-border">
               <td className="p-3 font-medium text-text-secondary">Price</td>
               {listings.map((l) => (
@@ -197,7 +223,7 @@ export function CompareClient({
               })}
             </tr>
             {attributeSchema
-              .filter((a) => a.isComparable)
+              .filter((a) => a.isComparable && !isRequirementAttribute(a.key))
               .map((attr) => (
                 <tr key={attr.key} className="border-b border-border last:border-0">
                   <td className="p-3 font-medium text-text-secondary">{attr.label}</td>
