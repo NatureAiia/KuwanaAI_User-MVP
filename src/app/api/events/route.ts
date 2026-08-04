@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireConsumer } from "@/lib/auth";
 import { recordEvent } from "@/lib/gamification/process-event";
 
 const bodySchema = z.object({
@@ -21,8 +21,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireConsumer();
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {

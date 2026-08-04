@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireConsumer } from "@/lib/auth";
 
 export async function GET() {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireConsumer();
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const consent = await prisma.consent.findUnique({
     where: { userId_consentType: { userId: user.id, consentType: "leaderboard_participation" } },

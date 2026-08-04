@@ -11,8 +11,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireConsumer();
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -46,8 +47,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireConsumer();
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const comparisons = await prisma.comparison.findMany({
     where: { userId: user.id },

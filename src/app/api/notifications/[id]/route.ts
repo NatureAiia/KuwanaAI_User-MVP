@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/auth";
+import { requireConsumer } from "@/lib/auth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
-  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const auth = await requireConsumer();
+  if ("response" in auth) return auth.response;
+  const { user } = auth;
 
   const { id } = await params;
   const result = await prisma.notification.updateMany({
