@@ -6,6 +6,7 @@ import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
 
 const CHAT_HISTORY_LIMIT = 20;
 
@@ -15,13 +16,22 @@ const SYSTEM_PROMPT =
   "users understand their options, how to compare providers, and how Kuwana's decision score works " +
   "(a transparent price/benefit blend). Never invent specific prices, providers, or statistics — if the " +
   "user asks about specific current listings and none are provided below as grounding data, say so " +
-  "plainly and point them to the Explore tab for live comparisons rather than guessing. Keep replies " +
-  "short (2-4 sentences unless more detail is clearly needed). Always make clear you're an AI assistant, " +
-  "not a financial advisor.";
+  "plainly and point them to the Explore tab for live comparisons rather than guessing. If an image is " +
+  "attached, you may describe or reason about it, but still never invent specific prices for a product " +
+  "you recognize unless that price is present in the grounding data. Keep replies short (2-4 sentences " +
+  "unless more detail is clearly needed). Always make clear you're an AI assistant, not a financial advisor.";
+
+const IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
 const postSchema = z.object({
-  content: z.string().trim().min(1).max(2000),
+  content: z.string().trim().max(2000),
   listingIds: z.array(z.string()).max(6).optional(),
+  image: z
+    .object({
+      mediaType: z.enum(IMAGE_MEDIA_TYPES),
+      data: z.string().max(6_000_000), // ~4.5MB decoded, comfortably under Claude's per-image limit
+    })
+    .optional(),
 });
 
 async function listingSummaries(listingIds: string[]) {
@@ -76,7 +86,10 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { content, listingIds } = parsed.data;
+  const { content, listingIds, image } = parsed.data;
+  if (!content && !image) {
+    return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
+  }
 
   const conversation = await prisma.conversation.findFirst({
     where: { userId: user.id },
@@ -136,54 +149,92 @@ export async function POST(req: Request) {
     }
   }
 
+  const lastUserContent: Parameters<typeof anthropic.messages.stream>[0]["messages"][number]["content"] = image
+    ? [
+        { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
+        { type: "text", text: content || "What can you tell me about this?" },
+      ]
+    : content;
+
   const claudeMessages = [
     ...priorMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user" as const, content },
+    { role: "user" as const, content: lastUserContent },
   ];
 
-  const response = await anthropic.messages.create({
-    model: RECOMMENDATION_MODEL,
-    max_tokens: 700,
-    system,
-    messages: claudeMessages,
-  });
+  const persistedUserContent = content || "[Image attached]";
 
-  const textBlock = response.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return NextResponse.json({ error: "No reply generated" }, { status: 502 });
-  }
-  const replyText = textBlock.text;
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      let fullText = "";
+      try {
+        const stream = anthropic.messages.stream({
+          model: RECOMMENDATION_MODEL,
+          max_tokens: 700,
+          system,
+          messages: claudeMessages,
+        });
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            fullText += event.delta.text;
+            controller.enqueue(encoder.encode(event.delta.text));
+          }
+        }
+      } catch {
+        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
+        controller.close();
+        return;
+      }
 
-  const { assistantMessage, conversationId, gamification } = await prisma.$transaction(async (tx) => {
-    const conv =
-      conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
+      if (!fullText.trim()) {
+        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
+        controller.close();
+        return;
+      }
 
-    await tx.message.create({
-      data: { conversationId: conv.id, role: "user", content, listingIds: listingIds ?? [] },
-    });
-    const assistant = await tx.message.create({
-      data: { conversationId: conv.id, role: "assistant", content: replyText, listingIds: listingIds ?? [] },
-    });
-    await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
+      try {
+        const { assistantMessage, conversationId, gamification } = await prisma.$transaction(
+          async (tx) => {
+            const conv = conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
 
-    const gam = isNewConversation
-      ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
-      : null;
+            await tx.message.create({
+              data: { conversationId: conv.id, role: "user", content: persistedUserContent, listingIds: listingIds ?? [] },
+            });
+            const assistant = await tx.message.create({
+              data: { conversationId: conv.id, role: "assistant", content: fullText, listingIds: listingIds ?? [] },
+            });
+            await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
 
-    return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
-  });
+            const gam = isNewConversation
+              ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
+              : null;
 
-  const listings = await listingSummaries(listingIds ?? []);
+            return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
+          },
+          { timeout: 15_000 },
+        );
 
-  return NextResponse.json({
-    conversationId,
-    message: {
-      id: assistantMessage.id,
-      role: "assistant",
-      content: assistantMessage.content,
-      createdAt: assistantMessage.createdAt.toISOString(),
-      listings,
+        const listings = await listingSummaries(listingIds ?? []);
+        const meta = {
+          conversationId,
+          gamification,
+          message: {
+            id: assistantMessage.id,
+            role: "assistant" as const,
+            content: fullText,
+            createdAt: assistantMessage.createdAt.toISOString(),
+            listings,
+          },
+        };
+        controller.enqueue(encoder.encode(STREAM_META_MARKER + JSON.stringify(meta)));
+      } catch {
+        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
+      }
+      controller.close();
     },
-    gamification,
+  });
+
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" },
   });
 }

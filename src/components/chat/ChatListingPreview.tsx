@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { FormattedPrice } from "@/components/FormattedPrice";
 import type { ChatListingSummary } from "@/components/chat/MessageBubble";
 
 export function ChatListingPreview({ listings }: { listings: ChatListingSummary[] }) {
@@ -22,7 +23,7 @@ export function ChatListingPreview({ listings }: { listings: ChatListingSummary[
             <p className="text-text-muted">{l.provider}</p>
           </div>
           <p className="font-mono font-semibold text-text-primary">
-            {l.currency} {l.price.toFixed(2)}
+            <FormattedPrice amount={l.price} currency={l.currency} />
           </p>
         </div>
       ))}

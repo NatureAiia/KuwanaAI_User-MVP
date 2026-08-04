@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SignalBloom } from "@/components/SignalBloom";
 import { Badge } from "@/components/ui/Card";
+import { FormattedPrice } from "@/components/FormattedPrice";
 import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
@@ -36,7 +37,7 @@ export function HeroCarousel({
               <SignalBloom value={listing.score} size={44} />
             </div>
             <p className="mt-3 font-mono text-[18px] font-semibold">
-              {listing.currency} {listing.price.toFixed(2)}
+              <FormattedPrice amount={listing.price} currency={listing.currency} />
             </p>
             {listing.trend && listing.trend.direction !== "flat" && (
               <Badge tone={TREND_TONE[listing.trend.direction]} className="mt-2">

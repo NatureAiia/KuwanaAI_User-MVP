@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, Manrope, IBM_Plex_Mono } from "next/font/google";
 import Script from "next/script";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
+import { CurrencyProvider } from "@/components/CurrencyProvider";
 import "./globals.css";
 
 const THEME_INIT_SCRIPT = `
@@ -52,7 +53,7 @@ export default function RootLayout({
           {THEME_INIT_SCRIPT}
         </Script>
         <GamificationToastHost />
-        {children}
+        <CurrencyProvider>{children}</CurrencyProvider>
       </body>
     </html>
   );

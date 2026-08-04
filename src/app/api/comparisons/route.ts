@@ -26,18 +26,21 @@ export async function POST(req: Request) {
   });
   if (!category) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
-  const result = await prisma.$transaction(async (tx) => {
-    const comparison = await tx.comparison.create({
-      data: { userId: user.id, categoryId, listingIds },
-    });
-    const gamification = await recordEvent(tx, {
-      userId: user.id,
-      eventType: "comparison_completed",
-      sector: category.sector.slug as Sector,
-      metadata: { categoryId, listingIds },
-    });
-    return { comparison, gamification };
-  });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const comparison = await tx.comparison.create({
+        data: { userId: user.id, categoryId, listingIds },
+      });
+      const gamification = await recordEvent(tx, {
+        userId: user.id,
+        eventType: "comparison_completed",
+        sector: category.sector.slug as Sector,
+        metadata: { categoryId, listingIds },
+      });
+      return { comparison, gamification };
+    },
+    { timeout: 15_000 },
+  );
 
   return NextResponse.json(result);
 }

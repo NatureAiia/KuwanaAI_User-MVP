@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bell, ChevronRight } from "lucide-react";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
+import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
@@ -69,6 +70,11 @@ export default function SettingsPage() {
             <ChevronRight size={16} className="text-text-muted" />
           </div>
         </Link>
+      </div>
+
+      <div className="mt-6 space-y-2.5">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Display currency</h2>
+        <CurrencySwitcher />
       </div>
 
       <div className="mt-6 space-y-2.5">

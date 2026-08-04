@@ -139,23 +139,26 @@ export async function POST(req: Request) {
 
   const confidence = Math.max(0, Math.min(1, result.confidence));
 
-  const gamification = await prisma.$transaction(async (tx) => {
-    await tx.recommendation.create({
-      data: {
+  const gamification = await prisma.$transaction(
+    async (tx) => {
+      await tx.recommendation.create({
+        data: {
+          userId: user.id,
+          listingId: recommendedListing.id,
+          explanation: result.explanation,
+          confidence,
+          scoreVersion: CURRENT_DECISION_SCORE_VERSION,
+        },
+      });
+      return recordEvent(tx, {
         userId: user.id,
-        listingId: recommendedListing.id,
-        explanation: result.explanation,
-        confidence,
-        scoreVersion: CURRENT_DECISION_SCORE_VERSION,
-      },
-    });
-    return recordEvent(tx, {
-      userId: user.id,
-      eventType: "recommendation_viewed",
-      sector: category.sector.slug as Sector,
-      metadata: { listingId: recommendedListing.id },
-    });
-  });
+        eventType: "recommendation_viewed",
+        sector: category.sector.slug as Sector,
+        metadata: { listingId: recommendedListing.id },
+      });
+    },
+    { timeout: 15_000 },
+  );
 
   return NextResponse.json({
     listingId: recommendedListing.id,

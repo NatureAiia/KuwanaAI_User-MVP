@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { ListingActions } from "@/components/ListingActions";
 import { PriceSparkline } from "@/components/PriceSparkline";
+import { FormattedPrice } from "@/components/FormattedPrice";
 import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +42,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
       <div className="mt-4 flex items-center gap-3">
         <p className="font-mono text-[28px] font-semibold">
-          {listing.currency} {Number(listing.price).toFixed(2)}
+          <FormattedPrice amount={Number(listing.price)} currency={listing.currency} />
         </p>
         <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]}>{listing.freshnessStatus}</Badge>
       </div>
@@ -67,8 +68,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
       {forecast && (
         <p className="mt-2 text-[11px] text-text-muted">
-          At this rate, expect ~{listing.currency} {forecast.projectedPrice.toFixed(2)} in {forecast.projectionDays}{" "}
-          days. Estimate based on the recent trend, not a guarantee.
+          At this rate, expect ~<FormattedPrice amount={forecast.projectedPrice} currency={listing.currency} /> in{" "}
+          {forecast.projectionDays} days. Estimate based on the recent trend, not a guarantee.
         </p>
       )}
 

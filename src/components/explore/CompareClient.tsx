@@ -7,6 +7,7 @@ import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { SignalBloom } from "@/components/SignalBloom";
+import { FormattedPrice } from "@/components/FormattedPrice";
 import { computeDecisionScores } from "@/lib/scoring";
 import { notifyGamification } from "@/lib/gamification/client";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
@@ -149,7 +150,7 @@ export function CompareClient({
               <td className="p-3 font-medium text-text-secondary">Price</td>
               {listings.map((l) => (
                 <td key={l.id} className="p-3 font-mono font-semibold">
-                  {l.currency} {l.price.toFixed(2)}
+                  <FormattedPrice amount={l.price} currency={l.currency} />
                 </td>
               ))}
             </tr>

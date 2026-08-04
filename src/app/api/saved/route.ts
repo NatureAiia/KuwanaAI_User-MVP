@@ -20,20 +20,23 @@ export async function POST(req: Request) {
   });
   if (!listing) return NextResponse.json({ error: "Listing not found" }, { status: 404 });
 
-  const result = await prisma.$transaction(async (tx) => {
-    await tx.savedListing.upsert({
-      where: { userId_listingId: { userId: user.id, listingId: listing.id } },
-      update: {},
-      create: { userId: user.id, listingId: listing.id },
-    });
-    const gamification = await recordEvent(tx, {
-      userId: user.id,
-      eventType: "item_saved",
-      sector: listing.category.sector.slug as Sector,
-      metadata: { listingId: listing.id },
-    });
-    return gamification;
-  });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      await tx.savedListing.upsert({
+        where: { userId_listingId: { userId: user.id, listingId: listing.id } },
+        update: {},
+        create: { userId: user.id, listingId: listing.id },
+      });
+      const gamification = await recordEvent(tx, {
+        userId: user.id,
+        eventType: "item_saved",
+        sector: listing.category.sector.slug as Sector,
+        metadata: { listingId: listing.id },
+      });
+      return gamification;
+    },
+    { timeout: 15_000 },
+  );
 
   return NextResponse.json({ gamification: result });
 }

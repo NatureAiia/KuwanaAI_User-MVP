@@ -9,6 +9,7 @@ import { ProviderLogo } from "@/components/ProviderLogo";
 import { Badge } from "@/components/ui/Card";
 import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 import { notifyGamification } from "@/lib/gamification/client";
+import { useCurrency } from "@/components/CurrencyProvider";
 import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
@@ -28,6 +29,7 @@ export function ListingCard({
   onToggleSelect: (id: string) => void;
 }) {
   const [saved, setSaved] = useState(false);
+  const { display } = useCurrency();
 
   async function toggleSaved() {
     const nextSaved = !saved;
@@ -93,11 +95,11 @@ export function ListingCard({
         <div>
           <div className="flex items-baseline gap-1.5">
             <p className="font-mono text-[22px] font-semibold text-text-primary">
-              {listing.currency} {listing.price.toFixed(2)}
+              {display(listing.price, listing.currency)}
             </p>
             {hasSavings && (
               <p className="font-mono text-[13px] text-text-muted line-through">
-                {listing.currency} {trend!.earliestPrice.toFixed(2)}
+                {display(trend!.earliestPrice, listing.currency)}
               </p>
             )}
           </div>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
+import { FormattedPrice } from "@/components/FormattedPrice";
 import { SECTORS } from "@/lib/sectors";
 
 export default async function SavedPage() {
@@ -44,7 +45,7 @@ export default async function SavedPage() {
                 <p className="text-[12px] text-text-muted">{s.listing.provider.name}</p>
               </div>
               <p className="font-mono text-[14px] font-semibold">
-                {s.listing.currency} {Number(s.listing.price).toFixed(2)}
+                <FormattedPrice amount={Number(s.listing.price)} currency={s.listing.currency} />
               </p>
             </Link>
           ))}

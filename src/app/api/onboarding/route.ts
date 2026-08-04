@@ -79,38 +79,41 @@ export async function POST(req: Request) {
     healthcare: healthcareFootprint,
   };
 
-  const gamification = await prisma.$transaction(async (tx) => {
-    await tx.user.upsert({
-      where: { id: authUser.id },
-      update: { email: authUser.email!, role },
-      create: { id: authUser.id, email: authUser.email!, role },
-    });
-
-    await tx.userProfile.upsert({
-      where: { userId: authUser.id },
-      update: { fullName, ageRange, occupation, location, socialPlatforms },
-      create: { userId: authUser.id, fullName, ageRange, occupation, location, socialPlatforms },
-    });
-
-    for (const [sector, data] of Object.entries(footprintsBySector)) {
-      if (!data) continue;
-      await tx.sectorFootprint.upsert({
-        where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
-        update: { data },
-        create: { userId: authUser.id, sector: sector as Sector, data },
+  const gamification = await prisma.$transaction(
+    async (tx) => {
+      await tx.user.upsert({
+        where: { id: authUser.id },
+        update: { email: authUser.email!, role },
+        create: { id: authUser.id, email: authUser.email!, role },
       });
-    }
 
-    for (const [consentType, granted] of Object.entries(consents)) {
-      await tx.consent.upsert({
-        where: { userId_consentType: { userId: authUser.id, consentType } },
-        update: { granted, grantedAt: new Date() },
-        create: { userId: authUser.id, consentType, granted },
+      await tx.userProfile.upsert({
+        where: { userId: authUser.id },
+        update: { fullName, ageRange, occupation, location, socialPlatforms },
+        create: { userId: authUser.id, fullName, ageRange, occupation, location, socialPlatforms },
       });
-    }
 
-    return recordEvent(tx, { userId: authUser.id, eventType: "profile_completed" });
-  });
+      for (const [sector, data] of Object.entries(footprintsBySector)) {
+        if (!data) continue;
+        await tx.sectorFootprint.upsert({
+          where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
+          update: { data },
+          create: { userId: authUser.id, sector: sector as Sector, data },
+        });
+      }
+
+      for (const [consentType, granted] of Object.entries(consents)) {
+        await tx.consent.upsert({
+          where: { userId_consentType: { userId: authUser.id, consentType } },
+          update: { granted, grantedAt: new Date() },
+          create: { userId: authUser.id, consentType, granted },
+        });
+      }
+
+      return recordEvent(tx, { userId: authUser.id, eventType: "profile_completed" });
+    },
+    { timeout: 15_000 },
+  );
 
   return NextResponse.json({ gamification });
 }
