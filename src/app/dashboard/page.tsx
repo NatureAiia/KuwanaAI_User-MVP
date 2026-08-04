@@ -9,6 +9,7 @@ import { Header } from "@/components/Header";
 import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
+import { NeedIntake } from "@/components/explore/NeedIntake";
 
 const ROLE_DASHBOARD: Partial<Record<string, string>> = { corporate: "/corporate", regulator: "/regulator" };
 
@@ -46,6 +47,8 @@ export default async function DashboardPage() {
           <h1 className="font-display text-[24px] font-bold">{firstName ?? "there"}</h1>
         </div>
       </div>
+
+      <NeedIntake />
 
       <div className="mt-4">
         <GamificationStrip
