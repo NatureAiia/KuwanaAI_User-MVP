@@ -3,7 +3,17 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // /explore is intentionally NOT protected — pre-signup visitors can browse
 // read-only (Section 7.1); compare/save/action routes gate client-side.
-const PROTECTED_PREFIXES = ["/dashboard", "/profile", "/leaderboard", "/settings", "/chat", "/admin"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/profile",
+  "/leaderboard",
+  "/settings",
+  "/chat",
+  "/admin",
+  "/corporate",
+  "/regulator",
+  "/notifications",
+];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
