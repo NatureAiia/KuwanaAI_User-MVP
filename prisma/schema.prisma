@@ -404,3 +404,29 @@ model UserStreak {
 
   @@map("user_streaks")
 }
+
+enum SocialPlatform {
+  telegram
+  reddit
+}
+
+/// A public social post mentioning a price, found by the free social-media
+/// price scanner (see scripts/social-scan). Read-only intelligence feed —
+/// never shown to end users directly, reviewed by an admin before any
+/// listing/price data is acted on.
+model SocialPriceMention {
+  id              String         @id @default(uuid())
+  platform        SocialPlatform
+  channel         String // Telegram channel username, or subreddit name
+  sourceUrl       String         @map("source_url")
+  postedAt        DateTime?      @map("posted_at")
+  discoveredAt    DateTime       @default(now()) @map("discovered_at")
+  text            String
+  matchedProvider String?        @map("matched_provider")
+  extractedPrices Json           @map("extracted_prices") // ExtractedPrice[]
+  reviewed        Boolean        @default(false)
+
+  @@unique([platform, sourceUrl])
+  @@index([matchedProvider])
+  @@map("social_price_mentions")
+}

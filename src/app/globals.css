@@ -82,3 +82,25 @@ body {
   min-height: 44px;
   min-width: 44px;
 }
+
+/* Route-change crossfade — see components/PageTransition.tsx */
+.page-transition--exit {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.page-transition--enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition--exit,
+  .page-transition--enter {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}

@@ -1,6 +1,9 @@
 import type { EventType } from "@prisma/client";
 
-// Section 6.2 — starting XP values.
+// Section 6.2 — starting XP values. Seeded once into GamificationRule at
+// `prisma/seed.ts` time; after that, the DB row is the source of truth —
+// process-event.ts reads from GamificationRule, never from this constant.
+// Editing a live value is a data change (update the row), not a deploy.
 export const XP_RULES: Record<EventType, number> = {
   profile_completed: 50,
   comparison_viewed: 2,
@@ -42,3 +45,37 @@ export const BADGE_DEFS = [
 ] as const;
 
 export type BadgeName = (typeof BADGE_DEFS)[number]["name"];
+
+/**
+ * Badge trigger specs, seeded into GamificationRule.badgeTrigger (jsonb) —
+ * process-event.ts evaluates whatever's in the DB, not this constant. Kept
+ * here only as what the seed writes on first run.
+ */
+export type BadgeTrigger =
+  | { badge: BadgeName; type: "always" }
+  | { badge: BadgeName; type: "event_count_in_sector"; count: number }
+  | { badge: BadgeName; type: "distinct_sector_count"; count: number }
+  | { badge: BadgeName; type: "streak_count"; count: number };
+
+export const BADGE_TRIGGERS: Partial<Record<EventType, BadgeTrigger[]>> = {
+  profile_completed: [{ badge: "Profile complete", type: "always" }],
+  comparison_completed: [
+    { badge: "5 comparisons in one sector", type: "event_count_in_sector", count: 5 },
+    { badge: "Multi-sector explorer", type: "distinct_sector_count", count: 2 },
+  ],
+  daily_visit: [{ badge: "7-day streak", type: "streak_count", count: 7 }],
+};
+
+/** Event types whose GamificationRule carries `questTrigger: true` at seed time. */
+export const QUEST_TRIGGER_EVENTS: EventType[] = ["comparison_completed", "daily_visit"];
+
+/**
+ * Quest.criteria shapes the progress engine understands. "target" is the
+ * count/streak length that completes the quest; "window" (days) restricts
+ * counting to the quest's own activeFrom/activeTo span when unset.
+ */
+export type QuestCriteria =
+  | { type: "category_count"; target: number }
+  | { type: "comparison_count"; target: number }
+  | { type: "sector_diversity"; target: number }
+  | { type: "streak_count"; target: number };

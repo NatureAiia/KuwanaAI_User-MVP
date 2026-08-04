@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
+import { DynamicBar } from "@/components/ui/DynamicBar";
+import { GlowBorder } from "@/components/ui/GlowBorder";
 
 export default async function QuestsPage() {
   const user = await requireUser();
@@ -31,7 +33,7 @@ export default async function QuestsPage() {
           const pct = Math.min(100, Math.round((progress / target) * 100));
 
           return (
-            <div key={quest.id} className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-4">
+            <GlowBorder key={quest.id} className="bg-bg-surface p-4">
               <div className="flex items-center gap-2">
                 {completed ? (
                   <CheckCircle2 size={18} className="text-accent-teal" />
@@ -41,16 +43,13 @@ export default async function QuestsPage() {
                 <p className="font-display text-[15px] font-semibold">{quest.name}</p>
               </div>
               <p className="mt-1 text-[13px] text-text-secondary">{quest.description}</p>
-              <div className="mt-3 h-1.5 w-full rounded-full bg-bg-surface-raised">
-                <div
-                  className="h-1.5 rounded-full bg-accent-teal transition-all"
-                  style={{ width: `${pct}%` }}
-                />
+              <div className="mt-3">
+                <DynamicBar value={pct} color="teal" />
               </div>
               <p className="mt-1.5 text-[11px] text-text-muted">
                 {progress}/{target} · ends {quest.activeTo.toLocaleDateString()}
               </p>
-            </div>
+            </GlowBorder>
           );
         })}
       </div>

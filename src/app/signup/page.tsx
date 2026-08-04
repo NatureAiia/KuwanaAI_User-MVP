@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
 import { buildFactQueue } from "@/lib/onboarding-facts";
+import { DynamicBar } from "@/components/ui/DynamicBar";
 import { Building2, Check, Landmark, User, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
@@ -73,14 +74,7 @@ type Step = "role" | ConsumerStep | "processing";
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
   const pct = ((index + 1) / CONSUMER_STEPS.length) * 100;
-  return (
-    <div className="h-1.5 w-full rounded-full bg-bg-surface-raised">
-      <div
-        className="h-1.5 rounded-full bg-accent-sky transition-all duration-300"
-        style={{ width: `${Math.min(pct, 100)}%` }}
-      />
-    </div>
-  );
+  return <DynamicBar value={pct} color="sky" />;
 }
 
 function ChipGroup({

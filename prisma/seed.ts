@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from "@prisma/client";
-import { BADGE_DEFS } from "../src/lib/gamification/rules";
+import { BADGE_DEFS, XP_RULES, BADGE_TRIGGERS, QUEST_TRIGGER_EVENTS } from "../src/lib/gamification/rules";
 
 const prisma = new PrismaClient();
 
@@ -27,16 +27,6 @@ function buildPriceHistory(currentPrice: number, seedKey: string) {
   points.push({ price: currentPrice, recordedAt: new Date(now) });
   return points;
 }
-
-const XP_RULES: Record<string, number> = {
-  profile_completed: 50,
-  comparison_viewed: 2,
-  comparison_completed: 10,
-  recommendation_viewed: 3,
-  item_saved: 5,
-  action_taken: 25,
-  daily_visit: 5,
-};
 
 type AttrDef = {
   key: string;
@@ -467,10 +457,17 @@ async function main() {
   await prisma.provider.update({ where: { id: "electronics-Electromart" }, data: { verified: false } });
 
   for (const [eventType, xpValue] of Object.entries(XP_RULES)) {
+    const badgeTrigger = BADGE_TRIGGERS[eventType as keyof typeof BADGE_TRIGGERS] as
+      | Prisma.InputJsonValue
+      | undefined;
+    const questTrigger = QUEST_TRIGGER_EVENTS.includes(eventType as never)
+      ? (true as unknown as Prisma.InputJsonValue)
+      : undefined;
+
     await prisma.gamificationRule.upsert({
       where: { eventType: eventType as never },
-      update: { xpValue },
-      create: { eventType: eventType as never, xpValue },
+      update: { xpValue, badgeTrigger, questTrigger },
+      create: { eventType: eventType as never, xpValue, badgeTrigger, questTrigger },
     });
   }
 
