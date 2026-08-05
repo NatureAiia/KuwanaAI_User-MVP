@@ -145,10 +145,11 @@ decision-intelligence core over porting more comparison-platform features from o
 - **9 sectors are seeded "live"** (beyond the original 4-sector MVP scope). Left as-is rather than
   rolling back real seeded work — worth an explicit product conversation, not a unilateral scope
   cut.
-- **Corporate/Regulator/Provider portals stay intentionally thin** relative to the older
+- **Corporate/Regulator portals stay intentionally thin** relative to the older
   `zim-compare-ui-redesign` prototype's full 13-vertical, four-portal build — that breadth is
-  explicitly "backlog, not current scope" per the build plan; this session prioritized depth on
-  the Consumer decision-intelligence loop instead.
+  explicitly "backlog, not current scope" per the build plan. (Provider now has a real,
+  purpose-built portal — see below — since it needed to exist at all for the role to mean
+  anything, not because it needed the same depth as Corporate/Regulator.)
 - **`process-event.ts` gamification-engine tests weren't added** — it takes a live Prisma
   transaction client and mocking a multi-step `tx.*` interaction properly is a separate, larger
   piece of work than this pass covers. (`requireConsumer`/`requireAdmin` *are* now covered, with
@@ -159,3 +160,46 @@ decision-intelligence core over porting more comparison-platform features from o
 - **A `next`/`postcss`/`sharp` transitive dependency audit warning** (3 high-severity, fixed only
   by bumping `next` to 16.3.0, outside the currently pinned range) — a framework version bump is
   a deliberate call for someone to make, not a silent side effect of a session.
+
+## 2026-08-05 continuation: role security fix + the Provider portal
+
+A second pass, continuing from the same session.
+
+**Security fix:** `/api/onboarding` accepted `role: "corporate" | "regulator"` straight from the
+client with zero server-side check, despite the signup UI's own copy claiming domain/verification
+requirements — any signed-up user could self-grant Corporate ("Market Intelligence") or Regulator
+("Compliance & Market Monitoring") access. Restricted to `role: "consumer"` only
+(`src/lib/onboardingSchema.ts`), matching the build plan's "admin-invited only" design. Checked the
+live DB first (one existing user) — broke nothing real. This is exactly why questions worth asking
+get asked before automating further: closing it also made Corporate/Regulator/Provider
+unreachable by any legitimate path, so `/admin/users` (role assignment) had to be built as the
+replacement in the same pass.
+
+**The Provider portal** (build plan 15.2, "the 5th interface") went from schema-only to fully
+working:
+
+- **Schema**: `Listing.status` (draft/pending_review/published/rejected, default `published` so
+  every existing listing keeps behaving exactly as before) and `Provider.ownerUserId` (nullable,
+  unique — links a "provider" role account to the one Provider record it can self-manage).
+  Applied via `prisma migrate diff --from-url ... --to-schema-datamodel`, a hand-placed migration
+  file, then `migrate deploy`, since `migrate dev` needs a TTY this environment doesn't have.
+- **Every consumer-facing listing read now filters `status: "published"`** — catalog.ts's three
+  read functions, the listing detail page, `/api/chat`'s grounding queries, `/api/recommendations`,
+  `/api/saved`. Verified end to end against the live DB with a throwaway listing: invisible while
+  pending, visible once published.
+- **`/admin/catalog`** gained a Providers table with email-based owner linking (an admin knows a
+  contact's email, not their internal user id), a listing Status column, and a "Needs review"
+  filter pill with a live count — without it, a pending listing is a needle in however many
+  listings exist.
+- **`/provider`**: deliberately *not* a standard web form. The intended user may have no website,
+  no social media, and limited reading comfort — someone who uses WhatsApp/EcoCash daily but has
+  never filled out a business form online. It's a guided, one-question-per-screen wizard (sector →
+  category → name → price → one attribute per screen → plain-language review → send), all big tap
+  targets and plain words, no JSON, no dropdowns, ending on one obvious action low on the screen.
+  Only reachable once an admin links the account to a Provider record via `/admin/catalog`.
+- Every route added is covered by a mocked-auth test (`providerAuth.test.ts`,
+  `providerListingSchema.test.ts`) proving a provider account can only ever act on its own linked
+  Provider and can never self-assign `published`/`rejected`.
+
+Also fixed in passing: the "you can change this later in settings" line in the signup role picker
+was inaccurate (no such control exists) — removed rather than left misleading.
