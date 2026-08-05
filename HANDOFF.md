@@ -265,8 +265,11 @@ depth. Real gaps if that changes:
 - Admin auth is still an email allowlist (`ADMIN_EMAILS`), not a real
   role with granular permissions — fine for one admin, would need
   rethinking for multiple admins with different scopes.
-- No audit log of admin actions (who approved/rejected what, who linked
-  which provider to which user).
+- ~~No audit log of admin actions~~ **closed 2026-08-05**: `AdminAuditLog`
+  + `logAdminAction()` (`src/lib/adminAudit.ts`), wired into
+  approve/reject, listing delete, provider link/unlink, and role
+  changes. Viewable at `/admin/audit`. Tracking starts from this
+  commit — nothing before it was recorded retroactively.
 - No error-tracking/monitoring service wired up (Sentry, etc.) —
   `console.error` is the only signal right now for both the new
   `error.tsx` boundary and the recommendations failure handling.
