@@ -17,8 +17,9 @@ export default async function AdminUsersPage() {
     <div className="mx-auto max-w-[720px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Users</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
-        {users.length} user(s). This is the only way to grant Corporate/Regulator/Provider access —
-        self-service signup only ever creates Consumer accounts, by design.
+        {users.length} user(s). Corporate/Provider/Regulator can now self-register with a verified
+        email (see src/lib/orgVerification.ts) — use this to correct a mis-set role or grant access
+        manually when verification can&apos;t apply.
       </p>
 
       <div className="mt-6 overflow-x-auto rounded-[var(--radius-card)] border border-border">

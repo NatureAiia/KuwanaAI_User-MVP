@@ -54,12 +54,25 @@ database indexing).
   grant Corporate ("Market Intelligence") or Regulator ("Compliance &
   Market Monitoring") access, despite the signup UI's own copy claiming
   domain/verification requirements. Restricted to `role: "consumer"` only
-  (`src/lib/onboardingSchema.ts`). This is now the **only** self-service
-  role.
-- Built `/admin/users` as the **only legitimate way** to grant Corporate/
-  Regulator/Provider — the role-escalation fix removed the only other
-  path, so this had to exist or those three roles would be permanently
-  unreachable.
+  (`src/lib/onboardingSchema.ts`). This was the **only** self-service role.
+  - **2026-08-05 update**: reopened deliberately, at the project owner's
+    explicit request, with the missing server-side check actually built
+    this time — see `src/lib/orgVerification.ts`. Corporate now requires
+    a non-personal-email domain (blocklist); Regulator requires the
+    authenticated email's domain to match one of a small curated
+    allowlist (`REGULATORS`); Provider has no domain check by design (the
+    informal-sector persona below has no company domain to check). Both
+    checks key off `authUser.email` from the Supabase session, never the
+    request body — that's what makes this different from the original
+    hole. Admin was explicitly *not* reopened — it isn't a `Role` at all,
+    stays the `ADMIN_EMAILS` allowlist, and was deliberately left off the
+    signup role list. If you're re-reading this before touching
+    `onboardingSchema.ts` or the signup role picker: the check is the
+    point, don't strip it back to a bare role literal.
+- Built `/admin/users` as **another legitimate way** to grant Corporate/
+  Regulator/Provider (e.g. to fix a mis-set role, or hand-grant when
+  automated verification doesn't fit) — no longer the *only* way after the
+  above update, but still the only path for Admin-adjacent corrections.
 - Closed a middleware gap: `/corporate`, `/regulator`, `/notifications`,
   `/provider` weren't in `proxy.ts`'s `PROTECTED_PREFIXES` — only page-
   level checks guarded them.

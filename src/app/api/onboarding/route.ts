@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
+import { emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
     data: { user: authUser },
   } = await supabase.auth.getUser();
 
-  if (!authUser) {
+  if (!authUser?.email) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -19,51 +20,92 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const {
-    role,
-    fullName,
-    ageRange,
-    occupation,
-    location,
-    socialPlatforms,
-    telecomFootprint,
-    bankingFootprint,
-    insuranceFootprint,
-    healthcareFootprint,
-    consents,
-  } = parsed.data;
+  const data = parsed.data;
 
-  const footprintsBySector: Partial<Record<Sector, object>> = {
-    telecom: telecomFootprint,
-    banking: bankingFootprint,
-    insurance: insuranceFootprint,
-    healthcare: healthcareFootprint,
-  };
+  // The security boundary for Corporate/Regulator lives here, not in the
+  // schema — both checks key off authUser.email (from Supabase's verified
+  // session), which the client can't spoof, unlike a role in the request
+  // body. See HANDOFF.md and src/lib/orgVerification.ts.
+  if (data.role === "corporate" && isPersonalEmailDomain(authUser.email)) {
+    return NextResponse.json(
+      { error: "Corporate accounts need a work email address — please sign up again with your company email." },
+      { status: 403 },
+    );
+  }
+  if (data.role === "regulator" && !emailMatchesRegulator(authUser.email, data.regulatorName)) {
+    return NextResponse.json(
+      { error: `That email isn't a verified ${data.regulatorName} address — please sign up again with your ${data.regulatorName} email.` },
+      { status: 403 },
+    );
+  }
+
+  const footprintsBySector: Partial<Record<Sector, object>> =
+    data.role === "consumer"
+      ? {
+          telecom: data.telecomFootprint,
+          banking: data.bankingFootprint,
+          insurance: data.insuranceFootprint,
+          healthcare: data.healthcareFootprint,
+        }
+      : {};
+
+  const profileName =
+    data.role === "consumer"
+      ? data.fullName
+      : data.role === "corporate"
+        ? data.organizationName
+        : data.role === "provider"
+          ? data.businessName
+          : data.regulatorName;
 
   const gamification = await prisma.$transaction(
     async (tx) => {
       await tx.user.upsert({
         where: { id: authUser.id },
-        update: { email: authUser.email!, role },
-        create: { id: authUser.id, email: authUser.email!, role },
+        update: { email: authUser.email!, role: data.role },
+        create: { id: authUser.id, email: authUser.email!, role: data.role },
       });
 
       await tx.userProfile.upsert({
         where: { userId: authUser.id },
-        update: { fullName, ageRange, occupation, location, socialPlatforms },
-        create: { userId: authUser.id, fullName, ageRange, occupation, location, socialPlatforms },
+        update: {
+          fullName: profileName,
+          ...(data.role === "consumer"
+            ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
+            : {}),
+        },
+        create: {
+          userId: authUser.id,
+          fullName: profileName,
+          ...(data.role === "consumer"
+            ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
+            : {}),
+        },
       });
 
-      for (const [sector, data] of Object.entries(footprintsBySector)) {
-        if (!data) continue;
-        await tx.sectorFootprint.upsert({
-          where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
-          update: { data },
-          create: { userId: authUser.id, sector: sector as Sector, data },
+      // A self-service provider needs its own Provider record to manage —
+      // admin-linking (the only other path, see /admin/catalog) doesn't
+      // apply here since there's no pre-existing record to link to.
+      // verified: false until an admin reviews it (see /admin/catalog),
+      // same "unvetted until checked" pattern as a submitted listing.
+      if (data.role === "provider") {
+        await tx.provider.upsert({
+          where: { ownerUserId: authUser.id },
+          update: { name: data.businessName },
+          create: { name: data.businessName, ownerUserId: authUser.id, verified: false },
         });
       }
 
-      for (const [consentType, granted] of Object.entries(consents)) {
+      for (const [sector, sectorData] of Object.entries(footprintsBySector)) {
+        if (!sectorData) continue;
+        await tx.sectorFootprint.upsert({
+          where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
+          update: { data: sectorData },
+          create: { userId: authUser.id, sector: sector as Sector, data: sectorData },
+        });
+      }
+
+      for (const [consentType, granted] of Object.entries(data.consents)) {
         await tx.consent.upsert({
           where: { userId_consentType: { userId: authUser.id, consentType } },
           update: { granted, grantedAt: new Date() },

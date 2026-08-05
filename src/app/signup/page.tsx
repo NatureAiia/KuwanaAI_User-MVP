@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { buildFactQueue } from "@/lib/onboarding-facts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
-import { Check, User, type LucideIcon } from "lucide-react";
+import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
   OCCUPATIONS,
@@ -23,10 +23,18 @@ import {
   POLICY_TYPES,
   MEDICAL_AIDS,
 } from "@/lib/onboarding-options";
+import { REGULATORS } from "@/lib/orgVerification";
 import { clsx } from "clsx";
 
-type Role = "consumer" | "regulator" | "corporate";
+type Role = "consumer" | "corporate" | "provider" | "regulator";
 
+// Corporate/Provider/Regulator each grant elevated access (Market
+// Intelligence, a Provider listing portal, Compliance & Market Monitoring),
+// so each is backed by a real server-side check in /api/onboarding rather
+// than the client simply asserting a role — see src/lib/orgVerification.ts
+// and HANDOFF.md's "Security — do not reopen these" for why that check
+// exists at all. Admin is deliberately not here: it isn't a Role, it's the
+// ADMIN_EMAILS allowlist, and never becomes a signup option.
 const ROLE_OPTIONS: {
   id: Role;
   icon: LucideIcon;
@@ -43,12 +51,30 @@ const ROLE_OPTIONS: {
     bullet: "For data subjects",
     meta: "5-step profile",
   },
-  // Regulator and Corporate are deliberately NOT self-service options here —
-  // /api/onboarding only ever accepts role: "consumer" from this endpoint.
-  // Those accounts are admin-provisioned (see build plan: regulator
-  // self-registration is explicitly disallowed), never granted by a user
-  // simply picking a card, since they unlock market-intelligence/compliance
-  // views a consumer shouldn't be able to opt into.
+  {
+    id: "corporate",
+    icon: Building2,
+    title: "Corporate",
+    desc: "Bank, telco, insurer, or hospital — monitor market intelligence across every sector.",
+    bullet: "Work email required",
+    meta: "1-step setup",
+  },
+  {
+    id: "provider",
+    icon: Store,
+    title: "Provider self-service",
+    desc: "List and manage your own products or services — a kiosk, an agent, a small business.",
+    bullet: "For any business, any size",
+    meta: "1-step setup",
+  },
+  {
+    id: "regulator",
+    icon: Landmark,
+    title: "Regulator",
+    desc: "POTRAZ, RBZ, IPEC — monitor compliance and complaints across the market.",
+    bullet: "Verified institutional email required",
+    meta: "1-step setup",
+  },
 ];
 
 const CONSUMER_STEPS = [
@@ -61,7 +87,7 @@ const CONSUMER_STEPS = [
   "consent",
 ] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | ConsumerStep | "processing";
+type Step = "role" | ConsumerStep | "orgDetails" | "processing";
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -141,6 +167,12 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Corporate/Provider share a free-text org name; Regulator is a closed
+  // dropdown (REGULATOR_NAMES) since its self-service safety depends on the
+  // name mapping to one specific verified domain (see orgVerification.ts).
+  const [organizationName, setOrganizationName] = useState("");
+  const [regulatorName, setRegulatorName] = useState<string>("");
+
   const [ageRange, setAgeRange] = useState("");
   const [occupation, setOccupation] = useState("");
   const [socialPlatforms, setSocialPlatforms] = useState<string[]>([]);
@@ -205,49 +237,58 @@ export default function SignupPage() {
       const bankSelected = bank && bank !== "I don't bank";
       const insuranceSelected = insurer && insurer !== "I don't have insurance";
 
-      const isConsumer = role === "consumer";
+      const consents = {
+        research_use: researchConsent,
+        leaderboard_participation: leaderboardConsent,
+        health_data_sharing: healthDataConsent,
+      };
+
+      const body =
+        role === "corporate"
+          ? { role, organizationName, consents }
+          : role === "provider"
+            ? { role, businessName: organizationName, consents }
+            : role === "regulator"
+              ? { role, regulatorName, consents }
+              : {
+                  role: "consumer" as const,
+                  fullName,
+                  ageRange,
+                  occupation,
+                  socialPlatforms,
+                  telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
+                  bankingFootprint: bankSelected ? { bank_name: bank, account_types: accountTypes } : undefined,
+                  insuranceFootprint: {
+                    provider: insurer,
+                    policy_types: insuranceSelected ? policyTypes : [],
+                    has_insurance: !!insuranceSelected,
+                  },
+                  healthcareFootprint: {
+                    medical_aid_provider: medicalAid,
+                    chronic_condition_disclosure_opt_in: chronicOptIn,
+                  },
+                  consents,
+                };
+
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          role: role ?? "consumer",
-          fullName,
-          ageRange,
-          occupation,
-          socialPlatforms,
-          telecomFootprint: isConsumer
-            ? { primary_network: network, plan_type: planType, monthly_spend_range: spend }
-            : undefined,
-          bankingFootprint: isConsumer && bankSelected ? { bank_name: bank, account_types: accountTypes } : undefined,
-          insuranceFootprint: isConsumer
-            ? {
-                provider: insurer,
-                policy_types: insuranceSelected ? policyTypes : [],
-                has_insurance: !!insuranceSelected,
-              }
-            : undefined,
-          healthcareFootprint: isConsumer
-            ? { medical_aid_provider: medicalAid, chronic_condition_disclosure_opt_in: chronicOptIn }
-            : undefined,
-          consents: {
-            research_use: researchConsent,
-            leaderboard_participation: leaderboardConsent,
-            health_data_sharing: healthDataConsent,
-          },
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
+        const errBody = await res.json().catch(() => ({}));
         setError(
-          body?.error
-            ? "We couldn't save your profile. Check your email to confirm your account, then log in."
-            : "Something went wrong saving your profile.",
+          res.status === 403 && typeof errBody?.error === "string"
+            ? errBody.error
+            : errBody?.error
+              ? "We couldn't save your profile. Check your email to confirm your account, then log in."
+              : "Something went wrong saving your profile.",
         );
         return;
       }
 
-      router.push("/dashboard");
+      router.push(role === "consumer" ? "/dashboard" : `/${role}`);
       router.refresh();
     })();
   }, [
@@ -256,6 +297,8 @@ export default function SignupPage() {
     email,
     password,
     fullName,
+    organizationName,
+    regulatorName,
     ageRange,
     occupation,
     socialPlatforms,
@@ -274,7 +317,7 @@ export default function SignupPage() {
     router,
   ]);
 
-  function canContinue(s: ConsumerStep) {
+  function canContinue(s: ConsumerStep | "orgDetails") {
     switch (s) {
       case "account":
         return !!(fullName.trim() && email.trim() && password.length >= 6);
@@ -288,6 +331,8 @@ export default function SignupPage() {
         return !!insurer;
       case "health":
         return !!medicalAid;
+      case "orgDetails":
+        return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "consent":
         return true;
     }
@@ -309,7 +354,7 @@ export default function SignupPage() {
   return (
     <div className="flex flex-1 items-center justify-center px-5 py-10">
       <AuthTopBar />
-      <div className={clsx("w-full", step === "role" ? "max-w-[820px]" : "max-w-[460px]")}>
+      <div className={clsx("w-full", step === "role" ? "max-w-[960px]" : "max-w-[460px]")}>
         <div className="flex items-center gap-2">
           <Image src="/kuwana-mark.png" alt="" width={28} height={28} />
           <span className="font-display text-xl font-bold">kuwana.ai</span>
@@ -327,7 +372,7 @@ export default function SignupPage() {
             <p className="mt-2 text-[14px] text-text-secondary">
               This helps us personalize your experience and dashboard.
             </p>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
               {ROLE_OPTIONS.map((option) => {
                 const selected = role === option.id;
                 return (
@@ -412,7 +457,11 @@ export default function SignupPage() {
               />
             </label>
             <p className="text-[12px] text-text-muted">
-              We only use this to secure your account — never shared with providers.
+              {role === "corporate"
+                ? "Use your work email — Corporate accounts can't be verified with a personal address (Gmail, Yahoo, etc)."
+                : role === "regulator"
+                  ? "Use your official institutional email — it must match the regulator you select next."
+                  : "We only use this to secure your account — never shared with providers."}
             </p>
             {error && <p className="text-[13px] text-accent-coral">{error}</p>}
             <div className="flex gap-3 pt-2">
@@ -420,8 +469,80 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go(role === "consumer" ? "personal" : "consent")}
+                onClick={() => go(role === "consumer" ? "personal" : "orgDetails")}
                 disabled={!canContinue("account")}
+                className="flex-1"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "orgDetails" && (
+          <div className="mt-8 space-y-5">
+            {role === "regulator" ? (
+              <>
+                <h1 className="font-display text-[24px] font-bold">Which regulator?</h1>
+                <p className="text-[13px] text-text-secondary">
+                  We&apos;ll verify your email matches this institution&apos;s domain.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  {REGULATORS.map((r) => (
+                    <button
+                      key={r.name}
+                      type="button"
+                      onClick={() => setRegulatorName(r.name)}
+                      className={clsx(
+                        "tap-target rounded-xl border p-4 text-left transition-all",
+                        regulatorName === r.name
+                          ? "border-accent-teal bg-accent-teal/[0.08] ring-1 ring-accent-teal/30"
+                          : "border-border bg-bg-surface hover:border-accent-teal/40",
+                      )}
+                    >
+                      <div className="text-[14px] font-semibold">{r.name}</div>
+                      <p className="mt-0.5 text-[12px] text-text-secondary">{r.fullName}</p>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-[24px] font-bold">
+                  {role === "corporate" ? "Your organization" : "Your business"}
+                </h1>
+                <p className="text-[13px] text-text-secondary">
+                  {role === "corporate"
+                    ? "The bank, telco, insurer, or hospital you're signing up on behalf of."
+                    : "What should shoppers see as your business name?"}
+                </p>
+                <label className="block">
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    {role === "corporate" ? "Organization name" : "Business name"}
+                  </span>
+                  <input
+                    value={organizationName}
+                    onChange={(e) => setOrganizationName(e.target.value)}
+                    placeholder={role === "corporate" ? "e.g. CBZ Bank Limited" : "e.g. Tendai's Airtime Kiosk"}
+                    className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                  />
+                </label>
+                {role === "provider" && (
+                  <p className="text-[12px] text-text-muted">
+                    Your listings stay unverified until an admin reviews your first submission — this
+                    only creates your account.
+                  </p>
+                )}
+              </>
+            )}
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("consent")}
+                disabled={!canContinue("orgDetails")}
                 className="flex-1"
               >
                 Continue
@@ -619,39 +740,60 @@ export default function SignupPage() {
 
         {step === "consent" && (
           <div className="mt-8 space-y-4">
-            <h1 className="font-display text-[24px] font-bold">Before we save your profile</h1>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={researchConsent}
-                onChange={(e) => setResearchConsent(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Allow anonymized use of my comparison activity to improve Kuwana&apos;s
-                recommendations.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={leaderboardConsent}
-                onChange={(e) => setLeaderboardConsent(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Join the opt-in XP leaderboard under a nickname (never your real name).
-              </span>
-            </label>
-            <p className="text-[12px] text-text-muted">
-              You can change either setting anytime in Settings.
-            </p>
+            {role === "consumer" ? (
+              <>
+                <h1 className="font-display text-[24px] font-bold">Before we save your profile</h1>
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                  <input
+                    type="checkbox"
+                    checked={researchConsent}
+                    onChange={(e) => setResearchConsent(e.target.checked)}
+                    className="mt-0.5 tap-target"
+                  />
+                  <span className="text-[13px] text-text-secondary">
+                    Allow anonymized use of my comparison activity to improve Kuwana&apos;s
+                    recommendations.
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                  <input
+                    type="checkbox"
+                    checked={leaderboardConsent}
+                    onChange={(e) => setLeaderboardConsent(e.target.checked)}
+                    className="mt-0.5 tap-target"
+                  />
+                  <span className="text-[13px] text-text-secondary">
+                    Join the opt-in XP leaderboard under a nickname (never your real name).
+                  </span>
+                </label>
+                <p className="text-[12px] text-text-muted">
+                  You can change either setting anytime in Settings.
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-[24px] font-bold">Review &amp; create account</h1>
+                <div className="rounded-xl border border-border bg-bg-surface p-4 text-[13px]">
+                  <p className="text-text-secondary">
+                    {role === "regulator" ? "Regulator" : ROLE_OPTIONS.find((r) => r.id === role)?.title}
+                  </p>
+                  <p className="mt-1 font-semibold">
+                    {role === "regulator" ? regulatorName : organizationName}
+                  </p>
+                </div>
+                <p className="text-[12px] text-text-muted">
+                  {role === "provider"
+                    ? "We'll create your account now — your first listing still goes through admin review before it's visible to shoppers."
+                    : "We'll verify your email domain and create your account now."}
+                </p>
+              </>
+            )}
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
               <Button onClick={startProcessing} className="flex-1">
-                Save my profile
+                {role === "consumer" ? "Save my profile" : "Create account"}
               </Button>
             </div>
           </div>
