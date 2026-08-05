@@ -228,12 +228,16 @@ assignment, provider listing creation/update).
   change requires... nothing currently. This needs a real "propose an
   edit, goes back to pending_review" flow — a genuine next feature, not
   a bug.
-- No delete capability for providers (drafts/rejected included) — only
-  admin can delete listings today.
-- No notification to a provider when their submission is approved/
-  rejected — they'd have to manually revisit `/provider` to find out.
-  `rejectionReason` is already stored and shown; just needs a push
-  (email/in-app notification row) on status change.
+- ~~No delete capability for providers~~ **closed 2026-08-05**: a
+  provider can now delete their own draft/pending_review/rejected
+  listings (`DELETE /api/provider/listings/[id]`); published stays
+  admin-only, same boundary the PATCH route already drew.
+- ~~No notification to a provider when their submission is approved/
+  rejected~~ **closed 2026-08-05**: `notifyListingDecision`
+  (`src/lib/notifications.ts`) creates an in-app Notification row on
+  admin approve/reject, reusing the existing price-drop notification
+  system (`/notifications`, now open to provider accounts too via
+  `requireConsumerOrProvider`).
 - No provider-facing analytics (views, times shown in a comparison,
   etc.) — `getAlsoCompared`'s co-occurrence data exists in `Comparison`
   rows already; could be surfaced per-provider without new tracking.
