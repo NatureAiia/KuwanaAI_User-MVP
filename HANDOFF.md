@@ -297,9 +297,14 @@ depth. Real gaps if that changes:
   environment to drive a real browser, so also confirmed via the dev
   server's own request log that real browser traffic succeeded after
   restarting with the new header.
-- **No rate limiting** on public unauthenticated endpoints (`/api/
-  waitlist`, `/api/need-intake`) — no Redis/Upstash infra exists to build
-  this properly; would need a real infra decision, not a unilateral add.
+- ~~No rate limiting~~ **closed 2026-08-05**: added, backed by Postgres
+  (`RateLimitHit` + `checkRateLimit()` in `src/lib/rateLimit.ts`) rather
+  than Redis/Upstash — sidesteps the original blocker entirely, since
+  this app already has Postgres and it (unlike an in-memory counter)
+  works correctly across Vercel's serverless invocations. `/api/waitlist`
+  10/hour/IP, `/api/need-intake` 20/10min/IP (the cost-relevant one — it
+  hits the paid Anthropic API). Numbers are reasonable defaults, not a
+  claim they're final — tune if real traffic says otherwise.
 - `migrate dev` still needs a TTY this environment doesn't have — the
   established workaround (documented in commit messages) is:
   ```
