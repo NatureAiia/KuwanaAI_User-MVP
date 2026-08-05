@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getProviderListingStats } from "@/lib/catalog";
 import { Header } from "@/components/Header";
 import { Card, Badge } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
@@ -50,6 +51,7 @@ export default async function ProviderPortalPage() {
       orderBy: { lastVerifiedAt: "desc" },
     }),
   ]);
+  const stats = await getProviderListingStats(listings.map((l) => l.id));
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
@@ -89,6 +91,13 @@ export default async function ProviderPortalPage() {
               </div>
               {l.status === "rejected" && l.rejectionReason && (
                 <p className="text-[12px] text-accent-coral">Rejected: {l.rejectionReason}</p>
+              )}
+              {l.status === "published" && (
+                <p className="text-[11px] text-text-muted">
+                  Saved by {stats[l.id].savedCount} {stats[l.id].savedCount === 1 ? "person" : "people"} · appeared in{" "}
+                  {stats[l.id].comparisonAppearances} comparison
+                  {stats[l.id].comparisonAppearances === 1 ? "" : "s"}
+                </p>
               )}
               {(l.status === "draft" || l.status === "pending_review" || l.status === "rejected") && (
                 <ProviderListingActions

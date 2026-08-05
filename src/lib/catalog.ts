@@ -269,6 +269,40 @@ export async function getAlsoCompared(listingId: string, limit = 4): Promise<Lis
   return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
 }
 
+export type ProviderListingStats = { comparisonAppearances: number; savedCount: number };
+
+/**
+ * Provider-facing interest signals, sourced entirely from data that already
+ * exists (Comparison/SavedListing) — no new tracking. Deliberately doesn't
+ * report a "views" count: nothing in this app tracks a per-listing page
+ * view today (see EventType in schema.prisma), and inventing one would be
+ * exactly the kind of number this project's design brief forbids.
+ */
+export async function getProviderListingStats(
+  listingIds: string[],
+): Promise<Record<string, ProviderListingStats>> {
+  const stats: Record<string, ProviderListingStats> = Object.fromEntries(
+    listingIds.map((id) => [id, { comparisonAppearances: 0, savedCount: 0 }]),
+  );
+  if (listingIds.length === 0) return stats;
+
+  const [comparisons, savedCounts] = await Promise.all([
+    prisma.comparison.findMany({ where: { listingIds: { hasSome: listingIds } }, select: { listingIds: true } }),
+    prisma.savedListing.groupBy({ by: ["listingId"], where: { listingId: { in: listingIds } }, _count: true }),
+  ]);
+
+  for (const comparison of comparisons) {
+    for (const id of comparison.listingIds) {
+      if (id in stats) stats[id].comparisonAppearances += 1;
+    }
+  }
+  for (const row of savedCounts) {
+    if (row.listingId in stats) stats[row.listingId].savedCount = row._count;
+  }
+
+  return stats;
+}
+
 export type MarketOverview = {
   bySector: {
     sectorSlug: string;
