@@ -4,7 +4,7 @@
 
 const PROVIDER_FACTS: Record<string, string[]> = {
   Econet: [
-    "Econet was founded in 1998 and was Zimbabwe's first licensed mobile network operator.",
+    "Econet launched in 1998 as Zimbabwe's first private mobile network, after a 5-year legal battle that ended the state telecoms monopoly.",
     "EcoCash, launched in 2011, is used by millions of Zimbabweans for everyday mobile payments.",
   ],
   NetOne: [
@@ -16,19 +16,18 @@ const PROVIDER_FACTS: Record<string, string[]> = {
     "Telecel was among the first in Zimbabwe to offer per-second call billing.",
   ],
   "CBZ Bank": [
-    "CBZ Bank traces back to 1980 and is Zimbabwe's largest bank by assets.",
-    "CBZ was the first Zimbabwean bank to launch contactless cards, in 2018.",
+    "CBZ Bank traces back to 1980 and is one of Zimbabwe's largest financial institutions.",
   ],
   "Steward Bank": [
     "Steward Bank launched in 2013 as Zimbabwe's first fully digital-first bank.",
     "Steward Bank pioneered USSD (*236#) banking for feature-phone users.",
   ],
   Stanbic: [
-    "Stanbic Bank Zimbabwe has operated since 1992, part of the Standard Bank Group.",
+    "Stanbic Bank Zimbabwe has banked locally since 1965, joining the Standard Bank Group in 1992.",
   ],
-  FBC: ["FBC Bank, listed since 1997, is known for housing and mortgage finance in Zimbabwe."],
+  FBC: ["FBC Bank, established in 1997, is known for housing and mortgage finance in Zimbabwe."],
   "ZB Bank": ["ZB Bank's roots go back to 1951, making it one of Zimbabwe's oldest banking brands."],
-  Nedbank: ["Nedbank Zimbabwe has operated locally since 1954."],
+  Nedbank: ["Nedbank Zimbabwe traces back to 1956, originally the Merchant Bank of Central Africa."],
   "Old Mutual": [
     "Old Mutual has operated in Zimbabwe since 1902, over 120 years of life and savings cover.",
   ],
@@ -36,15 +35,15 @@ const PROVIDER_FACTS: Record<string, string[]> = {
   ZIMNAT: ["ZIMNAT was founded in 1946 and pioneered livestock insurance for communal farmers."],
   "Fidelity Life": ["Fidelity Life Assurance has offered life cover in Zimbabwe since 1936."],
   Cimas: [
-    "Cimas, founded in 1945, is Zimbabwe's oldest medical aid society with 400k+ members.",
+    "Cimas, founded in 1945, is one of Zimbabwe's largest medical aid societies.",
     "Cimas runs its own clinics and labs — one of the first HMO-style models in Zimbabwe.",
   ],
-  "First Mutual Health": ["First Mutual Health covers over 150,000 lives across Zimbabwe."],
-  PSMAS: ["PSMAS was founded in 1930 and is Zimbabwe's largest medical aid scheme by membership."],
+  "First Mutual Health": ["First Mutual Health covers a large share of medically insured Zimbabweans."],
+  PSMAS: ["PSMAS was founded in 1930, making it Zimbabwe's oldest medical aid society."],
 };
 
 const GENERIC_FACTS = [
-  "Zimbabwe has one of the highest mobile penetration rates in Southern Africa, over 90% SIM penetration.",
+  "Zimbabwe's mobile penetration rate passed 100% in 2024 (POTRAZ) — many people carry more than one active SIM.",
   "Zimbabwe's multi-currency system makes comparing prices in USD the clearest way to see real value.",
   "Bundled data plans in Zimbabwe often expire in as little as 24 hours — validity matters as much as price.",
   "Building your Kuwana profile takes under a minute and unlocks personalized comparisons immediately.",
