@@ -50,6 +50,7 @@ model User {
   streak          UserStreak?
   notifications   Notification[]
   conversations   Conversation[]
+  ownedProvider   Provider?
 
   @@map("users")
 }
@@ -161,10 +162,17 @@ model AttributeSchemaField {
 }
 
 model Provider {
-  id       String  @id @default(uuid())
-  name     String
-  logoUrl  String? @map("logo_url")
-  verified Boolean @default(true)
+  id          String  @id @default(uuid())
+  name        String
+  logoUrl     String? @map("logo_url")
+  verified    Boolean @default(true)
+  // Nullable: the ~15 seeded reference providers (CBZ, Econet, etc.) have no
+  // login of their own — this is only set when a "provider" role account is
+  // admin-linked to self-manage this provider's listings (see /provider,
+  // /admin/users). SetNull rather than Cascade: deleting the linked user
+  // account shouldn't delete the provider or its listings.
+  ownerUserId String? @unique @map("owner_user_id")
+  owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
   listings Listing[]
 
@@ -175,6 +183,13 @@ enum FreshnessStatus {
   fresh
   stale
   unverified
+}
+
+enum ListingStatus {
+  draft
+  pending_review
+  published
+  rejected
 }
 
 model Listing {
@@ -190,6 +205,12 @@ model Listing {
   sourceUrl       String?         @map("source_url")
   lastVerifiedAt  DateTime        @default(now()) @map("last_verified_at")
   freshnessStatus FreshnessStatus @default(fresh) @map("freshness_status")
+  // Provider self-submission workflow (build plan 15.2): draft -> pending_review
+  // -> published/rejected. Defaults to "published" so every existing/admin-created
+  // listing keeps behaving exactly as before — this workflow only applies to
+  // listings a provider submits through /provider.
+  status          ListingStatus   @default(published)
+  rejectionReason String?         @map("rejection_reason")
 
   priceHistory    ListingPriceHistory[]
   savedBy         SavedListing[]
