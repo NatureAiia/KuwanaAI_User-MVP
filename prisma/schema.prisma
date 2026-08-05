@@ -5,8 +5,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model WaitlistSignup {
@@ -101,6 +102,9 @@ model Consent {
   grantedAt   DateTime @default(now()) @map("granted_at")
 
   @@unique([userId, consentType])
+  // The leaderboard query filters exactly this combination to find every
+  // opted-in user before joining against UserXp.
+  @@index([consentType, granted])
   @@map("consents")
 }
 
@@ -217,6 +221,15 @@ model Listing {
   recommendations Recommendation[]
   notifications   Notification[]
 
+  // (categoryId, status, price): the consumer-facing hot path — every
+  // catalog read filters this combination then orders by price
+  // (getCategoryWithListings et al.). status alone: the admin review queue
+  // filters by status with no categoryId, which can't use the composite
+  // index's later columns without its first. providerId: the provider
+  // portal's "my listings" query.
+  @@index([categoryId, status, price])
+  @@index([status])
+  @@index([providerId])
   @@map("listings")
 }
 
@@ -227,6 +240,9 @@ model ListingPriceHistory {
   price      Decimal  @db.Decimal(12, 2)
   recordedAt DateTime @default(now()) @map("recorded_at")
 
+  // computePriceTrend/computePriceForecast read a listing's full history
+  // ordered by time — this is the exact access pattern.
+  @@index([listingId, recordedAt])
   @@map("listing_price_history")
 }
 
@@ -243,6 +259,14 @@ model Comparison {
   listingIds String[] @map("listing_ids")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  // Every quest-progress check (category_count/comparison_count/
+  // sector_diversity criteria) queries exactly userId + a createdAt range,
+  // on every comparison_completed event.
+  @@index([userId, createdAt(sort: Desc)])
+  // getAlsoCompared's `listingIds: { has: listingId }` is an array-
+  // containment query — a GIN index is the correct index type for that,
+  // not a btree.
+  @@index([listingIds], type: Gin)
   @@map("comparisons")
 }
 
@@ -254,6 +278,11 @@ model SavedListing {
   savedAt   DateTime @default(now()) @map("saved_at")
 
   @@id([userId, listingId])
+  // The PK above already covers a plain userId filter (leftmost prefix),
+  // but the saved-listings page also orders by savedAt (most recent
+  // first) — a separate index matching that exact order avoids an
+  // in-memory sort.
+  @@index([userId, savedAt(sort: Desc)])
   @@map("saved_listings")
 }
 
@@ -268,6 +297,8 @@ model Recommendation {
   scoreVersion String   @default("v1") @map("score_version")
   generatedAt  DateTime @default(now()) @map("generated_at")
 
+  @@index([listingId])
+  @@index([userId, generatedAt(sort: Desc)])
   @@map("recommendations")
 }
 
@@ -288,6 +319,8 @@ model Notification {
   createdAt     DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, listingId, type])
+  @@index([listingId])
+  @@index([userId, read, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
@@ -309,6 +342,7 @@ model Conversation {
 
   messages Message[]
 
+  @@index([userId, createdAt])
   @@map("conversations")
 }
 
@@ -321,6 +355,7 @@ model Message {
   listingIds     String[]     @default([]) @map("listing_ids")
   createdAt      DateTime     @default(now()) @map("created_at")
 
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 
@@ -348,6 +383,9 @@ model UserEvent {
   metadata  Json?
   createdAt DateTime  @default(now()) @map("created_at")
 
+  // Every badge-trigger check (event_count_in_sector/distinct_sector_count)
+  // queries exactly this combination, on every qualifying event.
+  @@index([userId, eventType, createdAt(sort: Desc)])
   @@map("user_events")
 }
 
@@ -366,6 +404,8 @@ model UserXp {
   totalXp Int    @default(0) @map("total_xp")
   level   Int    @default(1)
 
+  // The leaderboard's ORDER BY totalXp DESC.
+  @@index([totalXp(sort: Desc)])
   @@map("user_xp")
 }
 
@@ -401,6 +441,8 @@ model Quest {
 
   progress UserQuestProgress[]
 
+  // quest-rotation checks "is anything active right now" via activeTo.
+  @@index([activeTo])
   @@map("quests")
 }
 
@@ -449,6 +491,8 @@ model SocialPriceMention {
 
   @@unique([platform, sourceUrl])
   @@index([matchedProvider])
+  // The admin review queue's reviewed/unreviewed toggle, newest first.
+  @@index([reviewed, discoveredAt(sort: Desc)])
   @@map("social_price_mentions")
 }
 
