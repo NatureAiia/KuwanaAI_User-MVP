@@ -158,9 +158,11 @@ decision-intelligence core over porting more comparison-platform features from o
   search; found and fixed 5 real inaccuracies (Econet wasn't first to launch, Nedbank/Stanbic
   founding years, Cimas's false "oldest" claim, an uncorroborated CBZ contactless-cards claim) —
   see the fix commit for sources.
-- **A `next`/`postcss`/`sharp` transitive dependency audit warning** (3 high-severity, fixed only
-  by bumping `next` to 16.3.0, outside the currently pinned range) — a framework version bump is
-  a deliberate call for someone to make, not a silent side effect of a session.
+- ~~A `next`/`postcss`/`sharp` transitive dependency audit warning (3 high-severity)~~ — fixed by
+  bumping `next` 16.2.12 -> 16.3.0 (a minor bump, not the major one initially assumed) + matching
+  `eslint-config-next`. `npm audit` now reports 0 vulnerabilities; full verification + a runtime
+  smoke test both passed. That bump also auto-generates `AGENTS.md`/`CLAUDE.md` on every
+  `next dev`/`build` (new in 16.3.0) — committed per the generator's own recommendation.
 
 ## 2026-08-05 continuation: role security fix + the Provider portal
 
