@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireConsumer } from "@/lib/auth";
+import { requireConsumerOrProvider } from "@/lib/auth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireConsumer();
+  const auth = await requireConsumerOrProvider();
   if ("response" in auth) return auth.response;
   const { user } = auth;
 

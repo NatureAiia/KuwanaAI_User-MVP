@@ -41,6 +41,28 @@ export async function requireConsumer(): Promise<
 }
 
 /**
+ * Notifications now cover two unrelated concepts (a consumer's saved-listing
+ * price drops, a provider's listing approval/rejection) that share the same
+ * table — so the read/mark-read routes need either role, unlike the
+ * consumer-only routes above.
+ */
+export async function requireConsumerOrProvider(): Promise<
+  { user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }
+> {
+  const user = await requireUser();
+  if (!user) {
+    return { response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
+  }
+  const role = await getUserRole(user.id);
+  if (role !== "consumer" && role !== "provider") {
+    return {
+      response: NextResponse.json({ error: "This feature is for consumer or provider accounts" }, { status: 403 }),
+    };
+  }
+  return { user };
+}
+
+/**
  * No "admin" role exists in the Role enum yet (consumer/corporate/regulator/
  * provider only — see schema.prisma) — adding one is a real decision (who
  * else can hold it, does it need its own onboarding) that shouldn't be

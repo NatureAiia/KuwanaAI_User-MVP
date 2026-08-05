@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireConsumer } from "@/lib/auth";
+import { requireConsumerOrProvider } from "@/lib/auth";
 import { syncPriceDropNotifications } from "@/lib/notifications";
 
 export async function GET() {
-  const auth = await requireConsumer();
+  const auth = await requireConsumerOrProvider();
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
+  // No-ops for a provider account (they have no SavedListing rows) — cheap
+  // enough to call unconditionally rather than branching on role.
   await syncPriceDropNotifications(user.id);
 
   const notifications = await prisma.notification.findMany({

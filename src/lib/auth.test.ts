@@ -11,7 +11,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique } },
 }));
 
-const { requireUser, getUserRole, requireConsumer, requireAdmin } = await import("@/lib/auth");
+const { requireUser, getUserRole, requireConsumer, requireConsumerOrProvider, requireAdmin } =
+  await import("@/lib/auth");
 
 const originalAdminEmails = process.env.ADMIN_EMAILS;
 
@@ -70,6 +71,37 @@ describe("requireConsumer", () => {
     const result = await requireConsumer();
     expect("user" in result).toBe(true);
     if ("user" in result) expect(result.user.id).toBe("u1");
+  });
+});
+
+describe("requireConsumerOrProvider", () => {
+  it("returns a 401 response when unauthenticated", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    const result = await requireConsumerOrProvider();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(401);
+  });
+
+  it("returns a 403 response for a role with no notifications concept, e.g. corporate", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ role: "corporate" });
+    const result = await requireConsumerOrProvider();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(403);
+  });
+
+  it("returns the user for a consumer", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ role: "consumer" });
+    const result = await requireConsumerOrProvider();
+    expect("user" in result).toBe(true);
+  });
+
+  it("returns the user for a provider", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ role: "provider" });
+    const result = await requireConsumerOrProvider();
+    expect("user" in result).toBe(true);
   });
 });
 
