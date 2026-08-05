@@ -5,7 +5,15 @@ import { Badge } from "@/components/ui/Card";
 import { NewListingForm } from "@/components/admin/NewListingForm";
 import { NewProviderForm } from "@/components/admin/NewProviderForm";
 import { ListingRowActions } from "@/components/admin/ListingRowActions";
+import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
+
+const STATUS_TONE = {
+  draft: "neutral",
+  pending_review: "sky",
+  published: "teal",
+  rejected: "coral",
+} as const;
 
 export default async function AdminCatalogPage() {
   const admin = await requireAdmin();
@@ -21,7 +29,7 @@ export default async function AdminCatalogPage() {
       include: { sector: true },
       orderBy: [{ sector: { name: "asc" } }, { name: "asc" }],
     }),
-    prisma.provider.findMany({ orderBy: { name: "asc" } }),
+    prisma.provider.findMany({ orderBy: { name: "asc" }, include: { owner: { select: { email: true } } } }),
   ]);
 
   return (
@@ -46,6 +54,7 @@ export default async function AdminCatalogPage() {
               <th className="p-3 font-medium text-text-muted">Provider</th>
               <th className="p-3 font-medium text-text-muted">Price</th>
               <th className="p-3 font-medium text-text-muted">Freshness</th>
+              <th className="p-3 font-medium text-text-muted">Status</th>
               <th className="p-3 font-medium text-text-muted">Actions</th>
             </tr>
           </thead>
@@ -70,6 +79,9 @@ export default async function AdminCatalogPage() {
                   </Badge>
                 </td>
                 <td className="p-3">
+                  <Badge tone={STATUS_TONE[l.status]}>{l.status.replace("_", " ")}</Badge>
+                </td>
+                <td className="p-3">
                   <ListingRowActions
                     listingId={l.id}
                     currentPrice={Number(l.price)}
@@ -81,13 +93,52 @@ export default async function AdminCatalogPage() {
             ))}
             {listings.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-text-muted">
+                <td colSpan={7} className="p-6 text-center text-text-muted">
                   No listings yet.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="font-display text-[16px] font-semibold">Providers</h2>
+        <p className="mt-1 text-[12.5px] text-text-secondary">
+          Link a provider to a user&apos;s email to let that account manage it via /provider —
+          the only way a &quot;provider&quot; role account can self-submit listings.
+        </p>
+        <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+            <thead>
+              <tr className="border-b border-border bg-bg-surface-raised text-left">
+                <th className="p-3 font-medium text-text-muted">Provider</th>
+                <th className="p-3 font-medium text-text-muted">Verified</th>
+                <th className="p-3 font-medium text-text-muted">Owner</th>
+              </tr>
+            </thead>
+            <tbody>
+              {providers.map((p) => (
+                <tr key={p.id} className="border-b border-border last:border-0">
+                  <td className="p-3 font-medium">{p.name}</td>
+                  <td className="p-3">
+                    <Badge tone={p.verified ? "teal" : "coral"}>{p.verified ? "Verified" : "Unverified"}</Badge>
+                  </td>
+                  <td className="p-3">
+                    <ProviderOwnerLink providerId={p.id} currentOwnerEmail={p.owner?.email ?? null} />
+                  </td>
+                </tr>
+              ))}
+              {providers.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="p-6 text-center text-text-muted">
+                    No providers yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

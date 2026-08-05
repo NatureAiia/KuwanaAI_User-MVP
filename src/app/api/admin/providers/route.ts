@@ -7,7 +7,10 @@ export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
 
-  const providers = await prisma.provider.findMany({ orderBy: { name: "asc" } });
+  const providers = await prisma.provider.findMany({
+    orderBy: { name: "asc" },
+    include: { owner: { select: { email: true } } },
+  });
   return NextResponse.json({ providers });
 }
 
