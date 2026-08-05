@@ -87,7 +87,7 @@ export function NewListingForm({
       <select
         value={categoryId}
         onChange={(e) => setCategoryId(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       >
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
@@ -99,7 +99,7 @@ export function NewListingForm({
       <select
         value={providerId}
         onChange={(e) => setProviderId(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       >
         {providers.map((p) => (
           <option key={p.id} value={p.id}>
@@ -113,7 +113,7 @@ export function NewListingForm({
         placeholder="Listing name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       />
 
       <div className="flex gap-2">
@@ -125,12 +125,12 @@ export function NewListingForm({
           placeholder="Price"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
         />
         <input
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
-          className="w-24 rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+          className="tap-target w-24 rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
         />
       </div>
 
@@ -138,7 +138,7 @@ export function NewListingForm({
         placeholder="Source URL (optional)"
         value={sourceUrl}
         onChange={(e) => setSourceUrl(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       />
 
       <textarea

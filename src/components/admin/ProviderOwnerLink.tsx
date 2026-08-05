@@ -59,7 +59,7 @@ export function ProviderOwnerLink({
           placeholder="owner@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-44 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+          className="tap-target w-44 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
         />
         <Button size="md" onClick={save} disabled={loading} className="!px-2.5 !py-1.5 !text-[12px]">
           Save

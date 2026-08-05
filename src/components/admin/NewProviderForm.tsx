@@ -46,13 +46,13 @@ export function NewProviderForm() {
           placeholder="Provider name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
         />
         <input
           placeholder="Logo URL (optional)"
           value={logoUrl}
           onChange={(e) => setLogoUrl(e.target.value)}
-          className="w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
         />
         <label className="flex items-center gap-2 text-[13px] text-text-secondary">
           <input type="checkbox" checked={verified} onChange={(e) => setVerified(e.target.checked)} />

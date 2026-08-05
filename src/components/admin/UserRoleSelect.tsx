@@ -33,7 +33,7 @@ export function UserRoleSelect({ userId, currentRole }: { userId: string; curren
       value={currentRole}
       disabled={loading}
       onChange={(e) => changeRole(e.target.value as Role)}
-      className="rounded-lg border border-border bg-bg-surface p-1.5 text-[12.5px] disabled:opacity-50"
+      className="tap-target rounded-lg border border-border bg-bg-surface p-1.5 text-[12.5px] disabled:opacity-50"
     >
       {ROLES.map((r) => (
         <option key={r} value={r}>

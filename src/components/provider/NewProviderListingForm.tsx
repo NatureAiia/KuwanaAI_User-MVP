@@ -192,7 +192,7 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Type here…"
-            className="mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-4 text-[16px] outline-none focus:border-accent-sky"
+            className="tap-target mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-4 text-[16px] outline-none focus:border-accent-sky"
           />
           <button
             onClick={goNext}
@@ -213,7 +213,7 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
             value={price}
             onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))}
             placeholder="0.00"
-            className="mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-5 text-center font-mono text-[28px] outline-none focus:border-accent-sky"
+            className="tap-target mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-5 text-center font-mono text-[28px] outline-none focus:border-accent-sky"
           />
           <div className="mt-3 flex flex-wrap justify-center gap-2">
             {CURRENCIES.map((c) => (
@@ -358,7 +358,7 @@ function AttributeScreen({
         value={value}
         onChange={(e) => onChange(field.key, field.dataType === "number" ? e.target.value.replace(/[^0-9.]/g, "") : e.target.value)}
         placeholder="Type here… (or leave blank to skip)"
-        className="mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-4 text-[16px] outline-none focus:border-accent-sky"
+        className="tap-target mt-4 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-4 text-[16px] outline-none focus:border-accent-sky"
       />
       <button
         onClick={onNext}

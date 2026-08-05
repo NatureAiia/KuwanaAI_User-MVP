@@ -46,12 +46,12 @@ export function ProviderListingActions({
           step="0.01"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="w-20 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+          className="tap-target w-20 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
         />
         <input
           value={currency}
           onChange={(e) => setCurrency(e.target.value)}
-          className="w-14 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+          className="tap-target w-14 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
         />
         <Button
           size="md"
