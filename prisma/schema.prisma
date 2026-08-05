@@ -304,6 +304,8 @@ model Recommendation {
 
 enum NotificationType {
   price_drop
+  listing_approved
+  listing_rejected
 }
 
 model Notification {
@@ -314,7 +316,8 @@ model Notification {
   listing       Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
   type          NotificationType @default(price_drop)
   message       String
-  changePercent Float            @map("change_percent")
+  // Only meaningful for price_drop; null for listing_approved/listing_rejected.
+  changePercent Float?           @map("change_percent")
   read          Boolean          @default(false)
   createdAt     DateTime         @default(now()) @map("created_at")
 

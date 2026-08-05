@@ -42,3 +42,31 @@ export async function syncPriceDropNotifications(userId: string): Promise<void> 
     });
   }
 }
+
+/**
+ * Tells a provider their submitted listing was approved or rejected, via the
+ * same Notification row the price-drop feature uses (so /notifications and
+ * its unread badge work for either). Re-approving/re-rejecting the same
+ * listing upserts the existing row rather than piling up duplicates, mirroring
+ * the price-drop upsert above.
+ */
+export async function notifyListingDecision(params: {
+  listingId: string;
+  ownerUserId: string;
+  listingName: string;
+  status: "published" | "rejected";
+  rejectionReason?: string | null;
+}): Promise<void> {
+  const { listingId, ownerUserId, listingName, status, rejectionReason } = params;
+  const type = status === "published" ? "listing_approved" : "listing_rejected";
+  const message =
+    status === "published"
+      ? `"${listingName}" was approved and is now live.`
+      : `"${listingName}" was rejected${rejectionReason ? `: ${rejectionReason}` : "."}`;
+
+  await prisma.notification.upsert({
+    where: { userId_listingId_type: { userId: ownerUserId, listingId, type } },
+    update: { message, read: false },
+    create: { userId: ownerUserId, listingId, type, message },
+  });
+}
