@@ -154,9 +154,10 @@ decision-intelligence core over porting more comparison-platform features from o
   in-memory fake transaction client — see `src/lib/gamification/process-event.test.ts`.
   (`requireConsumer`/`requireAdmin` are covered too, with mocked Supabase/Prisma — see
   `src/lib/auth.test.ts`.)
-- **`onboarding-facts.ts`'s historical trivia** (provider founding dates, membership counts) is
-  unsourced/unverified by this session — worth a fact-check pass since the brief's "no invented
-  statistics" bar arguably extends to onboarding copy, not just computed recommendations.
+- ~~`onboarding-facts.ts`'s historical trivia was unsourced/unverified~~ — fact-checked via web
+  search; found and fixed 5 real inaccuracies (Econet wasn't first to launch, Nedbank/Stanbic
+  founding years, Cimas's false "oldest" claim, an uncorroborated CBZ contactless-cards claim) —
+  see the fix commit for sources.
 - **A `next`/`postcss`/`sharp` transitive dependency audit warning** (3 high-severity, fixed only
   by bumping `next` to 16.3.0, outside the currently pinned range) — a framework version bump is
   a deliberate call for someone to make, not a silent side effect of a session.
