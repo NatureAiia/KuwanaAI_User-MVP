@@ -23,7 +23,10 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
       category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } },
     },
   });
-  if (!listing) notFound();
+  // Public page — a draft/pending/rejected listing isn't published yet, so
+  // it doesn't exist as far as a consumer visitor is concerned. Providers
+  // view their own listings' status via /provider, not this page.
+  if (!listing || listing.status !== "published") notFound();
 
   const attributes = listing.attributes as Record<string, unknown>;
   const attributeSchema = listing.category.attributeSchema.map((a) => ({

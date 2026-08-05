@@ -59,7 +59,11 @@ export async function getCategoryWithListings(
     where: { sectorId_slug: { sectorId: sector.id, slug: categorySlug } },
     include: {
       attributeSchema: { orderBy: { sortOrder: "asc" } },
-      listings: { include: { provider: true }, orderBy: { price: "asc" } },
+      listings: {
+        where: { status: "published" },
+        include: { provider: true },
+        orderBy: { price: "asc" },
+      },
     },
   });
   if (!category) return null;
@@ -228,7 +232,7 @@ export async function getListingPriceTrends(listingIds: string[]): Promise<Recor
 
 export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   const listings = await prisma.listing.findMany({
-    where: { id: { in: ids } },
+    where: { id: { in: ids }, status: "published" },
     include: { provider: true },
   });
   return listings.map(toListingDTO);
@@ -291,6 +295,7 @@ export type MarketOverview = {
 export async function getMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
   const rows = await prisma.listing.findMany({
     where: {
+      status: "published",
       category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
     },
     include: { provider: true, category: { include: { sector: true } } },

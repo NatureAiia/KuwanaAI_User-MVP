@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   const { listingIds } = parsed.data;
 
   const listings = await prisma.listing.findMany({
-    where: { id: { in: listingIds } },
+    where: { id: { in: listingIds }, status: "published" },
     include: { provider: true, category: { include: { attributeSchema: true, sector: true } } },
   });
   if (listings.length < 2) {

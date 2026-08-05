@@ -15,8 +15,8 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const listing = await prisma.listing.findUnique({
-    where: { id: parsed.data.listingId },
+  const listing = await prisma.listing.findFirst({
+    where: { id: parsed.data.listingId, status: "published" },
     include: { category: { include: { sector: true } } },
   });
   if (!listing) return NextResponse.json({ error: "Listing not found" }, { status: 404 });

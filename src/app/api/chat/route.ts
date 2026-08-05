@@ -37,7 +37,7 @@ const postSchema = z.object({
 async function listingSummaries(listingIds: string[]) {
   if (listingIds.length === 0) return [];
   const listings = await prisma.listing.findMany({
-    where: { id: { in: listingIds } },
+    where: { id: { in: listingIds }, status: "published" },
     include: { provider: true, category: { include: { sector: true } } },
   });
   return listings.map((l) => ({
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
   let system = SYSTEM_PROMPT;
   if (listingIds && listingIds.length > 0) {
     const listings = await prisma.listing.findMany({
-      where: { id: { in: listingIds } },
+      where: { id: { in: listingIds }, status: "published" },
       include: { provider: true, category: { include: { attributeSchema: true } } },
     });
     if (listings.length > 0) {
