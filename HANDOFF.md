@@ -238,9 +238,13 @@ assignment, provider listing creation/update).
   admin approve/reject, reusing the existing price-drop notification
   system (`/notifications`, now open to provider accounts too via
   `requireConsumerOrProvider`).
-- No provider-facing analytics (views, times shown in a comparison,
-  etc.) — `getAlsoCompared`'s co-occurrence data exists in `Comparison`
-  rows already; could be surfaced per-provider without new tracking.
+- ~~No provider-facing analytics~~ **partially closed 2026-08-05**:
+  `getProviderListingStats()` (`src/lib/catalog.ts`) surfaces saved-count
+  and comparison-appearance count per listing on `/provider`, sourced
+  from existing `Comparison`/`SavedListing` rows. **Views specifically
+  is still a real gap** — nothing in this app tracks a per-listing page
+  view (no such `EventType`), and it was deliberately left unbuilt
+  rather than fabricated.
 
 ### Corporate/Regulator — intentionally left thin
 Per the build plan itself ("backlog, not current scope" for the fuller
