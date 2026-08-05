@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
+import { PriceSparkline } from "@/components/PriceSparkline";
 import { Badge } from "@/components/ui/Card";
 import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 import { notifyGamification } from "@/lib/gamification/client";
@@ -104,6 +105,9 @@ export function ListingCard({
               <p className="font-mono text-[13px] text-text-muted line-through">
                 {display(trend!.earliestPrice, listing.currency)}
               </p>
+            )}
+            {trend && trend.points.length >= 2 && (
+              <PriceSparkline points={trend.points} direction={trend.direction} width={44} height={18} />
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-1.5">
