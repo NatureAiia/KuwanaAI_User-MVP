@@ -150,10 +150,10 @@ decision-intelligence core over porting more comparison-platform features from o
   explicitly "backlog, not current scope" per the build plan. (Provider now has a real,
   purpose-built portal — see below — since it needed to exist at all for the role to mean
   anything, not because it needed the same depth as Corporate/Regulator.)
-- **`process-event.ts` gamification-engine tests weren't added** — it takes a live Prisma
-  transaction client and mocking a multi-step `tx.*` interaction properly is a separate, larger
-  piece of work than this pass covers. (`requireConsumer`/`requireAdmin` *are* now covered, with
-  mocked Supabase/Prisma — see `src/lib/auth.test.ts`.)
+- ~~`process-event.ts` gamification-engine tests weren't added~~ — now covered (12 tests) via an
+  in-memory fake transaction client — see `src/lib/gamification/process-event.test.ts`.
+  (`requireConsumer`/`requireAdmin` are covered too, with mocked Supabase/Prisma — see
+  `src/lib/auth.test.ts`.)
 - **`onboarding-facts.ts`'s historical trivia** (provider founding dates, membership counts) is
   unsourced/unverified by this session — worth a fact-check pass since the brief's "no invented
   statistics" bar arguably extends to onboarding copy, not just computed recommendations.
