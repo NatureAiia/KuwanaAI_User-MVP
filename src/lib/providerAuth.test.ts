@@ -1,0 +1,63 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const getUser = vi.fn();
+const userFindUnique = vi.fn();
+const providerFindUnique = vi.fn();
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: async () => ({ auth: { getUser } }),
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: { user: { findUnique: userFindUnique }, provider: { findUnique: providerFindUnique } },
+}));
+
+const { requireOwnProvider } = await import("@/lib/providerAuth");
+
+beforeEach(() => {
+  getUser.mockReset();
+  userFindUnique.mockReset();
+  providerFindUnique.mockReset();
+});
+
+describe("requireOwnProvider", () => {
+  it("returns a 401 when unauthenticated", async () => {
+    getUser.mockResolvedValue({ data: { user: null } });
+    const result = await requireOwnProvider();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(401);
+  });
+
+  it("returns a 403 when authenticated but not a provider account", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    userFindUnique.mockResolvedValue({ role: "consumer" });
+    const result = await requireOwnProvider();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(403);
+  });
+
+  it("returns a 404 when a provider account has no linked Provider record", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    userFindUnique.mockResolvedValue({ role: "provider" });
+    providerFindUnique.mockResolvedValue(null);
+    const result = await requireOwnProvider();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(404);
+  });
+
+  it("returns the caller's own provider, never one it merely asserts", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    userFindUnique.mockResolvedValue({ role: "provider" });
+    providerFindUnique.mockResolvedValue({ id: "prov-1", name: "Test Co" });
+    const result = await requireOwnProvider();
+    expect("provider" in result).toBe(true);
+    if ("provider" in result) {
+      expect(result.provider.id).toBe("prov-1");
+      // Confirms the lookup is keyed by the authenticated user's own id, not
+      // anything client-supplied.
+      expect(providerFindUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { ownerUserId: "u1" } }),
+      );
+    }
+  });
+});
