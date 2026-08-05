@@ -11,6 +11,11 @@ const updateSchema = z.object({
   currency: z.string().optional(),
   sourceUrl: z.string().url().nullable().optional(),
   freshnessStatus: z.enum(["fresh", "stale", "unverified"]).optional(),
+  // The provider review queue: approve (-> published) or reject (with a
+  // reason the provider sees on /provider) a pending_review submission.
+  // Also usable by an admin to directly retire/unpublish any listing.
+  status: z.enum(["draft", "pending_review", "published", "rejected"]).optional(),
+  rejectionReason: z.string().nullable().optional(),
   // Editing any field is itself an act of verification — bump the clock
   // unless the admin explicitly wants to backdate it for some reason.
   markVerifiedNow: z.boolean().default(true),
@@ -31,6 +36,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     data: {
       ...rest,
       ...(attributes ? { attributes: attributes as Prisma.InputJsonValue } : {}),
+      // Approving clears any stale rejection reason from a prior round.
+      ...(rest.status === "published" ? { rejectionReason: null } : {}),
       ...(markVerifiedNow ? { lastVerifiedAt: new Date(), freshnessStatus: rest.freshnessStatus ?? "fresh" } : {}),
     },
   });

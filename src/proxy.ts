@@ -13,6 +13,7 @@ const PROTECTED_PREFIXES = [
   "/corporate",
   "/regulator",
   "/notifications",
+  "/provider",
 ];
 
 export async function proxy(request: NextRequest) {

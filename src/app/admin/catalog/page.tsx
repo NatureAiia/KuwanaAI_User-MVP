@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/Card";
@@ -15,16 +16,28 @@ const STATUS_TONE = {
   rejected: "coral",
 } as const;
 
-export default async function AdminCatalogPage() {
+export default async function AdminCatalogPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
   const admin = await requireAdmin();
   if (!admin) notFound();
 
-  const [listings, categories, providers] = await Promise.all([
+  const { status: statusFilter } = await searchParams;
+  const activeStatus =
+    statusFilter && ["draft", "pending_review", "published", "rejected"].includes(statusFilter)
+      ? (statusFilter as keyof typeof STATUS_TONE)
+      : undefined;
+
+  const [listings, pendingCount, categories, providers] = await Promise.all([
     prisma.listing.findMany({
+      where: activeStatus ? { status: activeStatus } : undefined,
       include: { provider: true, category: { include: { sector: true } } },
       orderBy: [{ category: { sector: { name: "asc" } } }, { name: "asc" }],
       take: 500,
     }),
+    prisma.listing.count({ where: { status: "pending_review" } }),
     prisma.category.findMany({
       include: { sector: true },
       orderBy: [{ sector: { name: "asc" } }, { name: "asc" }],
@@ -39,6 +52,28 @@ export default async function AdminCatalogPage() {
         {listings.length} listing(s) across {categories.length} categor{categories.length === 1 ? "y" : "ies"} ·{" "}
         {providers.length} provider(s). Editing a listing marks it freshly verified.
       </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href="/admin/catalog"
+          className={`tap-target rounded-full border px-4 py-2 text-[13px] font-medium ${
+            !activeStatus ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
+          }`}
+        >
+          All
+        </Link>
+        <Link
+          href="/admin/catalog?status=pending_review"
+          className={`tap-target flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-medium ${
+            activeStatus === "pending_review"
+              ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
+              : "border-border text-text-secondary"
+          }`}
+        >
+          Needs review
+          {pendingCount > 0 && <Badge tone="coral">{pendingCount}</Badge>}
+        </Link>
+      </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <NewListingForm categories={categories} providers={providers} />
@@ -87,6 +122,7 @@ export default async function AdminCatalogPage() {
                     currentPrice={Number(l.price)}
                     currentCurrency={l.currency}
                     currentSourceUrl={l.sourceUrl}
+                    status={l.status}
                   />
                 </td>
               </tr>

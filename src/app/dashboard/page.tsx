@@ -11,7 +11,11 @@ import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 
-const ROLE_DASHBOARD: Partial<Record<string, string>> = { corporate: "/corporate", regulator: "/regulator" };
+const ROLE_DASHBOARD: Partial<Record<string, string>> = {
+  corporate: "/corporate",
+  regulator: "/regulator",
+  provider: "/provider",
+};
 
 export default async function DashboardPage() {
   const user = await requireUser();
