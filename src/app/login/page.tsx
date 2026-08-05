@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { safeRedirectPath } from "@/lib/safeRedirect";
 import { Button } from "@/components/ui/Button";
 
 function LoginForm() {
@@ -25,7 +26,10 @@ function LoginForm() {
       setError(error.message);
       return;
     }
-    router.push(params.get("next") ?? "/dashboard");
+    // `next` is attacker-controllable — anyone can send a link with their own
+    // value. Passing it to the router unchecked is an open redirect off the
+    // back of a successful login. See lib/safeRedirect.ts.
+    router.push(safeRedirectPath(params.get("next")));
     router.refresh();
   }
 

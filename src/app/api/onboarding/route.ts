@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
@@ -12,12 +12,12 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
 
   if (!authUser) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    return privateJson({ error: "Not authenticated" }, { status: 401 });
   }
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return privateJson({ error: parsed.error.flatten() }, { status: 400 });
   }
   const {
     role,
@@ -76,5 +76,5 @@ export async function POST(req: Request) {
     { timeout: 15_000 },
   );
 
-  return NextResponse.json({ gamification });
+  return privateJson({ gamification });
 }

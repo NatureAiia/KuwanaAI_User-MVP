@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
 
@@ -18,7 +20,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const existing = await prisma.listing.findUnique({ where: { id } });
   if (!existing || existing.providerId !== auth.provider.id) {
-    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    return privateJson({ error: "Listing not found" }, { status: 404 });
   }
   if (!EDITABLE_STATUSES.includes(existing.status as (typeof EDITABLE_STATUSES)[number])) {
     return NextResponse.json(
@@ -28,7 +30,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const parsed = providerUpdateListingSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, ...rest } = parsed.data;
   const listing = await prisma.listing.update({
@@ -41,5 +43,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(existing.status === "rejected" ? { rejectionReason: null } : {}),
     },
   });
-  return NextResponse.json({ listing });
+  // The catalog read cache is keyed by tag, not by TTL alone — without
+  // this, an edited price keeps serving stale until the 5-minute backstop.
+  revalidateCatalog();
+  return privateJson({ listing });
 }

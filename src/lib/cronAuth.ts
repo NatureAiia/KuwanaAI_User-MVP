@@ -1,4 +1,22 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
+
+/**
+ * Constant-time string compare. `===` on a secret short-circuits at the
+ * first differing byte, which over enough samples leaks the secret one
+ * character at a time. Hashing to a fixed length first means the comparison
+ * itself never reveals the secret's length either.
+ */
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) {
+    // Still burn a comparison so the length check isn't itself the signal.
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
 
 /**
  * Vercel Cron calls these routes as plain HTTP GETs — anyone who guesses the
@@ -13,8 +31,8 @@ export function verifyCronRequest(req: Request): NextResponse | null {
   if (!secret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (!secretsMatch(authHeader, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
   return null;

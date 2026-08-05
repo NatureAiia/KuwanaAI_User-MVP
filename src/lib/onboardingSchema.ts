@@ -12,11 +12,11 @@ import { z } from "zod";
 // only permit specific recognized exports.
 export const onboardingBodySchema = z.object({
   role: z.literal("consumer").default("consumer"),
-  fullName: z.string().min(1),
-  ageRange: z.string().optional(),
-  occupation: z.string().optional(),
-  location: z.string().optional(),
-  socialPlatforms: z.array(z.string()).default([]),
+  fullName: z.string().trim().min(1).max(120),
+  ageRange: z.string().trim().max(40).optional(),
+  occupation: z.string().trim().max(120).optional(),
+  location: z.string().trim().max(120).optional(),
+  socialPlatforms: z.array(z.string().trim().max(40)).max(20).default([]),
   telecomFootprint: z
     .object({
       primary_network: z.string(),

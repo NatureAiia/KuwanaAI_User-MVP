@@ -7,11 +7,16 @@ import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/sco
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { privateJson } from "@/lib/apiResponse";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { Sector } from "@prisma/client";
 
 const bodySchema = z.object({
-  listingIds: z.array(z.string()).min(2),
+  // Capped at 10 — each listing is serialized into the prompt, so an
+  // uncapped array lets one authenticated request drive an arbitrarily
+  // large (and arbitrarily expensive) model call.
+  listingIds: z.array(z.string()).min(2).max(10),
 });
 
 const RECOMMENDATION_SCHEMA = {
@@ -39,6 +44,12 @@ export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  // Every call here is a billed Claude request. Keyed on the user id rather
+  // than the IP: the caller is authenticated, so this cannot be sidestepped
+  // by rotating a forwarded-for header.
+  const limited = await enforceRateLimit(`recommendations:${user.id}`, RATE_LIMITS.authedAi);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -167,7 +178,7 @@ export async function POST(req: Request) {
     { timeout: 15_000 },
   );
 
-  return NextResponse.json({
+  return privateJson({
     listingId: recommendedListing.id,
     explanation: result.explanation,
     confidence,

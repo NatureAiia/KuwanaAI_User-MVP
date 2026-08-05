@@ -3,10 +3,18 @@ import { z } from "zod";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
+import { privateJson } from "@/lib/apiResponse";
+import { enforceRateLimit, clientKey, RATE_LIMITS } from "@/lib/rateLimit";
 
 // Deliberately no auth check — /explore itself is intentionally public for
 // pre-signup browsing (see proxy.ts), and this is just a faster way into
 // the same read-only pages, not a consumer-identity action.
+//
+// That combination — unauthenticated, and a billed Claude call on every
+// request — made this the cheapest way to run up the project's Anthropic
+// bill from a laptop. It is rate limited per client below. See
+// lib/rateLimit.ts for why a per-instance limiter is a real but partial
+// mitigation on a serverless deploy.
 const bodySchema = z.object({ query: z.string().trim().min(1).max(300) });
 
 const INTAKE_SCHEMA = {
@@ -27,6 +35,9 @@ const INTAKE_SCHEMA = {
 };
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(`need-intake:${clientKey(req)}`, RATE_LIMITS.publicAi);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
@@ -65,7 +76,7 @@ export async function POST(req: Request) {
 
   const textBlock = message.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
-    return NextResponse.json({ sectorSlug: null, categorySlug: null, confidence: 0 });
+    return privateJson({ sectorSlug: null, categorySlug: null, confidence: 0 });
   }
 
   const result = JSON.parse(textBlock.text) as {
@@ -78,7 +89,7 @@ export async function POST(req: Request) {
   const matchedSector = sectorsWithCategories.find((s) => s.slug === result.sector_slug);
   const matchedCategory = matchedSector?.categories.find((c) => c.slug === result.category_slug);
 
-  return NextResponse.json({
+  return privateJson({
     sectorSlug: matchedSector?.slug ?? null,
     categorySlug: matchedCategory?.slug ?? null,
     confidence: Math.max(0, Math.min(1, result.confidence)),

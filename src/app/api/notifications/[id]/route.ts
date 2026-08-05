@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 
@@ -12,7 +12,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     where: { id, userId: user.id },
     data: { read: true },
   });
-  if (result.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (result.count === 0) return privateJson({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }
