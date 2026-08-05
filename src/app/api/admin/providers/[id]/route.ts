@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 
@@ -45,9 +46,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     ownerUserId = owner.id;
   }
 
-  const provider = await prisma.provider.update({
-    where: { id },
-    data: { ...rest, ...(ownerUserId !== undefined ? { ownerUserId } : {}) },
-  });
-  return NextResponse.json({ provider });
+  try {
+    const provider = await prisma.provider.update({
+      where: { id },
+      data: { ...rest, ...(ownerUserId !== undefined ? { ownerUserId } : {}) },
+    });
+    return NextResponse.json({ provider });
+  } catch (err) {
+    // The alreadyLinked check above is a look-then-act race — two concurrent
+    // requests linking different providers to the same email could both pass
+    // it before either write commits. The unique constraint on ownerUserId
+    // is the real guard; this just turns its violation into the same
+    // friendly response the pre-check already gives in the common case,
+    // instead of a raw 500.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json(
+        { error: `${ownerEmail} already owns another provider — try again` },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 }
