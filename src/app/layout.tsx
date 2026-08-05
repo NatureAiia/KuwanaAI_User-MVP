@@ -4,6 +4,7 @@ import Script from "next/script";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { PageTransition } from "@/components/PageTransition";
+import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
 const THEME_INIT_SCRIPT = `
@@ -33,6 +34,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
   title: "Kuwana — Compare smarter, gain more",
   description:
     "AI-assisted, explainable comparisons across telecom, banking, insurance, and education in Zimbabwe.",

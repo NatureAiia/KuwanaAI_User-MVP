@@ -1,8 +1,15 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
+
+export const metadata: Metadata = {
+  title: "Explore & Compare — Kuwana",
+  description:
+    "Compare telecom, banking, insurance, and education providers in Zimbabwe with transparent, explainable decision scores.",
+};
 
 export default function ExploreHubPage() {
   return (

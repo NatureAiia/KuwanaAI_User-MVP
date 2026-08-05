@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
 import { computePriceForecast } from "@/lib/priceTrend";
@@ -12,6 +13,27 @@ import { ListingActions } from "@/components/ListingActions";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { FormattedPrice } from "@/components/FormattedPrice";
 import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  // Deliberately a small, separate query rather than reusing the fuller one
+  // below — Prisma calls aren't request-deduped the way fetch() is, and
+  // metadata only needs a handful of fields, not the full category/provider
+  // includes the page body needs.
+  const listing = await prisma.listing.findUnique({
+    where: { id, status: "published" },
+    select: { name: true, price: true, currency: true, provider: { select: { name: true } } },
+  });
+  if (!listing) return {};
+  return {
+    title: `${listing.name} — ${listing.provider.name} | Kuwana`,
+    description: `${listing.name} from ${listing.provider.name}: ${listing.currency} ${Number(listing.price).toFixed(2)}. Compare against alternatives with a transparent decision score on Kuwana.`,
+  };
+}
 
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

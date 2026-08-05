@@ -1,9 +1,24 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { ExploreClient } from "@/components/explore/ExploreClient";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ sector: string }>;
+}): Promise<Metadata> {
+  const { sector } = await params;
+  if (!LIVE_SECTORS.includes(sector as SectorSlug)) return {};
+  const meta = SECTORS[sector as SectorSlug];
+  return {
+    title: `${meta.name} — Compare on Kuwana`,
+    description: `${meta.blurb} — compare ${meta.name.toLowerCase()} providers in Zimbabwe with transparent decision scores.`,
+  };
+}
 
 export default async function ExploreSectorPage({
   params,
