@@ -1,0 +1,105 @@
+{{- if and .Values.postgresql.enabled .Values.postgresql.backup.enabled }}
+{{- $name := include "kuwana.postgresFullname" . -}}
+# Nightly logical dump to a PVC.
+#
+# This is a floor, not a backup strategy: a volume in the same cluster does not
+# survive losing the cluster, and pg_dump gives no point-in-time recovery.
+# Ship these off-cluster (object storage with versioning + a lifecycle policy)
+# before treating the in-cluster database as production-grade.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $name }}-backup
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.postgresql.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.backup.size }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $name }}-backup
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.postgresql.backup.schedule | quote }}
+  {{- with .Values.cronJobs.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "kuwana.labels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            fsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: pg-dump
+              image: {{ .Values.postgresql.image }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ default $name .Values.postgresql.auth.existingSecret }}
+                      key: password
+              command:
+                - sh
+                - -c
+                - |
+                  set -euo pipefail
+                  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+                  target="/backup/{{ .Values.postgresql.auth.database }}-${stamp}.dump"
+                  # Write to .partial first: a job killed mid-dump must not
+                  # leave a truncated file that looks like a valid backup.
+                  pg_dump --format=custom --compress=6 \
+                    -h {{ $name }} -U {{ .Values.postgresql.auth.username }} \
+                    -d {{ .Values.postgresql.auth.database }} \
+                    -f "${target}.partial"
+                  mv "${target}.partial" "${target}"
+                  echo "wrote ${target}"
+                  find /backup -name '*.dump' -type f -mtime +{{ .Values.postgresql.backup.retentionDays }} -print -delete
+                  find /backup -name '*.partial' -type f -mtime +1 -print -delete
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: {{ $name }}-backup
+            - name: tmp
+              emptyDir: {}
+{{- end }}

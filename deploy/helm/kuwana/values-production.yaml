@@ -1,0 +1,155 @@
+# Production overlay.
+#
+# Database is Supabase (managed): it is already the auth provider, so running
+# a second, self-managed Postgres in-cluster would add an operational burden
+# without removing the Supabase dependency. The in-cluster StatefulSet stays
+# available behind postgresql.enabled if that calculus ever changes — staging
+# runs it, so the path is not theoretical.
+#
+#   helm upgrade --install kuwana deploy/helm/kuwana \
+#     -n kuwana --create-namespace \
+#     -f deploy/helm/kuwana/values-production.yaml \
+#     --set image.digest=sha256:<digest> \
+#     --set migrations.image.digest=sha256:<digest> \
+#     --atomic --timeout 10m
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 65
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 768Mi
+  limits:
+    memory: 1536Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 50%
+
+topologySpreadConstraints:
+  # Stricter than the chart default: a real multi-zone production cluster
+  # should refuse to schedule a pod that would concentrate the service in one
+  # zone, rather than quietly allowing it.
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kuwana
+        app.kubernetes.io/component: web
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kuwana
+        app.kubernetes.io/component: web
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Edge-level flood control, kept as a second and independent limit now
+    # that src/lib/rateLimit.ts counts in the shared store. This one also
+    # covers traffic that never reaches a pod, and still applies if the store
+    # is unreachable and the app falls back to per-replica counting.
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+  hosts:
+    - host: kuwana.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: kuwana-tls
+      hosts:
+        - kuwana.example.com
+
+config:
+  adminEmails: "arthur@rubiem.com"
+  supabaseUrl: "https://your-production-project.supabase.co"
+  supabasePublishableKey: "sb_publishable_replace_me"
+
+# Vault-backed, via the External Secrets Operator. Nothing sensitive is ever
+# written into this file or into the release's stored values.
+externalSecret:
+  enabled: true
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  refreshInterval: 1h
+  data:
+    - secretKey: DATABASE_URL
+      remoteRef:
+        key: kuwana/production
+        property: database_url
+    - secretKey: SUPABASE_SERVICE_ROLE_KEY
+      remoteRef:
+        key: kuwana/production
+        property: supabase_service_role_key
+    - secretKey: ANTHROPIC_API_KEY
+      remoteRef:
+        key: kuwana/production
+        property: anthropic_api_key
+    - secretKey: CRON_SECRET
+      remoteRef:
+        key: kuwana/production
+        property: cron_secret
+
+postgresql:
+  enabled: false
+
+# Supabase is the database, so DATABASE_URL must point at the **pooler**
+# (pgBouncer, port 6543) and carry connection_limit — 20 replicas each opening
+# Prisma's default pool will exhaust a managed instance. The chart cannot check
+# a managed server's max_connections, so this one is on you.
+database:
+  connectionLimit: 5
+  poolTimeout: 20
+
+# Mandatory here, not optional: at 3-20 replicas, cache invalidation and rate
+# limiting are both wrong without it. The chart refuses to render otherwise.
+valkey:
+  enabled: true
+  maxmemory: 768mb
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+# Turn on once KEDA and Prometheus (scraping ingress-nginx) exist in the
+# cluster, and set autoscaling.enabled=false in the same change — they are
+# mutually exclusive and the chart enforces that. Tune
+# requestsPerSecondPerPod from a load test, not from taste.
+keda:
+  enabled: false
+  minReplicaCount: 3
+  maxReplicaCount: 20
+  requestsPerSecondPerPod: 50
+  p95LatencySeconds: 1.5
+
+migrations:
+  enabled: true
+  # One attempt. A migration that failed halfway is a situation for a human to
+  # look at, not for Kubernetes to retry into a worse state.
+  backoffLimit: 0
+
+cronJobs:
+  enabled: true
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelectors:
+    - matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx

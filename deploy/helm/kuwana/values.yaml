@@ -1,0 +1,388 @@
+# Kuwana chart — safe-by-default values.
+#
+# Defaults target a production-shaped cluster: no root, read-only rootfs, a
+# NetworkPolicy that denies unexpected ingress, and secrets referenced rather
+# than inlined. Environment overlays live in values-staging.yaml and
+# values-production.yaml; nothing environment-specific belongs in this file.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# --- images ---------------------------------------------------------------
+image:
+  repository: ghcr.io/natureaiia/kuwana
+  # Empty means "use Chart.appVersion". Set explicitly (to an immutable tag or
+  # a digest) from CI — a floating tag makes a rollback unable to reproduce
+  # what was actually running.
+  tag: ""
+  digest: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+# - name: ghcr-pull
+
+# --- replicas & scaling ---------------------------------------------------
+# Ignored when autoscaling.enabled is true (the HPA owns the replica count;
+# leaving both live makes every Helm upgrade fight the autoscaler).
+replicaCount: 3
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 12
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleUp:
+      # A traffic spike on an SSR app needs capacity in seconds, not minutes.
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 4
+          periodSeconds: 30
+      selectPolicy: Max
+    scaleDown:
+      # Long window on the way down: shedding replicas quickly after a spike
+      # is how a second spike five minutes later becomes an outage.
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+
+podDisruptionBudget:
+  enabled: true
+  # Percentage, not a count, so it stays correct as the HPA moves replicas.
+  minAvailable: 50%
+
+# Request-rate autoscaling. Mutually exclusive with autoscaling.enabled — two
+# controllers driving one Deployment's replica count fight each other.
+#
+# Requires KEDA in the cluster and Prometheus scraping ingress-nginx. Left off
+# by default so the chart installs on a bare cluster; turn it on once that
+# dependency exists, because CPU is a weak proxy for load in an app that
+# spends its time waiting on Supabase, Postgres and the Claude API.
+keda:
+  enabled: false
+  prometheusAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 3
+  maxReplicaCount: 20
+  # Sustained requests per second one pod should carry. Set this from a load
+  # test, not from taste — the right number depends on how much of a request
+  # is spent waiting on an upstream.
+  requestsPerSecondPerPod: 50
+  p95LatencySeconds: 1.5
+  cpuFloor:
+    enabled: true
+    utilizationPercentage: 80
+  fallback:
+    failureThreshold: 3
+    replicas: 5
+
+# --- resources ------------------------------------------------------------
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    # No CPU limit on purpose. CFS throttling on a Node process shows up as
+    # latency spikes on exactly the requests that matter (SSR + streaming
+    # chat); the request already guarantees the share, and the memory limit
+    # still bounds the blast radius. Set one here if cluster policy demands it.
+    memory: 1Gi
+
+# --- placement ------------------------------------------------------------
+# Spread across zones first, then nodes, so losing either does not take the
+# service with it. ScheduleAnyway, not DoNotSchedule: a single-zone cluster
+# must still be able to schedule.
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kuwana
+        app.kubernetes.io/component: web
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: kuwana
+        app.kubernetes.io/component: web
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""
+
+# --- pod & container hardening -------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Endpoint removal and pod termination race; without a preStop pause, in-flight
+# requests land on a pod that is already shutting down.
+terminationGracePeriodSeconds: 30
+preStopSleepSeconds: 5
+
+# --- service & ingress ----------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+  annotations: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+    # Chat streams token-by-token; the default 60s read timeout truncates a
+    # long answer mid-sentence.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: kuwana.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: kuwana-tls
+      hosts:
+        - kuwana.example.com
+
+# --- application config (non-secret) --------------------------------------
+config:
+  # Comma-separated admin allowlist consumed by requireAdmin() in src/lib/auth.ts.
+  adminEmails: ""
+  nodeEnv: production
+  # Public by design — inlined into the client bundle at image build time and
+  # repeated here so the readiness probe's config check can see them.
+  supabaseUrl: ""
+  supabasePublishableKey: ""
+
+# Arbitrary extra env, e.g. feature flags.
+extraEnv: []
+# - name: SOME_FLAG
+#   value: "1"
+
+# --- secrets --------------------------------------------------------------
+# Order of preference:
+#   1. externalSecret.enabled — External Secrets Operator pulls from the real
+#      vault. This is what production should use.
+#   2. existingSecret — a Secret created out of band (sealed-secrets, SOPS).
+#   3. secrets.create — values inlined here. Development only: anything in a
+#      values file ends up in Git and in `helm get values` in plaintext.
+existingSecret: ""
+
+secrets:
+  create: false
+  databaseUrl: ""
+  supabaseServiceRoleKey: ""
+  anthropicApiKey: ""
+  cronSecret: ""
+
+externalSecret:
+  enabled: false
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  refreshInterval: 1h
+  # remoteKey/property per entry, mapped onto the env names the app reads.
+  data:
+    - secretKey: DATABASE_URL
+      remoteRef:
+        key: kuwana/production
+        property: database_url
+    - secretKey: SUPABASE_SERVICE_ROLE_KEY
+      remoteRef:
+        key: kuwana/production
+        property: supabase_service_role_key
+    - secretKey: ANTHROPIC_API_KEY
+      remoteRef:
+        key: kuwana/production
+        property: anthropic_api_key
+    - secretKey: CRON_SECRET
+      remoteRef:
+        key: kuwana/production
+        property: cron_secret
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # No workload in this chart calls the Kubernetes API. Mounting a token
+  # anyway hands any RCE a cluster credential for free.
+  automountServiceAccountToken: false
+
+# --- database migrations --------------------------------------------------
+# Runs as a pre-install/pre-upgrade Helm hook: the new ReplicaSet is never
+# created until migrations succeed, and a failed migration aborts the release
+# instead of half-deploying against an old schema.
+migrations:
+  enabled: true
+  image:
+    repository: ghcr.io/natureaiia/kuwana-migrate
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  backoffLimit: 1
+  activeDeadlineSeconds: 600
+  # Kept after failure so `kubectl logs` can still explain what broke.
+  hookDeletePolicy: before-hook-creation
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+# --- scheduled jobs -------------------------------------------------------
+# The work lives behind authenticated HTTP endpoints (src/app/api/cron/*), so
+# these are curl calls against the in-cluster Service rather than a second
+# copy of the application image.
+cronJobs:
+  enabled: true
+  image: curlimages/curl:8.11.1
+  timeZone: Africa/Harare
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 300
+  backoffLimit: 2
+  jobs:
+    - name: freshness
+      path: /api/cron/freshness
+      schedule: "0 3 * * *"
+    - name: quest-rotation
+      path: /api/cron/quest-rotation
+      schedule: "5 3 * * *"
+    - name: fx-refresh
+      path: /api/cron/fx-refresh
+      schedule: "10 3 * * *"
+
+# --- network policy -------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Namespaces allowed to reach the web pods (the ingress controller, and
+  # anything else that legitimately calls in).
+  ingressNamespaceSelectors:
+    - matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+  # Egress must stay open enough for DNS, Supabase, the Anthropic API and the
+  # database. CIDR-pinning those is not practical against managed endpoints,
+  # so egress is allowed to the internet minus RFC1918, plus in-cluster DNS
+  # and the optional in-cluster Postgres.
+  allowExternalEgress: true
+
+# --- database connection budget -------------------------------------------
+# Prisma opens a pool per process, defaulting to (cpu_count * 2 + 1). That
+# default is sized for one server, not for an autoscaled fleet: at 20 replicas
+# it silently asks for hundreds of connections and the database starts
+# refusing them — which looks like a total outage, not a capacity problem.
+#
+# The budget is: maxReplicas x connectionLimit + migrations + cron <= the
+# server's max_connections. The chart checks this arithmetic at render time
+# for the in-cluster database and fails rather than letting it be discovered
+# in production.
+database:
+  # Per pod. Small on purpose — an SSR request holds a connection for
+  # milliseconds, so a handful per pod saturates well past the point where
+  # the pods themselves are the bottleneck.
+  connectionLimit: 5
+  # Seconds a request waits for a free connection before erroring rather than
+  # queueing indefinitely behind a slow query.
+  poolTimeout: 20
+
+# --- shared cache / rate-limit store --------------------------------------
+# Above one replica this stops being optional infrastructure and becomes a
+# correctness requirement. Next's unstable_cache is per process: without a
+# shared store, `revalidateTag` after an admin catalog edit clears the cache on
+# the one pod that served the write and leaves the other N-1 serving stale data
+# until their own TTL expires, and the in-process rate limiter permits
+# limit x replicas requests instead of limit.
+valkey:
+  enabled: true
+  image: valkey/valkey:8.1-alpine
+  auth:
+    existingSecret: ""
+    # Generated on first install and held stable across upgrades. Never put a
+    # real password in a values file.
+    password: ""
+  # Bounded and evicting: everything in here is regenerable. Sized well under
+  # the container's memory limit so eviction, not the OOM killer, is what
+  # reclaims memory.
+  maxmemory: 384mb
+  maxmemoryPolicy: allkeys-lru
+  persistence:
+    # Off: a cold cache costs one slow request per key; AOF turns every cache
+    # write into disk I/O for data that is stale within minutes.
+    enabled: false
+    size: 1Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+# Managed Redis instead of the in-cluster StatefulSet. Mutually exclusive with
+# valkey.enabled; the URL is read from a Secret you create.
+externalRedis:
+  enabled: false
+  existingSecret: ""
+  secretKey: REDIS_URL
+
+# --- optional in-cluster Postgres ----------------------------------------
+# Off by default: production points DATABASE_URL at Supabase, which is also
+# the auth provider, so an in-cluster database would only split one datastore
+# into two without removing the Supabase dependency. Turn it on for staging,
+# air-gapped evaluation, or a migration away from managed Postgres.
+postgresql:
+  enabled: false
+  image: postgres:17-alpine
+  # Postgres defaults to 100, which an autoscaled web tier exhausts long
+  # before it exhausts CPU. Each connection costs a backend process and some
+  # work_mem, so this is raised deliberately rather than set to a huge number.
+  maxConnections: 200
+  auth:
+    username: kuwana
+    database: kuwana
+    # Read from this Secret's `password` key; generated on first install when
+    # left empty. Never write a real password into a values file.
+    existingSecret: ""
+    password: ""
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 2Gi
+  backup:
+    enabled: false
+    schedule: "0 1 * * *"
+    retentionDays: 7
+    size: 20Gi

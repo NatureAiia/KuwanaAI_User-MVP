@@ -1,0 +1,83 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kuwana.fullname" . }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kuwana.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The ingress controller.
+    {{- with .Values.networkPolicy.ingressNamespaceSelectors }}
+    - from:
+        {{- range . }}
+        - namespaceSelector:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $.Values.service.targetPort }}
+    {{- end }}
+    # The scheduled jobs, which call /api/cron/* through the Service, and the
+    # `helm test` probe pod.
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/instance
+                operator: In
+                values: [{{ .Release.Name | quote }}]
+              - key: app.kubernetes.io/component
+                operator: In
+                values: ["cron", "test"]
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.targetPort }}
+  egress:
+    # DNS. Everything else here fails without it, including the Postgres and
+    # Supabase hostnames.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if .Values.postgresql.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- end }}
+    {{- if .Values.networkPolicy.allowExternalEgress }}
+    # Supabase (auth + managed Postgres) and the Anthropic API are public
+    # endpoints on rotating IPs, so egress cannot be pinned to a CIDR. RFC1918
+    # and link-local are excluded instead, which is what actually matters: a
+    # compromised pod still cannot reach the cluster's internal services or
+    # the cloud metadata endpoint at 169.254.169.254.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+    {{- end }}
+{{- end }}
