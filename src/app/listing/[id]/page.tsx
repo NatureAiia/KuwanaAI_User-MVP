@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
+import { getListingDetail, getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
 import { computePriceForecast } from "@/lib/priceTrend";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -16,19 +15,14 @@ import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
 export default async function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const listing = await prisma.listing.findUnique({
-    where: { id },
-    include: {
-      provider: true,
-      category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } },
-    },
-  });
   // Public page — a draft/pending/rejected listing isn't published yet, so
-  // it doesn't exist as far as a consumer visitor is concerned. Providers
-  // view their own listings' status via /provider, not this page.
-  if (!listing || listing.status !== "published") notFound();
+  // it doesn't exist as far as a consumer visitor is concerned (getListingDetail
+  // returns null for those). Providers view their own listings' status via
+  // /provider, not this page.
+  const listing = await getListingDetail(id);
+  if (!listing) notFound();
 
-  const attributes = listing.attributes as Record<string, unknown>;
+  const attributes = listing.attributes;
   const attributeSchema = listing.category.attributeSchema.map((a) => ({
     key: a.key,
     label: a.label,
@@ -57,12 +51,12 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
       <div className="mt-4 flex items-center gap-3">
         <p className="font-mono text-[28px] font-semibold">
-          <FormattedPrice amount={Number(listing.price)} currency={listing.currency} />
+          <FormattedPrice amount={listing.price} currency={listing.currency} />
         </p>
         <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]}>{listing.freshnessStatus}</Badge>
       </div>
       <p className="mt-1 text-[11px] text-text-muted">
-        Last verified {listing.lastVerifiedAt.toLocaleDateString()}
+        Last verified {new Date(listing.lastVerifiedAt).toLocaleDateString()}
       </p>
 
       {trend && (

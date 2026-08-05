@@ -1,7 +1,29 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { computeDecisionScores } from "@/lib/scoring";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
+import { CATALOG_TAG, PRICE_HISTORY_TAG } from "@/lib/cacheTags";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
+
+/**
+ * How long a cached catalog read may serve without a write invalidating it.
+ * Writes call revalidateCatalog() and drop the entry immediately, so this is
+ * only the backstop for changes made outside the app (a direct SQL edit, a
+ * seed re-run, the freshness cron marking listings stale).
+ */
+const CATALOG_TTL_SECONDS = 300;
+
+/**
+ * How far back a price trend looks. 90 days is long enough for
+ * computePriceForecast to have the 3+ points it needs to fit a line, and
+ * short enough that a listing with years of history doesn't drag its whole
+ * table into memory on every explore page render.
+ */
+const TREND_WINDOW_DAYS = 90;
+
+function trendWindowStart() {
+  return new Date(Date.now() - TREND_WINDOW_DAYS * 86_400_000);
+}
 
 function toListingDTO(listing: {
   id: string;
@@ -27,63 +49,80 @@ function toListingDTO(listing: {
   };
 }
 
-export async function getSectorCategories(sectorSlug: string): Promise<CategoryDTO[]> {
-  const sector = await prisma.sectorConfig.findUnique({
-    where: { slug: sectorSlug },
-    include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
-  });
-  if (!sector) return [];
-  return sector.categories.map((c) => ({
-    id: c.id,
-    slug: c.slug,
-    name: c.name,
-    attributeSchema: c.attributeSchema.map((a) => ({
-      key: a.key,
-      label: a.label,
-      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
-      unit: a.unit,
-      isComparable: a.isComparable,
-      sortOrder: a.sortOrder,
-    })),
-  }));
-}
+/**
+ * Every page under /explore calls this before rendering anything, and the
+ * answer changes only when an admin edits the catalog — the clearest
+ * caching win in the app.
+ */
+export const getSectorCategories = unstable_cache(
+  async (sectorSlug: string): Promise<CategoryDTO[]> => {
+    const sector = await prisma.sectorConfig.findUnique({
+      where: { slug: sectorSlug },
+      include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
+    });
+    if (!sector) return [];
+    return sector.categories.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      attributeSchema: c.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+    }));
+  },
+  ["sector-categories"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_TTL_SECONDS },
+);
 
-export async function getCategoryWithListings(
-  sectorSlug: string,
-  categorySlug: string,
-): Promise<CategoryWithListingsDTO | null> {
-  const sector = await prisma.sectorConfig.findUnique({ where: { slug: sectorSlug } });
-  if (!sector) return null;
+export const getCategoryWithListings = unstable_cache(
+  async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | null> => {
+    const sector = await prisma.sectorConfig.findUnique({ where: { slug: sectorSlug } });
+    if (!sector) return null;
 
-  const category = await prisma.category.findUnique({
-    where: { sectorId_slug: { sectorId: sector.id, slug: categorySlug } },
-    include: {
-      attributeSchema: { orderBy: { sortOrder: "asc" } },
-      listings: {
-        where: { status: "published" },
-        include: { provider: true },
-        orderBy: { price: "asc" },
+    const category = await prisma.category.findUnique({
+      where: { sectorId_slug: { sectorId: sector.id, slug: categorySlug } },
+      include: {
+        attributeSchema: { orderBy: { sortOrder: "asc" } },
+        listings: {
+          where: { status: "published" },
+          include: { provider: true },
+          orderBy: { price: "asc" },
+        },
       },
-    },
-  });
-  if (!category) return null;
+    });
+    if (!category) return null;
 
-  return {
-    id: category.id,
-    slug: category.slug,
-    name: category.name,
-    attributeSchema: category.attributeSchema.map((a) => ({
-      key: a.key,
-      label: a.label,
-      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
-      unit: a.unit,
-      isComparable: a.isComparable,
-      sortOrder: a.sortOrder,
-    })),
-    listings: category.listings.map(toListingDTO),
-  };
-}
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      attributeSchema: category.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+      listings: category.listings.map(toListingDTO),
+    };
+  },
+  ["category-with-listings"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_TTL_SECONDS },
+);
 
+/**
+ * Not itself wrapped in unstable_cache: `priceWeight` is derived from the
+ * calling user's footprint, so caching on it would either key the cache by
+ * user (defeating the point) or serve one user's weighting to another. Both
+ * of the DB reads it makes are cached individually, so the uncached part is
+ * pure in-memory scoring.
+ */
 export async function getTopListings(
   sectorSlug: string,
   categorySlug: string,
@@ -183,11 +222,19 @@ export async function getPersonalizedSpecials(
     });
   }
 
+  // Fetched in parallel rather than sequentially in the loop: a user with
+  // footprints in five sectors was paying five serial round-trips before
+  // their dashboard could render its first tile.
   const engagedSectors = new Set([...candidates.values()].map((c) => c.sectorSlug));
-  for (const footprint of footprints) {
-    if (engagedSectors.has(footprint.sector)) continue;
-    const [firstCategory] = await getSectorCategories(footprint.sector);
-    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug: footprint.sector, categorySlug: firstCategory.slug });
+  const unengaged = footprints.filter((f) => !engagedSectors.has(f.sector));
+  const firstCategories = await Promise.all(
+    unengaged.map(async (footprint) => ({
+      sectorSlug: footprint.sector,
+      category: (await getSectorCategories(footprint.sector))[0],
+    })),
+  );
+  for (const { sectorSlug, category } of firstCategories) {
+    if (category) candidates.set(category.id, { sectorSlug, categorySlug: category.slug });
   }
 
   if (candidates.size === 0) return [];
@@ -208,35 +255,78 @@ export async function getPersonalizedSpecials(
  * to a PriceTrend (or null if there's no history yet). Keyed by listing id
  * so callers can look up a listing's trend alongside its other data.
  */
-export async function getListingPriceTrends(listingIds: string[]): Promise<Record<string, PriceTrend | null>> {
-  if (listingIds.length === 0) return {};
+export const getListingPriceTrends = unstable_cache(
+  async (listingIds: string[]): Promise<Record<string, PriceTrend | null>> => {
+    if (listingIds.length === 0) return {};
 
-  const rows = await prisma.listingPriceHistory.findMany({
-    where: { listingId: { in: listingIds } },
-    orderBy: { recordedAt: "asc" },
+    const rows = await prisma.listingPriceHistory.findMany({
+      // Bounded to the trend window instead of every row ever recorded: the
+      // table grows one row per price change per listing forever, and
+      // computePriceTrend only ever looks at recent movement.
+      where: { listingId: { in: listingIds }, recordedAt: { gte: trendWindowStart() } },
+      orderBy: { recordedAt: "asc" },
+    });
+
+    const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
+    for (const row of rows) {
+      const arr = grouped.get(row.listingId) ?? [];
+      arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
+      grouped.set(row.listingId, arr);
+    }
+
+    const result: Record<string, PriceTrend | null> = {};
+    for (const id of listingIds) {
+      result[id] = computePriceTrend(grouped.get(id) ?? []);
+    }
+    return result;
+  },
+  ["listing-price-trends"],
+  { tags: [PRICE_HISTORY_TAG], revalidate: CATALOG_TTL_SECONDS },
+);
+
+export type ListingDetail = NonNullable<Awaited<ReturnType<typeof readListingDetail>>>;
+
+async function readListingDetail(id: string) {
+  const listing = await prisma.listing.findUnique({
+    where: { id },
+    include: {
+      provider: true,
+      category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } },
+    },
   });
-
-  const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
-  for (const row of rows) {
-    const arr = grouped.get(row.listingId) ?? [];
-    arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
-    grouped.set(row.listingId, arr);
-  }
-
-  const result: Record<string, PriceTrend | null> = {};
-  for (const id of listingIds) {
-    result[id] = computePriceTrend(grouped.get(id) ?? []);
-  }
-  return result;
+  // Filtered here rather than at the page, so a draft/pending/rejected
+  // listing can never be cached under this key and then served to a
+  // consumer if the page's own status check is ever dropped.
+  if (!listing || listing.status !== "published") return null;
+  return {
+    ...listing,
+    price: Number(listing.price),
+    attributes: listing.attributes as Record<string, unknown>,
+  };
 }
 
-export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
-  const listings = await prisma.listing.findMany({
-    where: { id: { in: ids }, status: "published" },
-    include: { provider: true },
-  });
-  return listings.map(toListingDTO);
-}
+/**
+ * The listing detail page's own read. It was the last uncached catalog
+ * query left, and it showed: every /listing/[id] view paid a full remote
+ * round-trip to Supabase (~1.5s from here) that repeat views never
+ * amortised, while the fully-cached /explore pages served in ~0.25s.
+ */
+export const getListingDetail = unstable_cache(readListingDetail, ["listing-detail"], {
+  tags: [CATALOG_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getListingsByIds = unstable_cache(
+  async (ids: string[]): Promise<ListingDTO[]> => {
+    const listings = await prisma.listing.findMany({
+      where: { id: { in: ids }, status: "published" },
+      include: { provider: true },
+    });
+    return listings.map(toListingDTO);
+  },
+  ["listings-by-ids"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_TTL_SECONDS },
+);
 
 /**
  * "Others also compared" — the Amazon-style social-proof pattern named in
@@ -245,29 +335,36 @@ export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
  * it most often, and returns the top few in rank order. No separate
  * aggregation table — computed from Comparison rows that already exist.
  */
-export async function getAlsoCompared(listingId: string, limit = 4): Promise<ListingDTO[]> {
-  const comparisons = await prisma.comparison.findMany({
-    where: { listingIds: { has: listingId } },
-    select: { listingIds: true },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+export const getAlsoCompared = unstable_cache(
+  async (listingId: string, limit = 4): Promise<ListingDTO[]> => {
+    const comparisons = await prisma.comparison.findMany({
+      where: { listingIds: { has: listingId } },
+      select: { listingIds: true },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    });
 
-  const counts = new Map<string, number>();
-  for (const comparison of comparisons) {
-    for (const otherId of comparison.listingIds) {
-      if (otherId === listingId) continue;
-      counts.set(otherId, (counts.get(otherId) ?? 0) + 1);
+    const counts = new Map<string, number>();
+    for (const comparison of comparisons) {
+      for (const otherId of comparison.listingIds) {
+        if (otherId === listingId) continue;
+        counts.set(otherId, (counts.get(otherId) ?? 0) + 1);
+      }
     }
-  }
 
-  const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
-  if (rankedIds.length === 0) return [];
+    const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+    if (rankedIds.length === 0) return [];
 
-  const listings = await getListingsByIds(rankedIds);
-  const byId = new Map(listings.map((l) => [l.id, l]));
-  return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
-}
+    const listings = await getListingsByIds(rankedIds);
+    const byId = new Map(listings.map((l) => [l.id, l]));
+    return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
+  },
+  ["also-compared"],
+  // A 200-row scan plus an in-memory tally on every listing page view. The
+  // ranking is a popularity signal, so serving it a few minutes stale is
+  // indistinguishable from fresh to a user.
+  { tags: [CATALOG_TAG], revalidate: CATALOG_TTL_SECONDS },
+);
 
 export type MarketOverview = {
   bySector: {
@@ -292,15 +389,16 @@ export type MarketOverview = {
  * no separate aggregation tables. Pass sectorSlug to drill down into a
  * single sector (the "Explore" stage) instead of the full market.
  */
-export async function getMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
-  const rows = await prisma.listing.findMany({
-    where: {
-      status: "published",
-      category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
-    },
-    include: { provider: true, category: { include: { sector: true } } },
-  });
-  const trends = await getListingPriceTrends(rows.map((r) => r.id));
+export const getMarketOverview = unstable_cache(
+  async (sectorSlug?: string): Promise<MarketOverview> => {
+    const rows = await prisma.listing.findMany({
+      where: {
+        status: "published",
+        category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
+      },
+      include: { provider: true, category: { include: { sector: true } } },
+    });
+    const trends = await getListingPriceTrends(rows.map((r) => r.id));
 
   const bySector = new Map<string, MarketOverview["bySector"][number]>();
   const anomalies: MarketOverview["anomalies"] = [];
@@ -338,11 +436,17 @@ export async function getMarketOverview(sectorSlug?: string): Promise<MarketOver
     }
   }
 
-  anomalies.sort((a, b) => Math.abs(b.trend.changePercent) - Math.abs(a.trend.changePercent));
+    anomalies.sort((a, b) => Math.abs(b.trend.changePercent) - Math.abs(a.trend.changePercent));
 
-  return {
-    bySector: [...bySector.values()].map((s) => ({ ...s, avgPrice: Math.round(s.avgPrice * 100) / 100 })),
-    anomalies: anomalies.slice(0, 10),
-    unverifiedListings,
-  };
-}
+    return {
+      bySector: [...bySector.values()].map((s) => ({ ...s, avgPrice: Math.round(s.avgPrice * 100) / 100 })),
+      anomalies: anomalies.slice(0, 10),
+      unverifiedListings,
+    };
+  },
+  ["market-overview"],
+  // The single heaviest query in the app: every published listing in every
+  // live sector, plus their price history. Both dashboards that call it
+  // render nothing until it returns.
+  { tags: [CATALOG_TAG, PRICE_HISTORY_TAG], revalidate: CATALOG_TTL_SECONDS },
+);

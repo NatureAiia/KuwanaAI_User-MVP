@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/Header";
 import { Card, Badge } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
-import { NewProviderListingForm } from "@/components/provider/NewProviderListingForm";
+import { NewProviderListingFormLazy } from "@/components/LazyClients";
 import { ProviderListingActions } from "@/components/provider/ProviderListingActions";
 
 const STATUS_TONE = {
@@ -67,7 +67,7 @@ export default async function ProviderPortalPage() {
       </p>
 
       <div className="mt-6 max-w-[420px]">
-        <NewProviderListingForm categories={categories} />
+        <NewProviderListingFormLazy categories={categories} />
       </div>
 
       <section className="mt-8">

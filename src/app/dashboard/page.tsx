@@ -1,13 +1,13 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTopListings, getPersonalizedSpecials } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { DailyVisitPing } from "@/components/DailyVisitPing";
-import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
+import { DashboardRails, DashboardRailsSkeleton } from "@/components/dashboard/DashboardRails";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 
@@ -25,7 +25,10 @@ export default async function DashboardPage() {
   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
   if (roleRedirect) redirect(roleRedirect);
 
-  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials] = await Promise.all([
+  // Only the fast, user-scoped reads are awaited here. The listing rails —
+  // the slowest part of the page — stream in behind their own Suspense
+  // boundary below rather than holding up the whole render.
+  const [profile, xp, streak, activeQuest] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
     prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
@@ -33,9 +36,6 @@ export default async function DashboardPage() {
       where: { activeTo: { gte: new Date() } },
       orderBy: { activeTo: "asc" },
     }),
-    getTopListings("telecom", "data-bundles", 4),
-    getTopListings("banking", "savings-accounts", 4),
-    getPersonalizedSpecials(user.id, 4),
   ]);
 
   const firstName = profile?.fullName?.split(" ")[0];
@@ -64,29 +64,9 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6 space-y-6">
-        {specials.length > 0 ? (
-          specials.map((s) => (
-            <HeroCarousel
-              key={s.categorySlug}
-              title={`Specials for you: ${s.categoryName}`}
-              sectorSlug={s.sectorSlug}
-              listings={s.listings}
-            />
-          ))
-        ) : (
-          <>
-            <HeroCarousel
-              title="Best value data bundles this week"
-              sectorSlug="telecom"
-              listings={telecomHero.listings}
-            />
-            <HeroCarousel
-              title="Savings accounts with the lowest fees"
-              sectorSlug="banking"
-              listings={bankingHero.listings}
-            />
-          </>
-        )}
+        <Suspense fallback={<DashboardRailsSkeleton />}>
+          <DashboardRails userId={user.id} />
+        </Suspense>
       </div>
 
       <section className="mt-8">
