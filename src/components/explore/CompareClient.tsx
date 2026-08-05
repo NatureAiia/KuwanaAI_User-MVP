@@ -44,6 +44,7 @@ export function CompareClient({
     confidence: number;
   } | null>(null);
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const loggedComparison = useRef(false);
 
   const scores = computeDecisionScores(listings, attributeSchema, trends);
@@ -83,6 +84,7 @@ export function CompareClient({
 
   async function getRecommendation() {
     setLoadingRecommendation(true);
+    setRecommendationError(null);
     try {
       const res = await fetch("/api/recommendations", {
         method: "POST",
@@ -93,7 +95,17 @@ export function CompareClient({
         const data = await res.json();
         setRecommendation(data);
         notifyGamification(data?.gamification);
+      } else {
+        // Previously silent — a failed response just reverted the button
+        // with no explanation, indistinguishable from the click not having
+        // registered at all.
+        const data = await res.json().catch(() => null);
+        setRecommendationError(
+          typeof data?.error === "string" ? data.error : "Couldn't get a recommendation — please try again.",
+        );
       }
+    } catch {
+      setRecommendationError("Couldn't reach Kuwana — check your connection and try again.");
     } finally {
       setLoadingRecommendation(false);
     }
@@ -240,19 +252,22 @@ export function CompareClient({
 
       <div className="mt-5">
         {!recommendation && !loadingRecommendation && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={getRecommendation} size="lg">
-              <Sparkles size={16} />
-              Get AI recommendation
-            </Button>
-            <LinkButton
-              variant="secondary"
-              size="lg"
-              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
-            >
-              <MessageCircle size={16} />
-              Ask in chat
-            </LinkButton>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button onClick={getRecommendation} size="lg">
+                <Sparkles size={16} />
+                Get AI recommendation
+              </Button>
+              <LinkButton
+                variant="secondary"
+                size="lg"
+                href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+              >
+                <MessageCircle size={16} />
+                Ask in chat
+              </LinkButton>
+            </div>
+            {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
           </div>
         )}
 

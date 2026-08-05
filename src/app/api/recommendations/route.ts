@@ -104,32 +104,46 @@ export async function POST(req: Request) {
     };
   });
 
-  const message = await anthropic.messages.create({
-    model: RECOMMENDATION_MODEL,
-    max_tokens: 1024,
-    output_config: {
-      effort: "low",
-      format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
-    },
-    system:
-      "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
-      "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
-      "overall fit for value and needs. Each listing includes a decision_score breakdown " +
-      "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
-      "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
-      "access it) — use these as your primary evidence, and reference them concretely in your " +
-      "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
-      "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
-      "materially higher requirement than the others, say so explicitly — this is an eligibility " +
-      "signal, not just a spec difference. Only reference data present in the listings provided; " +
-      "never invent statistics. Always make clear this is an AI-assisted recommendation.",
-    messages: [
-      {
-        role: "user",
-        content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
+  let message;
+  try {
+    message = await anthropic.messages.create({
+      model: RECOMMENDATION_MODEL,
+      max_tokens: 1024,
+      output_config: {
+        effort: "low",
+        format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
       },
-    ],
-  });
+      system:
+        "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
+        "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
+        "overall fit for value and needs. Each listing includes a decision_score breakdown " +
+        "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
+        "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
+        "access it) — use these as your primary evidence, and reference them concretely in your " +
+        "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
+        "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
+        "materially higher requirement than the others, say so explicitly — this is an eligibility " +
+        "signal, not just a spec difference. Only reference data present in the listings provided; " +
+        "never invent statistics. Always make clear this is an AI-assisted recommendation.",
+      messages: [
+        {
+          role: "user",
+          content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
+        },
+      ],
+    });
+  } catch (err) {
+    // Previously unhandled — the client would get a bare 500 with no JSON
+    // body and silently do nothing (no error shown, no state change, just
+    // the button reverting as if nothing happened). 503 signals "the AI
+    // service itself is unavailable," distinct from a 400/404 caused by bad
+    // input.
+    console.error("[recommendations] Anthropic request failed:", err);
+    return NextResponse.json(
+      { error: "AI recommendation is unavailable right now — please try again shortly." },
+      { status: 503 },
+    );
+  }
 
   const textBlock = message.content.find((b) => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
