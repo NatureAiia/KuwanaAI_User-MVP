@@ -43,3 +43,27 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   });
   return NextResponse.json({ listing });
 }
+
+// Same editable-status boundary as PATCH above: a provider can withdraw
+// something that never went live, never something a consumer might already
+// be looking at. Deleting a published listing is an admin-only action
+// (/api/admin/listings/[id]) since that's live, comparison-affecting data.
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await requireOwnProvider();
+  if ("response" in auth) return auth.response;
+
+  const { id } = await params;
+  const existing = await prisma.listing.findUnique({ where: { id } });
+  if (!existing || existing.providerId !== auth.provider.id) {
+    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+  }
+  if (!EDITABLE_STATUSES.includes(existing.status as (typeof EDITABLE_STATUSES)[number])) {
+    return NextResponse.json(
+      { error: "This listing is published and can't be deleted here — ask an admin." },
+      { status: 409 },
+    );
+  }
+
+  await prisma.listing.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

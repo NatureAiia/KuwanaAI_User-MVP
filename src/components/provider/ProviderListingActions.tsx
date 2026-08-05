@@ -38,6 +38,17 @@ export function ProviderListingActions({
     }
   }
 
+  async function remove() {
+    if (!confirm("Delete this listing? This can't be undone.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/provider/listings/${listingId}`, { method: "DELETE" });
+      if (res.ok) router.refresh();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (editing) {
     return (
       <div className="flex flex-wrap items-center gap-1.5">
@@ -83,6 +94,15 @@ export function ProviderListingActions({
           {status === "rejected" ? "Resubmit" : "Submit for review"}
         </Button>
       )}
+      <Button
+        variant="danger"
+        size="md"
+        onClick={remove}
+        disabled={loading}
+        className="!px-2.5 !py-1.5 !text-[12px]"
+      >
+        Delete
+      </Button>
     </div>
   );
 }
