@@ -59,7 +59,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
     }
     await logAdminAction({
-      adminEmail: admin.email!,
+      adminEmail: admin.email,
       action: rest.status === "published" ? "listing_approved" : "listing_rejected",
       targetType: "listing",
       targetId: listing.id,
@@ -81,7 +81,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const listing = await prisma.listing.delete({ where: { id } });
 
   await logAdminAction({
-    adminEmail: admin.email!,
+    adminEmail: admin.email,
     action: "listing_deleted",
     targetType: "listing",
     targetId: id,

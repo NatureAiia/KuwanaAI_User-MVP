@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (before && before.role !== user.role) {
     await logAdminAction({
-      adminEmail: admin.email!,
+      adminEmail: admin.email,
       action: "user_role_changed",
       targetType: "user",
       targetId: user.id,

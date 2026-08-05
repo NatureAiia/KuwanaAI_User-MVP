@@ -69,12 +69,17 @@ export async function requireConsumerOrProvider(): Promise<
  * smuggled in via a migration for one review page. This checks against a
  * plain email allowlist instead; swap for a real role once one exists.
  */
-export async function requireAdmin() {
+export async function requireAdmin(): Promise<
+  (NonNullable<Awaited<ReturnType<typeof requireUser>>> & { email: string }) | null
+> {
   const user = await requireUser();
   if (!user?.email) return null;
   const allowlist = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return allowlist.includes(user.email.toLowerCase()) ? user : null;
+  // The `!user?.email` check above already guarantees email is a string —
+  // this cast just reflects that in the type once, instead of every call
+  // site that reads admin.email needing its own non-null assertion.
+  return allowlist.includes(user.email.toLowerCase()) ? (user as typeof user & { email: string }) : null;
 }

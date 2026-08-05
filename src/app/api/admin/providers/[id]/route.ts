@@ -55,7 +55,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     if (ownerUserId !== undefined) {
       await logAdminAction({
-        adminEmail: admin.email!,
+        adminEmail: admin.email,
         action: ownerUserId ? "provider_linked" : "provider_unlinked",
         targetType: "provider",
         targetId: provider.id,
