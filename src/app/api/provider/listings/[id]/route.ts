@@ -4,12 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
 
-// Editable only while draft/pending_review (still pre-review) or rejected
-// (fix and resend). A published listing is live, consumer-facing data —
-// changing it here would bypass the whole point of the review workflow, so
-// this route deliberately can't touch one; that requires a future
-// "propose an edit" flow, not a plain PATCH.
-const EDITABLE_STATUSES = ["draft", "pending_review", "rejected"] as const;
+// A plain edit while draft/pending_review (still pre-review) or rejected
+// (fix and resend) just updates the row. Editing a *published* listing is
+// the "propose an edit" flow: allowed, but the row drops back to
+// pending_review (and off every consumer-facing read, which all filter
+// status: "published") until an admin re-approves it — there's no separate
+// staging copy, so this is the only way to change live data without
+// bypassing the review workflow it exists for.
+const PATCH_ALLOWED_STATUSES = ["draft", "pending_review", "rejected", "published"] as const;
+// DELETE stays narrower: a provider can only withdraw something that was
+// never (or is no longer, post-rejection) publicly visible. Deleting a
+// published listing is admin-only (/api/admin/listings/[id]).
+const DELETE_ALLOWED_STATUSES = ["draft", "pending_review", "rejected"] as const;
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireOwnProvider();
@@ -20,11 +26,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!existing || existing.providerId !== auth.provider.id) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 });
   }
-  if (!EDITABLE_STATUSES.includes(existing.status as (typeof EDITABLE_STATUSES)[number])) {
-    return NextResponse.json(
-      { error: "This listing is published and can no longer be edited here" },
-      { status: 409 },
-    );
+  if (!PATCH_ALLOWED_STATUSES.includes(existing.status as (typeof PATCH_ALLOWED_STATUSES)[number])) {
+    return NextResponse.json({ error: "This listing can't be edited here" }, { status: 409 });
   }
 
   const parsed = providerUpdateListingSchema.safeParse(await req.json());
@@ -39,15 +42,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // Any edit while rejected clears the now-stale reason, whether or not
       // this request also moves status back to pending_review.
       ...(existing.status === "rejected" ? { rejectionReason: null } : {}),
+      // Editing a published listing always sends it back for review —
+      // never left as "published" with unreviewed changes live, and never
+      // whatever status (if any) the client asked for.
+      ...(existing.status === "published" ? { status: "pending_review" } : {}),
     },
   });
   return NextResponse.json({ listing });
 }
 
-// Same editable-status boundary as PATCH above: a provider can withdraw
-// something that never went live, never something a consumer might already
-// be looking at. Deleting a published listing is an admin-only action
-// (/api/admin/listings/[id]) since that's live, comparison-affecting data.
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireOwnProvider();
   if ("response" in auth) return auth.response;
@@ -57,7 +60,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!existing || existing.providerId !== auth.provider.id) {
     return NextResponse.json({ error: "Listing not found" }, { status: 404 });
   }
-  if (!EDITABLE_STATUSES.includes(existing.status as (typeof EDITABLE_STATUSES)[number])) {
+  if (!DELETE_ALLOWED_STATUSES.includes(existing.status as (typeof DELETE_ALLOWED_STATUSES)[number])) {
     return NextResponse.json(
       { error: "This listing is published and can't be deleted here — ask an admin." },
       { status: 409 },

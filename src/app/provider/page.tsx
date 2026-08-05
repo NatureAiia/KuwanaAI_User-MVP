@@ -99,14 +99,12 @@ export default async function ProviderPortalPage() {
                   {stats[l.id].comparisonAppearances === 1 ? "" : "s"}
                 </p>
               )}
-              {(l.status === "draft" || l.status === "pending_review" || l.status === "rejected") && (
-                <ProviderListingActions
-                  listingId={l.id}
-                  status={l.status}
-                  currentPrice={Number(l.price)}
-                  currentCurrency={l.currency}
-                />
-              )}
+              <ProviderListingActions
+                listingId={l.id}
+                status={l.status}
+                currentPrice={Number(l.price)}
+                currentCurrency={l.currency}
+              />
             </Card>
           ))}
         </div>
