@@ -3,6 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -51,6 +52,19 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       where: { id },
       data: { ...rest, ...(ownerUserId !== undefined ? { ownerUserId } : {}) },
     });
+
+    if (ownerUserId !== undefined) {
+      await logAdminAction({
+        adminEmail: admin.email!,
+        action: ownerUserId ? "provider_linked" : "provider_unlinked",
+        targetType: "provider",
+        targetId: provider.id,
+        detail: ownerUserId
+          ? `Linked ${ownerEmail} to "${provider.name}"`
+          : `Unlinked the owner account from "${provider.name}"`,
+      });
+    }
+
     return NextResponse.json({ provider });
   } catch (err) {
     // The alreadyLinked check above is a look-then-act race — two concurrent

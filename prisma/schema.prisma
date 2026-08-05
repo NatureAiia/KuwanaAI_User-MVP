@@ -512,3 +512,29 @@ model FxRate {
 
   @@map("fx_rates")
 }
+
+enum AdminAuditAction {
+  listing_approved
+  listing_rejected
+  listing_deleted
+  provider_linked
+  provider_unlinked
+  user_role_changed
+}
+
+// No FK relations to the acted-on row — an audit log needs to survive the
+// row it's about being deleted (e.g. listing_deleted), which a Cascade
+// would defeat and a SetNull would silently blank out.
+model AdminAuditLog {
+  id         String           @id @default(uuid())
+  adminEmail String           @map("admin_email")
+  action     AdminAuditAction
+  targetType String           @map("target_type") // "listing" | "provider" | "user"
+  targetId   String           @map("target_id")
+  detail     String
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  // The admin audit page reads newest-first with no other filter.
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_audit_log")
+}

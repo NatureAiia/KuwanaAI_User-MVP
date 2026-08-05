@@ -8,6 +8,7 @@ const ADMIN_LINKS = [
   { href: "/admin/catalog", label: "Catalog", blurb: "Providers and listings across every sector — create, edit, retire." },
   { href: "/admin/users", label: "Users", blurb: "The only way to grant Corporate/Regulator/Provider access." },
   { href: "/admin/social-mentions", label: "Social price mentions", blurb: "Review free-scanner posts that mention a price." },
+  { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change." },
 ];
 
 const ROLE_LABELS: Record<string, string> = {

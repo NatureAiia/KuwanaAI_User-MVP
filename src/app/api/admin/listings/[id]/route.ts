@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { notifyListingDecision } from "@/lib/notifications";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -47,13 +48,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Tell the provider only on an actual approve/reject action from the
   // review queue, not on an incidental admin edit that happens to touch
   // other fields — and only if it's a self-managed provider (ownerUserId set).
-  if ((rest.status === "published" || rest.status === "rejected") && listing.provider.ownerUserId) {
-    await notifyListingDecision({
-      listingId: listing.id,
-      ownerUserId: listing.provider.ownerUserId,
-      listingName: listing.name,
-      status: rest.status,
-      rejectionReason: listing.rejectionReason,
+  if (rest.status === "published" || rest.status === "rejected") {
+    if (listing.provider.ownerUserId) {
+      await notifyListingDecision({
+        listingId: listing.id,
+        ownerUserId: listing.provider.ownerUserId,
+        listingName: listing.name,
+        status: rest.status,
+        rejectionReason: listing.rejectionReason,
+      });
+    }
+    await logAdminAction({
+      adminEmail: admin.email!,
+      action: rest.status === "published" ? "listing_approved" : "listing_rejected",
+      targetType: "listing",
+      targetId: listing.id,
+      detail:
+        rest.status === "published"
+          ? `Approved "${listing.name}"`
+          : `Rejected "${listing.name}"${listing.rejectionReason ? `: ${listing.rejectionReason}` : ""}`,
     });
   }
 
@@ -65,7 +78,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
 
   const { id } = await params;
-  await prisma.listing.delete({ where: { id } });
+  const listing = await prisma.listing.delete({ where: { id } });
+
+  await logAdminAction({
+    adminEmail: admin.email!,
+    action: "listing_deleted",
+    targetType: "listing",
+    targetId: id,
+    detail: `Deleted "${listing.name}"`,
+  });
 
   return NextResponse.json({ ok: true });
 }
