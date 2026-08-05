@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
@@ -307,7 +308,10 @@ export default function SignupPage() {
   return (
     <div className="flex flex-1 items-center justify-center px-5 py-10">
       <div className={clsx("w-full", step === "role" ? "max-w-[820px]" : "max-w-[460px]")}>
-        <span className="font-display text-xl font-bold">kuwana</span>
+        <div className="flex items-center gap-2">
+          <Image src="/kuwana-mark.png" alt="" width={28} height={28} />
+          <span className="font-display text-xl font-bold">kuwana.ai</span>
+        </div>
 
         {(CONSUMER_STEPS as readonly string[]).includes(step) && (
           <div className="mt-6">

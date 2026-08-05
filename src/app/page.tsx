@@ -1,6 +1,8 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Lightbulb, Scale, Fingerprint, Sparkles, HeartPulse } from "lucide-react";
 import { LinkButton } from "@/components/ui/Button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { SignalBloom } from "@/components/SignalBloom";
 import { LandingFX } from "@/components/landing/LandingFX";
@@ -40,12 +42,11 @@ export default function LandingPage() {
     <div className="flex flex-1 flex-col">
       <header className="flex items-center justify-between px-5 py-4 md:px-10">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-accent-sky/30 bg-accent-sky/10 font-display text-[13px] font-bold text-accent-sky">
-            K
-          </span>
-          <span className="font-display text-xl font-bold tracking-tight">kuwana</span>
+          <Image src="/kuwana-mark.png" alt="" width={28} height={28} />
+          <span className="font-display text-xl font-bold tracking-tight">kuwana.ai</span>
         </div>
         <nav className="flex items-center gap-3">
+          <ThemeToggle />
           <LinkButton href="/login" variant="ghost" size="md">
             Log in
           </LinkButton>
@@ -211,10 +212,8 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-[1120px] flex-col gap-8 md:flex-row md:justify-between">
           <div className="max-w-[36ch]">
             <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-md border border-accent-sky/30 bg-accent-sky/10 font-display text-[11px] font-bold text-accent-sky">
-                K
-              </span>
-              <span className="font-display text-[15px] font-bold tracking-tight">kuwana</span>
+              <Image src="/kuwana-mark.png" alt="" width={22} height={22} />
+              <span className="font-display text-[15px] font-bold tracking-tight">kuwana.ai</span>
             </div>
             <p className="mt-2 text-[12px] leading-[1.6] text-text-muted">
               Explainable comparisons for the decisions that actually matter.

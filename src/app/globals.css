@@ -92,7 +92,11 @@ body {
 
 .page-transition--enter {
   opacity: 1;
-  transform: translateY(0);
+  /* No `transform` here (even translateY(0) counts) — any non-`none` transform on an
+     ancestor creates a new containing block for `position: fixed` descendants (Header,
+     BottomTabBar), which would make them scroll away with the page instead of staying
+     pinned to the viewport. Leaving `transform` in the transition list still lets it
+     animate smoothly from the exit state's translateY(4px) down to `none`. */
   transition: opacity 180ms ease, transform 180ms ease;
 }
 

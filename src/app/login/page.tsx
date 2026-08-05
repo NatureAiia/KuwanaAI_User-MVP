@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
@@ -31,7 +32,10 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-[420px]">
-      <span className="font-display text-xl font-bold">kuwana</span>
+      <div className="flex items-center gap-2">
+        <Image src="/kuwana-mark.png" alt="" width={28} height={28} />
+        <span className="font-display text-xl font-bold">kuwana.ai</span>
+      </div>
       <h1 className="mt-6 font-display text-[26px] font-bold">Welcome back</h1>
       <p className="mt-1 text-[14px] text-text-secondary">Log in to pick up where you left off.</p>
 
