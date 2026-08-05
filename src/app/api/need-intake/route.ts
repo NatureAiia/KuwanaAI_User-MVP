@@ -3,11 +3,17 @@ import { z } from "zod";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
+import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 
 // Deliberately no auth check — /explore itself is intentionally public for
 // pre-signup browsing (see proxy.ts), and this is just a faster way into
 // the same read-only pages, not a consumer-identity action.
 const bodySchema = z.object({ query: z.string().trim().min(1).max(300) });
+
+// Every call here hits the paid Anthropic API unauthenticated — the tighter,
+// cost-relevant limit of the two public endpoints. Still generous for a real
+// visitor trying a few different needs while browsing.
+const RATE_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 };
 
 const INTAKE_SCHEMA = {
   type: "object",
@@ -27,6 +33,9 @@ const INTAKE_SCHEMA = {
 };
 
 export async function POST(req: Request) {
+  const allowed = await checkRateLimit(`need-intake:${getClientIp(req)}`, RATE_LIMIT);
+  if (!allowed) return NextResponse.json({ error: "Too many requests — try again later." }, { status: 429 });
+
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 

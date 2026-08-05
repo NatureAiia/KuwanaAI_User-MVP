@@ -538,3 +538,18 @@ model AdminAuditLog {
   @@index([createdAt(sort: Desc)])
   @@map("admin_audit_log")
 }
+
+// Backs rate limiting on public unauthenticated endpoints (/api/waitlist,
+// /api/need-intake) without needing new infra (Redis/Upstash) — this app
+// deploys to Vercel (see vercel.json), where an in-memory counter wouldn't
+// reliably survive across serverless invocations, but Postgres already does.
+// Self-cleaning: checkRateLimit deletes a key's own expired hits on every
+// call, so this never needs a separate cron sweep.
+model RateLimitHit {
+  id        String   @id @default(uuid())
+  key       String // e.g. "need-intake:203.0.113.5"
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
