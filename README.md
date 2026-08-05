@@ -93,6 +93,15 @@ decision-intelligence core over porting more comparison-platform features from o
 
 **Fixed:**
 
+- **Security:** `/api/onboarding` accepted `role: "corporate" | "regulator"` straight from the
+  client with no server-side check, despite the signup UI's own copy claiming domain/verification
+  requirements for those options — any signed-up user could self-grant Corporate ("Market
+  Intelligence") or Regulator ("Compliance & Market Monitoring") access. Restricted the schema
+  (`src/lib/onboardingSchema.ts`) to `role: "consumer"` only, matching the build plan's own stated
+  design (those roles are admin-invited, never self-registered); removed the now-nonfunctional
+  Regulator/Corporate cards from the signup role picker. Checked the live DB first — only one
+  existing user, so this broke nothing real. Added `/admin/users` as the legitimate replacement —
+  the only remaining way to grant Corporate/Regulator/Provider, gated by `requireAdmin()`.
 - `proxy.ts` middleware wasn't guarding `/corporate`, `/regulator`, `/notifications` at the edge
   (only page-level `requireUser()` checks did) — added to `PROTECTED_PREFIXES`.
 - `ADMIN_EMAILS` was entirely unset in `.env`, so the admin account had no way to pass
