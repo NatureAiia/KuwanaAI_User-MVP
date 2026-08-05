@@ -1,53 +1,9 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
 import type { Sector } from "@prisma/client";
-
-const bodySchema = z.object({
-  role: z.enum(["consumer", "corporate", "regulator"]).default("consumer"),
-  fullName: z.string().min(1),
-  ageRange: z.string().optional(),
-  occupation: z.string().optional(),
-  location: z.string().optional(),
-  socialPlatforms: z.array(z.string()).default([]),
-  telecomFootprint: z
-    .object({
-      primary_network: z.string(),
-      plan_type: z.string(),
-      monthly_spend_range: z.string(),
-    })
-    .optional(),
-  bankingFootprint: z
-    .object({
-      bank_name: z.string(),
-      account_types: z.array(z.string()).default([]),
-    })
-    .optional(),
-  insuranceFootprint: z
-    .object({
-      provider: z.string(),
-      policy_types: z.array(z.string()).default([]),
-      has_insurance: z.boolean(),
-    })
-    .optional(),
-  healthcareFootprint: z
-    .object({
-      medical_aid_provider: z.string(),
-      chronic_condition_disclosure_opt_in: z.boolean(),
-    })
-    .optional(),
-  consents: z.object({
-    research_use: z.boolean(),
-    leaderboard_participation: z.boolean(),
-    // Separate from research_use — health data warrants its own opt-in,
-    // matching the granular consent split from the original wireframes
-    // (only meaningful for consumers who submit a healthcareFootprint, but
-    // harmless to store either way, same as the other two consent types).
-    health_data_sharing: z.boolean().optional(),
-  }),
-});
 
 export async function POST(req: Request) {
   const supabase = await createClient();

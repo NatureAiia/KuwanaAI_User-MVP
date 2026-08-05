@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
 import { buildFactQueue } from "@/lib/onboarding-facts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
-import { Building2, Check, Landmark, User, type LucideIcon } from "lucide-react";
+import { Check, User, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
   OCCUPATIONS,
@@ -41,22 +41,12 @@ const ROLE_OPTIONS: {
     bullet: "For data subjects",
     meta: "5-step profile",
   },
-  {
-    id: "regulator",
-    icon: Landmark,
-    title: "Regulator",
-    desc: "POTRAZ, RBZ, IPEC and other oversight bodies — monitor compliance & complaints.",
-    bullet: "Public domain email required",
-    meta: "Verified access",
-  },
-  {
-    id: "corporate",
-    icon: Building2,
-    title: "Corporate",
-    desc: "Banks, telcos, insurers & hospitals — manage your compliance obligations.",
-    bullet: "Corporate domain required",
-    meta: "Team account",
-  },
+  // Regulator and Corporate are deliberately NOT self-service options here —
+  // /api/onboarding only ever accepts role: "consumer" from this endpoint.
+  // Those accounts are admin-provisioned (see build plan: regulator
+  // self-registration is explicitly disallowed), never granted by a user
+  // simply picking a card, since they unlock market-intelligence/compliance
+  // views a consumer shouldn't be able to opt into.
 ];
 
 const CONSUMER_STEPS = [
@@ -329,8 +319,7 @@ export default function SignupPage() {
           <div className="mt-8">
             <h1 className="font-display text-[24px] font-bold">How will you use Kuwana?</h1>
             <p className="mt-2 text-[14px] text-text-secondary">
-              This helps us personalize your experience and dashboard. You can change this later
-              in settings.
+              This helps us personalize your experience and dashboard.
             </p>
             <div className="mt-6 grid gap-4 md:grid-cols-3">
               {ROLE_OPTIONS.map((option) => {
