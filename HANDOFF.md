@@ -221,13 +221,13 @@ assignment, provider listing creation/update).
   generate and ship translations unsupervised.
 
 ### Provider portal — real gaps, not just "more features"
-- **A provider cannot edit a published listing at all** through
-  `/provider` — deliberate scope boundary this session drew (editing
-  live, consumer-facing data without going through review would defeat
-  the point of the review workflow), but it means once approved, a price
-  change requires... nothing currently. This needs a real "propose an
-  edit, goes back to pending_review" flow — a genuine next feature, not
-  a bug.
+- ~~A provider cannot edit a published listing at all~~ **closed
+  2026-08-05**: editing a published listing now applies immediately and
+  drops it back to `pending_review` (off every consumer-facing read)
+  until an admin re-approves it — there's no staging copy, so this is
+  the only way to change live data without bypassing review. UI labels
+  it "Propose an edit" so the consequence (temporarily off the live
+  catalog) isn't a surprise.
 - ~~No delete capability for providers~~ **closed 2026-08-05**: a
   provider can now delete their own draft/pending_review/rejected
   listings (`DELETE /api/provider/listings/[id]`); published stays
