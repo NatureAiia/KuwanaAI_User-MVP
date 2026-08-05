@@ -308,9 +308,17 @@ depth. Real gaps if that changes:
   then hand-place the SQL into a timestamped `prisma/migrations/<ts>_name/`
   folder and run `prisma migrate deploy`. **Always read the generated SQL
   before applying it** — see the index-drift incident above.
-- No E2E/browser test coverage (Playwright etc.) — only unit tests via
-  Vitest. Every UI verification this session was done via `curl`/manual
-  DB queries against the real dev database, not a real browser.
+- ~~No E2E/browser test coverage~~ **partially closed 2026-08-05**:
+  Playwright added (`playwright.config.ts`, `e2e/`, `npm run test:e2e`),
+  9 tests covering unauthenticated golden paths (landing, login/signup
+  forms, explore/sector navigation, 404, robots/sitemap, CSP header
+  presence). **Still a real gap**: no authenticated-flow coverage —
+  there's no way to get a real, email-confirmed session without a live
+  inbox or the Supabase admin API (`SUPABASE_SERVICE_ROLE_KEY` is still
+  a placeholder in `.env`, same blocker as `ANTHROPIC_API_KEY`). Once
+  that's set, the natural next step is a seeded test account + a
+  `storageState` fixture to cover dashboard/compare/provider-submission
+  flows.
 - Payment integration (Paynow/Pesepay/Flutterwave, named in the older
   prototypes as a "standout feature") — not started, needs real merchant
   credentials for each provider, a genuine infra/business decision.
