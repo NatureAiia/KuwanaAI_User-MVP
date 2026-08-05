@@ -15,15 +15,18 @@ const BASE_ROT_X = 6;
 export function HeroDeviceMockup() {
   const visualRef = useRef<HTMLDivElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const backCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const visual = visualRef.current;
     const stage = stageRef.current;
-    if (!visual || !stage) return;
+    const backCard = backCardRef.current;
+    if (!visual || !stage || !backCard) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const reset = () => {
       stage.style.transform = `rotateY(${BASE_ROT_Y}deg) rotateX(${BASE_ROT_X}deg)`;
+      backCard.style.transform = `translate3d(0px, 0px, -70px) rotateY(${BASE_ROT_Y * 0.6}deg) rotateX(${BASE_ROT_X * 0.6}deg)`;
     };
 
     const onMouseMove = (event: MouseEvent) => {
@@ -31,6 +34,7 @@ export function HeroDeviceMockup() {
       const px = (event.clientX - rect.left) / rect.width - 0.5;
       const py = (event.clientY - rect.top) / rect.height - 0.5;
       stage.style.transform = `rotateY(${BASE_ROT_Y + px * 14}deg) rotateX(${BASE_ROT_X - py * 10}deg)`;
+      backCard.style.transform = `translate3d(${px * 10}px, ${-py * 8}px, -70px) rotateY(${BASE_ROT_Y * 0.6 + px * 8}deg) rotateX(${BASE_ROT_X * 0.6 - py * 6}deg)`;
     };
 
     reset();
@@ -45,8 +49,25 @@ export function HeroDeviceMockup() {
   return (
     <div ref={visualRef} className="relative mx-auto w-full max-w-[380px] [perspective:1400px]">
       <div
+        ref={backCardRef}
+        className="absolute -left-8 -top-8 z-0 w-[210px] rounded-2xl border border-border bg-bg-surface-raised p-3 opacity-90 shadow-xl transition-transform duration-300 ease-out will-change-transform"
+        style={{ transformStyle: "preserve-3d" }}
+      >
+        <div className="flex items-center gap-2">
+          <SignalBloom value={81} size={32} strokeWidth={4} color="teal" />
+          <div className="min-w-0">
+            <p className="truncate text-[10.5px] font-semibold leading-tight">Motor cover</p>
+            <p className="text-[9.5px] text-text-muted">Old Mutual</p>
+          </div>
+        </div>
+        <p className="mt-2 text-[9.5px] leading-snug text-text-secondary">
+          Beat 6 alternatives on payout speed
+        </p>
+      </div>
+
+      <div
         ref={stageRef}
-        className="relative rounded-[28px] border border-border bg-bg-surface p-4 shadow-2xl transition-transform duration-300 ease-out will-change-transform"
+        className="relative z-10 rounded-[28px] border border-border bg-bg-surface p-4 shadow-2xl transition-transform duration-300 ease-out will-change-transform"
         style={{ transformStyle: "preserve-3d" }}
       >
         <div className="flex items-center justify-between" data-scan>
