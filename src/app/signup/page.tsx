@@ -6,6 +6,7 @@ import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
+import { AuthTopBar } from "@/components/AuthTopBar";
 import { buildFactQueue } from "@/lib/onboarding-facts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
 import { Check, User, type LucideIcon } from "lucide-react";
@@ -307,6 +308,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex flex-1 items-center justify-center px-5 py-10">
+      <AuthTopBar />
       <div className={clsx("w-full", step === "role" ? "max-w-[820px]" : "max-w-[460px]")}>
         <div className="flex items-center gap-2">
           <Image src="/kuwana-mark.png" alt="" width={28} height={28} />

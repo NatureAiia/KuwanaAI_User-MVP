@@ -108,3 +108,24 @@ body {
     opacity: 1;
   }
 }
+
+/* Footer "back to top" chevron — see components/landing/BackToTopButton.tsx */
+@keyframes bounce-subtle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bounce-subtle {
+    animation: none;
+  }
+}

@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import { AuthTopBar } from "@/components/AuthTopBar";
 
 function LoginForm() {
   const router = useRouter();
@@ -81,6 +82,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="flex flex-1 items-center justify-center px-5 py-10">
+      <AuthTopBar />
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>

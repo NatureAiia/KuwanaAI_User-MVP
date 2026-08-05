@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Lightbulb, Scale, Fingerprint, Sparkles, HeartPulse } from "lucide-react";
 import { LinkButton } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { BackToTopButton } from "@/components/landing/BackToTopButton";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { SignalBloom } from "@/components/SignalBloom";
 import { LandingFX } from "@/components/landing/LandingFX";
@@ -258,9 +259,12 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <p className="mx-auto mt-8 max-w-[1120px] text-[12px] text-text-muted">
-          Kuwana — comparisons are AI-assisted and reference seed/mock listing data in this MVP.
-        </p>
+        <div className="mx-auto mt-8 flex max-w-[1120px] flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[12px] text-text-muted">
+            Kuwana — comparisons are AI-assisted and reference seed/mock listing data in this MVP.
+          </p>
+          <BackToTopButton />
+        </div>
       </footer>
 
       <ScrollButtons />
