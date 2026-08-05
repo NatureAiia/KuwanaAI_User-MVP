@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { SECTORS } from "@/lib/sectors";
 
-const bodySchema = z.object({ email: z.string().email(), sector: z.string().default("healthcare") });
+const SECTOR_SLUGS = Object.keys(SECTORS) as [string, ...string[]];
+const bodySchema = z.object({
+  email: z.string().email(),
+  sector: z.enum(SECTOR_SLUGS).default("healthcare"),
+});
 
 export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
