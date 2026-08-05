@@ -85,8 +85,10 @@ database indexing).
   have worked even after email confirmation. Fixed.
 - Added baseline security headers (`next.config.ts`): X-Frame-Options,
   X-Content-Type-Options, Referrer-Policy, Permissions-Policy, HSTS.
-  **No CSP yet** — deliberately deferred, needs an inline-script/style
-  audit first (see "Left for later" below).
+  ~~No CSP yet~~ **closed 2026-08-05**: added, using the pragmatic
+  'unsafe-inline' policy (not the strict nonce-based one, which would
+  force every page to dynamic rendering) — see the "No CSP" entry
+  further down for the reasoning and what was audited.
 
 ### The Provider portal (built from scratch — the "4th" of the 4-in-1)
 - Schema: `Listing.status` (draft/pending_review/published/rejected,
@@ -275,10 +277,26 @@ depth. Real gaps if that changes:
   `error.tsx` boundary and the recommendations failure handling.
 
 ### Infrastructure / cross-cutting
-- **No CSP (Content-Security-Policy) header** — deliberately deferred;
-  needs an audit of every inline style/script first (SVG components, the
-  `theme-init` `next/script` snippet in `layout.tsx`) to avoid breaking
-  something.
+- ~~No CSP (Content-Security-Policy) header~~ **closed 2026-08-05**
+  (`next.config.ts`): `default-src 'self'`, locked-down `object-src`/
+  `base-uri`/`form-action`/`frame-ancestors`, `connect-src`/`img-src`
+  restricted to origins the app actually talks to (Supabase, plus
+  `https:` broadly for `img-src` since `Provider.logoUrl` is an
+  admin-set arbitrary HTTPS URL, not one fixed CDN). `script-src`/
+  `style-src` use `'unsafe-inline'` — the strict nonce-based policy
+  Next's docs lead with would force every page to dynamic rendering
+  (no static optimization, no CDN caching) just to thread a nonce
+  through Next's own inline hydration scripts, which is a real
+  architectural/cost trade-off across the whole app, not something to
+  decide unilaterally in a security-headers pass. So this doesn't stop
+  injected inline-script XSS the way a strict policy would — a real,
+  known limitation, not an oversight. Verified via curl (header renders
+  correctly, `'unsafe-eval'` correctly dev-only) and by grepping
+  rendered HTML for any external resource not covered by the policy
+  (found none); no Playwright/chromium-cli available in this
+  environment to drive a real browser, so also confirmed via the dev
+  server's own request log that real browser traffic succeeded after
+  restarting with the new header.
 - **No rate limiting** on public unauthenticated endpoints (`/api/
   waitlist`, `/api/need-intake`) — no Redis/Upstash infra exists to build
   this properly; would need a real infra decision, not a unilateral add.
