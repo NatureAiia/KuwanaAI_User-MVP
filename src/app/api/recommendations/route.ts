@@ -65,6 +65,7 @@ export async function POST(req: Request) {
     freshnessStatus: l.freshnessStatus,
     lastVerifiedAt: l.lastVerifiedAt.toISOString(),
     sourceUrl: l.sourceUrl,
+    images: l.images,
     provider: l.provider,
   }));
   const attributeSchema: AttributeSchemaFieldDTO[] = category.attributeSchema.map((a) => ({

@@ -12,6 +12,7 @@ function toListingDTO(listing: {
   freshnessStatus: string;
   lastVerifiedAt: Date;
   sourceUrl: string | null;
+  images: string[];
   provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
 }): ListingDTO {
   return {
@@ -23,6 +24,7 @@ function toListingDTO(listing: {
     freshnessStatus: listing.freshnessStatus as ListingDTO["freshnessStatus"],
     lastVerifiedAt: listing.lastVerifiedAt.toISOString(),
     sourceUrl: listing.sourceUrl,
+    images: listing.images,
     provider: listing.provider,
   };
 }
@@ -318,6 +320,44 @@ export async function getAlsoCompared(listingId: string, limit = 4): Promise<Lis
   const listings = await getListingsByIds(rankedIds);
   const byId = new Map(listings.map((l) => [l.id, l]));
   return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
+}
+
+export type TrendingListing = { listing: ListingDTO; comparisonCount: number };
+
+/**
+ * "127 people compared this this week" style social-proof signal — real
+ * comparison volume in the trailing window, never invented. Same
+ * tally-over-Comparison-rows approach as getAlsoCompared, but time-windowed
+ * and ranked across a sector rather than scoped to one listing's neighbors.
+ */
+export async function getTrendingListings(
+  sectorSlug?: string,
+  limit = 6,
+  windowDays = 7,
+): Promise<TrendingListing[]> {
+  const since = new Date(Date.now() - windowDays * 86_400_000);
+  const comparisons = await prisma.comparison.findMany({
+    where: {
+      createdAt: { gte: since },
+      ...(sectorSlug ? { category: { sector: { slug: sectorSlug } } } : {}),
+    },
+    select: { listingIds: true },
+  });
+
+  const counts = new Map<string, number>();
+  for (const comparison of comparisons) {
+    for (const id of comparison.listingIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+
+  const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+  if (rankedIds.length === 0) return [];
+
+  const listings = await getListingsByIds(rankedIds);
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return rankedIds
+    .map((id) => byId.get(id))
+    .filter((l): l is ListingDTO => !!l)
+    .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
 }
 
 export type ProviderListingStats = { comparisonAppearances: number; savedCount: number };

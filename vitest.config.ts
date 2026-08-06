@@ -10,5 +10,12 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // providerListingSchema's LISTING_IMAGE_URL_PREFIX needs an absolute
+    // URL to build a valid z.string().url() prefix — real dev/prod get
+    // this from .env; tests get a fixed stand-in so they're deterministic
+    // regardless of ambient environment.
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+    },
   },
 });

@@ -32,11 +32,10 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String?  @map("password_hash") // Supabase Auth owns real credentials; kept for local/dev fallback
-  role         Role     @default(consumer)
-  createdAt    DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid())
+  email     String   @unique
+  role      Role     @default(consumer)
+  createdAt DateTime @default(now()) @map("created_at")
 
   profile         UserProfile?
   footprints      SectorFootprint[]

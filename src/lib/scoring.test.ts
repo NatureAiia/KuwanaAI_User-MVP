@@ -10,6 +10,7 @@ function listing(overrides: Partial<ListingDTO> & { id: string; price: number })
     freshnessStatus: "fresh",
     lastVerifiedAt: new Date().toISOString(),
     sourceUrl: null,
+    images: [],
     provider: { id: "p1", name: "Provider", logoUrl: null, verified: true },
     ...overrides,
   };

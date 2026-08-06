@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
+import { ListingCoverArt } from "@/components/ListingCoverArt";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { Badge } from "@/components/ui/Card";
 import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
@@ -53,91 +54,109 @@ export function ListingCard({
 
   const hasSavings = trend && trend.direction === "down" && trend.earliestPrice > trend.currentPrice;
 
+  const coverImage = listing.images[0];
+
   return (
     <div
       className={clsx(
-        "relative flex flex-col rounded-[var(--radius-card)] border bg-bg-surface p-4 transition-all",
+        "relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border bg-bg-surface transition-all",
         selected ? "border-accent-sky shadow-[0_0_0_1px_var(--accent-sky)]" : "border-border",
       )}
     >
-      <div className="absolute right-3 top-3 flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={toggleSaved}
-          aria-pressed={saved}
-          aria-label={saved ? `Remove ${listing.name} from saved` : `Save ${listing.name}`}
-          className="tap-target flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-surface-raised text-accent-sky"
-        >
-          {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => onToggleSelect(listing)}
-          aria-pressed={selected}
-          aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
-          className={clsx(
-            "tap-target flex h-7 w-7 items-center justify-center rounded-full border",
-            selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface-raised",
-          )}
-        >
-          {selected && <CheckCircle2 size={16} />}
-        </button>
+      <div className="relative aspect-[4/3] w-full">
+        {coverImage ? (
+          // eslint-disable-next-line @next/next/no-img-element -- provider-uploaded, arbitrary aspect ratios not worth next/image's fixed-size ceremony here
+          <img
+            src={coverImage}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            fetchPriority="low"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <ListingCoverArt seed={listing.id} className="h-full w-full" />
+        )}
+
+        <div className="absolute right-2 top-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={toggleSaved}
+            aria-pressed={saved}
+            aria-label={saved ? `Remove ${listing.name} from saved` : `Save ${listing.name}`}
+            className="tap-target flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-surface/90 text-accent-sky backdrop-blur"
+          >
+            {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => onToggleSelect(listing)}
+            aria-pressed={selected}
+            aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
+            className={clsx(
+              "tap-target flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur",
+              selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface/90",
+            )}
+          >
+            {selected && <CheckCircle2 size={16} />}
+          </button>
+        </div>
+
+        <div className="absolute bottom-2 left-2">
+          <SignalBloom value={score} size={40} />
+        </div>
       </div>
 
-      <div className="flex items-start justify-between gap-3 pr-16">
-        <div className="flex items-start gap-2.5">
-          <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={32} />
-          <div>
-            <p className="font-display text-[15px] font-semibold leading-tight">{listing.name}</p>
-            <p className="mt-1 flex items-center gap-1 text-[12px] text-text-muted">
-              {listing.provider.verified && <ShieldCheck size={12} className="text-accent-teal" />}
+      <div className="flex flex-1 flex-col p-3">
+        <div className="flex items-start gap-2">
+          <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={22} />
+          <div className="min-w-0">
+            <p className="truncate font-display text-[14px] font-semibold leading-tight">{listing.name}</p>
+            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-muted">
+              {listing.provider.verified && <ShieldCheck size={11} className="text-accent-teal" />}
               {listing.provider.name}
             </p>
           </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex items-end justify-between">
-        <div>
-          <div className="flex items-baseline gap-1.5">
-            <p className="font-mono text-[22px] font-semibold text-text-primary">
-              {display(listing.price, listing.currency)}
+        <div className="mt-2 flex items-baseline gap-1.5">
+          <p className="font-mono text-[18px] font-semibold text-text-primary">
+            {display(listing.price, listing.currency)}
+          </p>
+          {hasSavings && (
+            <p className="font-mono text-[11px] text-text-muted line-through">
+              {display(trend!.earliestPrice, listing.currency)}
             </p>
-            {hasSavings && (
-              <p className="font-mono text-[13px] text-text-muted line-through">
-                {display(trend!.earliestPrice, listing.currency)}
-              </p>
-            )}
-            {trend && trend.points.length >= 2 && (
-              <PriceSparkline points={trend.points} direction={trend.direction} width={44} height={18} />
-            )}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]}>{listing.freshnessStatus}</Badge>
-            {trend && trend.direction !== "flat" && (
-              <Badge tone={TREND_TONE[trend.direction]}>
-                {hasSavings
-                  ? `Save ${Math.abs(trend.changePercent)}%`
-                  : `${TREND_ARROW[trend.direction]} ${Math.abs(trend.changePercent)}%`}
-              </Badge>
-            )}
-            {requirements?.map((r) => (
-              <Badge key={r.key} tone="sky">
-                {r.label} {String(r.value)}
-                {r.unit ? ` ${r.unit}` : ""}
-              </Badge>
-            ))}
-          </div>
+          )}
+          {trend && trend.points.length >= 2 && (
+            <PriceSparkline points={trend.points} direction={trend.direction} width={36} height={16} />
+          )}
         </div>
-        <SignalBloom value={score} size={56} />
-      </div>
 
-      <Link
-        href={`/listing/${listing.id}?sector=${sectorSlug}`}
-        className="tap-target mt-4 flex items-center justify-center rounded-xl border border-border text-[13px] font-semibold text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
-      >
-        View details
-      </Link>
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          <Badge tone={FRESHNESS_TONE[listing.freshnessStatus]}>{listing.freshnessStatus}</Badge>
+          {trend && trend.direction !== "flat" && (
+            <Badge tone={TREND_TONE[trend.direction]}>
+              {hasSavings
+                ? `Save ${Math.abs(trend.changePercent)}%`
+                : `${TREND_ARROW[trend.direction]} ${Math.abs(trend.changePercent)}%`}
+            </Badge>
+          )}
+          {requirements?.map((r) => (
+            <Badge key={r.key} tone="sky">
+              {r.label} {String(r.value)}
+              {r.unit ? ` ${r.unit}` : ""}
+            </Badge>
+          ))}
+        </div>
+
+        <Link
+          href={`/listing/${listing.id}?sector=${sectorSlug}`}
+          className="tap-target mt-2.5 flex items-center justify-center rounded-xl border border-border text-[12px] font-semibold text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
+        >
+          View details
+        </Link>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Send, Save } from "lucide-react";
+import { ArrowLeft, Send, Save, Camera, Star, X, Loader2 } from "lucide-react";
 import { clsx } from "clsx";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currency";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_IMAGES, setCover, removeAt } from "@/components/provider/imageGallery";
 
 type AttributeField = {
   key: string;
@@ -40,6 +41,10 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState<CurrencyCode>("USD");
   const [attributeValues, setAttributeValues] = useState<Record<string, string>>({});
+  const [images, setImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<"draft" | "pending_review" | null>(null);
   const [done, setDone] = useState<"draft" | "pending_review" | null>(null);
@@ -55,7 +60,7 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
   const category = useMemo(() => categories.find((c) => c.id === categoryId) ?? null, [categories, categoryId]);
 
   const screens = useMemo(
-    () => ["sector", "category", "name", "price", ...(category?.attributeSchema.map((a) => `attr:${a.key}`) ?? []), "review"],
+    () => ["sector", "category", "name", "price", ...(category?.attributeSchema.map((a) => `attr:${a.key}`) ?? []), "images", "review"],
     [category],
   );
   const screen = screens[stepIndex];
@@ -82,7 +87,7 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
       const res = await fetch("/api/provider/listings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categoryId, name, price: Number(price), currency, attributes, status }),
+        body: JSON.stringify({ categoryId, name, price: Number(price), currency, attributes, images, status }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -104,7 +109,39 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
     setPrice("");
     setCurrency("USD");
     setAttributeValues({});
+    setImages([]);
+    setImageError(null);
     setDone(null);
+  }
+
+  async function handleFileChosen(fileList: FileList | null) {
+    const file = fileList?.[0];
+    if (!file || uploading || images.length >= MAX_IMAGES) return;
+    setImageError(null);
+
+    if (!ALLOWED_IMAGE_TYPES[file.type]) {
+      setImageError("Only JPEG, PNG, or WebP images are allowed");
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError("Image must be 5MB or smaller");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/provider/listings/images", { method: "POST", body });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || typeof data?.url !== "string") {
+        setImageError(typeof data?.error === "string" ? data.error : "Upload failed — please try again.");
+        return;
+      }
+      setImages((prev) => [...prev, data.url]);
+    } finally {
+      setUploading(false);
+    }
   }
 
   if (done) {
@@ -256,10 +293,86 @@ export function NewProviderListingForm({ categories }: { categories: CategoryOpt
           );
         })()}
 
+      {screen === "images" && (
+        <div>
+          <p className="font-display text-[18px] font-semibold">Add a photo?</p>
+          <p className="mt-1 text-[13px] text-text-secondary">
+            The first photo shows on your listing&apos;s card. Tap a photo to make it the first one — or skip this
+            for now.
+          </p>
+
+          <div className="mt-4 grid grid-cols-3 gap-2.5">
+            {images.map((url, i) => (
+              <div key={url} className="group relative aspect-square overflow-hidden rounded-xl border border-border">
+                {/* eslint-disable-next-line @next/next/no-img-element -- just-uploaded preview from our own storage bucket */}
+                <img src={url} alt="" className="h-full w-full object-cover" />
+                {i === 0 && (
+                  <span className="absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-accent-sky px-1.5 py-0.5 text-[10px] font-semibold text-[var(--text-on-accent-sky)]">
+                    <Star size={10} fill="currentColor" /> Cover
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setImages((prev) => removeAt(prev, i))}
+                  aria-label="Remove photo"
+                  className="tap-target absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                >
+                  <X size={13} />
+                </button>
+                {i !== 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setImages((prev) => setCover(prev, i))}
+                    className="absolute inset-x-0 bottom-0 bg-black/50 py-1 text-[11px] font-medium text-white opacity-0 group-hover:opacity-100"
+                  >
+                    Make cover
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {images.length < MAX_IMAGES && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="tap-target flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-text-muted disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={20} className="animate-spin" /> : <Camera size={20} />}
+                <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add photo"}</span>
+              </button>
+            )}
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              handleFileChosen(e.target.files);
+              e.target.value = "";
+            }}
+          />
+
+          {imageError && <p className="mt-3 text-[13px] text-accent-coral">{imageError}</p>}
+
+          <button
+            onClick={goNext}
+            className="tap-target mt-5 w-full rounded-xl bg-accent-sky py-4 text-[15px] font-semibold text-[var(--text-on-accent-sky)]"
+          >
+            {images.length > 0 ? "Next" : "Skip for now"}
+          </button>
+        </div>
+      )}
+
       {screen === "review" && (
         <div>
           <p className="font-display text-[18px] font-semibold">Ready to send?</p>
           <div className="mt-4 space-y-2 rounded-2xl border border-border bg-bg-surface-raised p-4 text-[14px]">
+            {images[0] && (
+              // eslint-disable-next-line @next/next/no-img-element -- just-uploaded preview from our own storage bucket
+              <img src={images[0]} alt="" className="mb-2 h-32 w-full rounded-xl object-cover" />
+            )}
             <p>
               <span className="text-text-muted">Offering: </span>
               <span className="font-semibold">{name}</span>

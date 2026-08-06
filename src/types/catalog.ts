@@ -16,6 +16,7 @@ export type ListingDTO = {
   freshnessStatus: "fresh" | "stale" | "unverified";
   lastVerifiedAt: string;
   sourceUrl: string | null;
+  images: string[];
   provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
 };
 
