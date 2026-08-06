@@ -19,8 +19,8 @@ const PROVIDER_FACTS: Record<string, string[]> = {
     "CBZ Bank traces back to 1980 and is one of Zimbabwe's largest financial institutions.",
   ],
   "Steward Bank": [
-    "Steward Bank launched in 2013 as Zimbabwe's first fully digital-first bank.",
-    "Steward Bank pioneered USSD (*236#) banking for feature-phone users.",
+    "Steward Bank launched in 2013 as one of Zimbabwe's first digital-first banks.",
+    "Steward Bank's USSD banking (*236#) brings banking access to feature-phone users.",
   ],
   Stanbic: [
     "Stanbic Bank Zimbabwe has banked locally since 1965, joining the Standard Bank Group in 1992.",
@@ -32,14 +32,14 @@ const PROVIDER_FACTS: Record<string, string[]> = {
     "Old Mutual has operated in Zimbabwe since 1902, over 120 years of life and savings cover.",
   ],
   "First Mutual": ["First Mutual has provided life and health cover in Zimbabwe for over 40 years."],
-  ZIMNAT: ["ZIMNAT was founded in 1946 and pioneered livestock insurance for communal farmers."],
+  ZIMNAT: ["ZIMNAT was founded in 1946 and offers livestock insurance for communal farmers."],
   "Fidelity Life": ["Fidelity Life Assurance has offered life cover in Zimbabwe since 1936."],
   Cimas: [
     "Cimas, founded in 1945, is one of Zimbabwe's largest medical aid societies.",
     "Cimas runs its own clinics and labs — one of the first HMO-style models in Zimbabwe.",
   ],
   "First Mutual Health": ["First Mutual Health covers a large share of medically insured Zimbabweans."],
-  PSMAS: ["PSMAS was founded in 1930, making it Zimbabwe's oldest medical aid society."],
+  PSMAS: ["PSMAS was founded in 1930, one of Zimbabwe's longest-running medical aid societies."],
 };
 
 const GENERIC_FACTS = [
