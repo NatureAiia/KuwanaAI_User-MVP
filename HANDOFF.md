@@ -228,6 +228,18 @@ assignment, provider listing creation/update).
   risks shipping *wrong* Shona/Ndebele, which is worse than not having it.
   If tackled, get a real translator in the loop, don't have an LLM
   generate and ship translations unsupervised.
+- **AI-generated listing cover art — not started, needs a key decision
+  first.** 2026-08-06 added `Listing.images` end-to-end (DTO, provider
+  upload UI at `/provider` using the already-existing but previously
+  unwired `/api/provider/listings/images` + `imageGallery.ts`, and an
+  image-forward `ListingCard`/`ExploreClient` grid), with a deterministic
+  generated-gradient fallback (`ListingCoverArt.tsx`) for listings with no
+  photo. True AI-generated art (vs. the gradient fallback) is blocked on
+  picking an image-gen provider — there's no image-gen key in `.env.example`
+  today, only `ANTHROPIC_API_KEY` (Claude doesn't do image generation) and
+  Supabase. Needs: pick a provider (OpenAI Images, Stability, fal.ai, etc.),
+  add the key, then wire a "Generate cover art" action into the provider
+  form/route.
 
 ### Provider portal — real gaps, not just "more features"
 - ~~A provider cannot edit a published listing at all~~ **closed
