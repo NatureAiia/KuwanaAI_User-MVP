@@ -1,14 +1,17 @@
 -- Kuwana — full database architecture (Postgres DDL)
 --
--- Portable by design: standard Postgres only (uuid text ids generated
--- app-side, jsonb, native enums, btree/GIN indexes, plain FKs). No
--- Supabase-specific objects — verified 2026-08-06 against the live project
--- (iguhrpbnnrdeplnbzyxc) via pg_indexes/pg_policies/pg_trigger/pg_extension:
--- zero RLS policies, zero triggers, zero functions, zero views, and the
--- only Supabase-only extension present (supabase_vault) is unused by any
--- table here. That means this same file runs unmodified on Supabase today
--- and on plain Postgres / RDS / Neon / self-hosted later — nothing to
--- strip out when you move.
+-- Portable by design: standard Postgres only for every table (text ids
+-- generated app-side, jsonb, native enums, btree/GIN indexes, plain FKs).
+-- Verified 2026-08-06 against the live project (iguhrpbnnrdeplnbzyxc) via
+-- pg_indexes/pg_policies/pg_extension: zero RLS policies, zero views, and
+-- the only Supabase-only extension present (supabase_vault) is unused by
+-- any table here. All 30 tables + every index/FK below run unmodified on
+-- Supabase today and on plain Postgres / RDS / Neon / self-hosted later.
+--
+-- The one exception: two small triggers at the very end of this file that
+-- link public.users to Supabase's own auth.users (see that section's
+-- comment for why and how). Everything above that line is 100% portable;
+-- skip only that final section when targeting non-Supabase Postgres.
 --
 -- HOW TO RUN
 --   Fresh Supabase project (no repo/Node needed):
@@ -29,15 +32,19 @@
 --       npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
 --
 --   Moving to a non-Supabase platform later:
---     Same file, same command. The only Supabase-specific thing this
---     project *could* add (and currently does not) is a foreign key tying
---     public.users.id to auth.users.id for cascade-delete-on-signup-removal
---     — see the commented-out block at the very end. Leave it commented out
---     if you're not on Supabase.
+--     Same file, minus the final trigger section (see above).
 --
 -- NOTE: id columns are TEXT (app-generated UUIDv4 strings via Prisma's
 -- @default(uuid()), not Postgres-native `uuid`/gen_random_uuid()) — kept as
 -- TEXT here to match exactly what's live and what Prisma's client sends.
+--
+-- KNOWN GAP (not introduced by this file, flagging so it isn't missed):
+-- prisma/schema.prisma's Listing model has an `images String[]` field
+-- (commit 07581ff) with no migration for it — it is NOT in the live
+-- database and therefore NOT in this file either, which reflects what's
+-- actually deployed. Whoever owns that change needs to generate and apply
+-- its migration before `prisma migrate diff` against schema.prisma will
+-- report clean again.
 
 BEGIN;
 
@@ -194,6 +201,18 @@ CREATE TABLE "recommendations" (
     "score_version" TEXT NOT NULL DEFAULT 'v1',
     "generated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "recommendations_pkey" PRIMARY KEY ("id")
+);
+
+-- Caches /api/recommendations' AI output per distinct listing-set (not
+-- per-user — a recommendation is a pure function of the listing set).
+-- Deliberately separate from "recommendations" above, which stays the
+-- audit-grade per-user record and is still written on every request,
+-- cache hit or not. No FK: cache_key is a derived hash, not an entity id.
+CREATE TABLE "recommendation_cache" (
+    "cache_key" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "recommendation_cache_pkey" PRIMARY KEY ("cache_key")
 );
 
 CREATE TABLE "notifications" (
@@ -398,6 +417,8 @@ CREATE INDEX "saved_listings_user_id_saved_at_idx" ON "saved_listings"("user_id"
 CREATE INDEX "recommendations_listing_id_idx" ON "recommendations"("listing_id");
 CREATE INDEX "recommendations_user_id_generated_at_idx" ON "recommendations"("user_id", "generated_at" DESC);
 
+CREATE INDEX "recommendation_cache_expires_at_idx" ON "recommendation_cache"("expires_at");
+
 CREATE INDEX "notifications_listing_id_idx" ON "notifications"("listing_id");
 CREATE INDEX "notifications_user_id_read_created_at_idx" ON "notifications"("user_id", "read", "created_at" DESC);
 CREATE UNIQUE INDEX "notifications_user_id_listing_id_type_key" ON "notifications"("user_id", "listing_id", "type");
@@ -458,12 +479,56 @@ ALTER TABLE "user_streaks" ADD CONSTRAINT "user_streaks_user_id_fkey" FOREIGN KE
 COMMIT;
 
 -- ---------------------------------------------------------------------
--- OPTIONAL, Supabase-only, NOT currently applied on the live project:
--- ties public.users.id to Supabase's own auth.users so deleting an Auth
--- user cascades through the whole app schema automatically. The app
--- already writes public.users.id to match auth.users.id itself (see
--- src/app/api/onboarding/route.ts), this just enforces it in the DB.
--- Skip this block entirely when running on a non-Supabase Postgres —
--- there is no auth.users table there.
+-- SUPABASE-ONLY — links public.users to Supabase's own auth.users.
+-- Skip this whole section when targeting non-Supabase Postgres — there is
+-- no auth.users table there, and no equivalent of it is needed either.
+--
+-- Not a native FK: auth.users.id is Postgres uuid, public.users.id is
+-- TEXT (Prisma's @default(uuid()) convention) — Postgres refuses a FK
+-- across incompatible types outright ("cannot be implemented ... text and
+-- uuid"), confirmed by testing it directly before writing this. Triggers
+-- get the same two guarantees a same-type FK would:
+--   1. public.users can't hold an id with no matching auth.users row
+--      (the app already only ever writes users.id from an authenticated
+--      session, see src/app/api/onboarding/route.ts — this is a backstop).
+--   2. Deleting the Auth user (e.g. via the Supabase dashboard) cascades
+--      to the app-side row and, from there, everything that already
+--      ON DELETE CASCADEs from public.users above.
+-- SECURITY DEFINER + empty search_path per Supabase's own documented
+-- pattern for auth.users triggers, to avoid search_path hijacking.
 -- ---------------------------------------------------------------------
--- ALTER TABLE "users" ADD CONSTRAINT "users_auth_id_fkey" FOREIGN KEY ("id") REFERENCES auth.users("id") ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE OR REPLACE FUNCTION public.enforce_users_auth_id()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = NEW.id::uuid) THEN
+    RAISE EXCEPTION 'public.users.id % has no matching auth.users row', NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER users_require_auth_id
+BEFORE INSERT OR UPDATE OF id ON public.users
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_users_auth_id();
+
+CREATE OR REPLACE FUNCTION public.handle_deleted_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  DELETE FROM public.users WHERE id = OLD.id::text;
+  RETURN OLD;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_deleted
+AFTER DELETE ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_deleted_auth_user();

@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends, getAlsoCompared } from "@/lib/catalog";
+import { requireUser } from "@/lib/auth";
 import { computePriceForecast } from "@/lib/priceTrend";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -66,6 +67,15 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const trend = trends[listing.id];
   const forecast = trend ? computePriceForecast(trend) : null;
   const alsoCompared = await getAlsoCompared(listing.id);
+
+  // Public page, so this can't require auth — just shows unsaved for
+  // anonymous visitors instead of gating the page on login.
+  const user = await requireUser();
+  const initialSaved = user
+    ? (await prisma.savedListing.findUnique({
+        where: { userId_listingId: { userId: user.id, listingId: listing.id } },
+      })) !== null
+    : false;
 
   return (
     <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
@@ -181,7 +191,12 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         />
       </div>
 
-      <ListingActions listingId={listing.id} sourceUrl={listing.sourceUrl} providerName={listing.provider.name} />
+      <ListingActions
+        listingId={listing.id}
+        sourceUrl={listing.sourceUrl}
+        providerName={listing.provider.name}
+        initialSaved={initialSaved}
+      />
 
       <CompareTrayBar />
       <BottomTabBar />

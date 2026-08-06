@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { notifyListingDecision } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/adminAudit";
+import { recordPriceChange } from "@/lib/catalog";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -33,6 +34,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { attributes, markVerifiedNow, ...rest } = parsed.data;
 
+  // Capture the pre-edit price before it's overwritten below — needed to
+  // snapshot into ListingPriceHistory, which every price-trend/sparkline/
+  // price-drop-notification feature reads from.
+  const previous = rest.price !== undefined ? await prisma.listing.findUnique({ where: { id }, select: { price: true } }) : null;
+
   const listing = await prisma.listing.update({
     where: { id },
     data: {
@@ -44,6 +50,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     },
     include: { provider: { select: { ownerUserId: true } } },
   });
+
+  if (previous && rest.price !== undefined && Number(previous.price) !== rest.price) {
+    await recordPriceChange(id, Number(previous.price));
+  }
 
   // Tell the provider only on an actual approve/reject action from the
   // review queue, not on an incidental admin edit that happens to touch

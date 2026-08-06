@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSectorCategories, getCategoryWithListings, getListingPriceTrends } from "@/lib/catalog";
+import { requireUser } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,7 +16,21 @@ export async function GET(req: Request) {
     const result = await getCategoryWithListings(sector, category);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const trends = await getListingPriceTrends(result.listings.map((l) => l.id));
-    return NextResponse.json({ ...result, trends });
+
+    // Browsing without an account is supported (see the homepage's "Browse
+    // now, sign up when you're ready" CTA), so this can't require auth —
+    // just skip the saved lookup for anonymous visitors.
+    const user = await requireUser();
+    const savedIds = user
+      ? (
+          await prisma.savedListing.findMany({
+            where: { userId: user.id, listingId: { in: result.listings.map((l) => l.id) } },
+            select: { listingId: true },
+          })
+        ).map((s) => s.listingId)
+      : [];
+
+    return NextResponse.json({ ...result, trends, savedIds });
   }
 
   const categories = await getSectorCategories(sector);

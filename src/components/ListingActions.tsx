@@ -9,12 +9,14 @@ export function ListingActions({
   listingId,
   sourceUrl,
   providerName,
+  initialSaved,
 }: {
   listingId: string;
   sourceUrl: string | null;
   providerName: string;
+  initialSaved?: boolean;
 }) {
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(initialSaved ?? false);
   const [saving, setSaving] = useState(false);
 
   async function toggleSave() {

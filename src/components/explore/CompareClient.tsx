@@ -29,6 +29,7 @@ export function CompareClient({
   listings,
   attributeSchema,
   trends,
+  initialSavedIds,
 }: {
   sectorSlug: string;
   categoryId: string;
@@ -36,8 +37,9 @@ export function CompareClient({
   listings: ListingDTO[];
   attributeSchema: AttributeSchemaFieldDTO[];
   trends: Record<string, PriceTrend | null>;
+  initialSavedIds?: string[];
 }) {
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set(initialSavedIds));
   const [recommendation, setRecommendation] = useState<{
     listingId: string;
     explanation: string;

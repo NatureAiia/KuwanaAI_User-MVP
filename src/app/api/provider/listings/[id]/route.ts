@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
+import { recordPriceChange } from "@/lib/catalog";
 
 // A plain edit while draft/pending_review (still pre-review) or rejected
 // (fix and resend) just updates the row. Editing a *published* listing is
@@ -48,6 +49,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(existing.status === "published" ? { status: "pending_review" } : {}),
     },
   });
+
+  if (rest.price !== undefined && Number(existing.price) !== rest.price) {
+    await recordPriceChange(id, Number(existing.price));
+  }
+
   return NextResponse.json({ listing });
 }
 

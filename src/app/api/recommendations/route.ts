@@ -7,6 +7,7 @@ import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/sco
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { getCachedRecommendation, recommendationCacheKey, setCachedRecommendation } from "@/lib/recommendationCache";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { Sector } from "@prisma/client";
 
@@ -104,56 +105,65 @@ export async function POST(req: Request) {
     };
   });
 
-  let message;
-  try {
-    message = await anthropic.messages.create({
-      model: RECOMMENDATION_MODEL,
-      max_tokens: 1024,
-      output_config: {
-        effort: "low",
-        format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
-      },
-      system:
-        "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
-        "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
-        "overall fit for value and needs. Each listing includes a decision_score breakdown " +
-        "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
-        "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
-        "access it) — use these as your primary evidence, and reference them concretely in your " +
-        "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
-        "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
-        "materially higher requirement than the others, say so explicitly — this is an eligibility " +
-        "signal, not just a spec difference. Only reference data present in the listings provided; " +
-        "never invent statistics. Always make clear this is an AI-assisted recommendation.",
-      messages: [
-        {
-          role: "user",
-          content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
-        },
-      ],
-    });
-  } catch (err) {
-    // Previously unhandled — the client would get a bare 500 with no JSON
-    // body and silently do nothing (no error shown, no state change, just
-    // the button reverting as if nothing happened). 503 signals "the AI
-    // service itself is unavailable," distinct from a 400/404 caused by bad
-    // input.
-    console.error("[recommendations] Anthropic request failed:", err);
-    return NextResponse.json(
-      { error: "AI recommendation is unavailable right now — please try again shortly." },
-      { status: 503 },
-    );
-  }
+  // Cache keyed on the resolved (published-only) listing set, not the raw
+  // request body — two requests differing only in an unpublished/junk ID
+  // that gets filtered out below should still hit the same entry.
+  const cacheKey = recommendationCacheKey(listings.map((l) => l.id));
+  let result = await getCachedRecommendation(cacheKey);
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
+  if (!result) {
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: RECOMMENDATION_MODEL,
+        max_tokens: 1024,
+        output_config: {
+          effort: "low",
+          format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
+        },
+        system:
+          "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
+          "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
+          "overall fit for value and needs. Each listing includes a decision_score breakdown " +
+          "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
+          "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
+          "access it) — use these as your primary evidence, and reference them concretely in your " +
+          "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
+          "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
+          "materially higher requirement than the others, say so explicitly — this is an eligibility " +
+          "signal, not just a spec difference. Only reference data present in the listings provided; " +
+          "never invent statistics. Always make clear this is an AI-assisted recommendation.",
+        messages: [
+          {
+            role: "user",
+            content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
+          },
+        ],
+      });
+    } catch (err) {
+      // Previously unhandled — the client would get a bare 500 with no JSON
+      // body and silently do nothing (no error shown, no state change, just
+      // the button reverting as if nothing happened). 503 signals "the AI
+      // service itself is unavailable," distinct from a 400/404 caused by bad
+      // input.
+      console.error("[recommendations] Anthropic request failed:", err);
+      return NextResponse.json(
+        { error: "AI recommendation is unavailable right now — please try again shortly." },
+        { status: 503 },
+      );
+    }
+
+    const textBlock = message.content.find((b) => b.type === "text");
+    if (!textBlock || textBlock.type !== "text") {
+      return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
+    }
+    result = JSON.parse(textBlock.text) as {
+      recommended_listing_name: string;
+      explanation: string;
+      confidence: number;
+    };
+    await setCachedRecommendation(cacheKey, result);
   }
-  const result = JSON.parse(textBlock.text) as {
-    recommended_listing_name: string;
-    explanation: string;
-    confidence: number;
-  };
 
   const recommendedListing =
     listings.find((l) => l.name === result.recommended_listing_name) ?? listings[0];

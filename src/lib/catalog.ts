@@ -230,12 +230,63 @@ export async function getListingPriceTrends(listingIds: string[]): Promise<Recor
   return result;
 }
 
+/**
+ * Snapshots a listing's price into ListingPriceHistory before it changes.
+ * Every price-trend/sparkline/price-drop-notification feature reads from
+ * this table — an edit that skips this call is invisible to all of them,
+ * which was true of every live admin/provider price edit until this was
+ * wired in (only prisma/seed.ts wrote here before). Call with the price
+ * *before* the update lands, so the history reflects what was actually true
+ * at that point in time.
+ */
+export async function recordPriceChange(listingId: string, previousPrice: number): Promise<void> {
+  await prisma.listingPriceHistory.create({ data: { listingId, price: previousPrice } });
+}
+
 export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   const listings = await prisma.listing.findMany({
     where: { id: { in: ids }, status: "published" },
     include: { provider: true },
   });
   return listings.map(toListingDTO);
+}
+
+export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string };
+
+/**
+ * The most recent distinct listings a user engaged with, sourced from
+ * `action_taken` events (ListingActions fires one with `metadata.listingId`
+ * on every CTA click). Not a full page-view log — there's no separate
+ * "viewed" event today — but every action_taken implies the listing was
+ * actually seen, so this under-counts rather than over-claims. Listings that
+ * are no longer published (unpublished/rejected/deleted since) are silently
+ * excluded via getListingsByIds' own status filter.
+ */
+export async function getRecentlyViewed(userId: string, limit = 6): Promise<RecentlyViewedListing[]> {
+  const events = await prisma.userEvent.findMany({
+    where: { userId, eventType: "action_taken" },
+    orderBy: { createdAt: "desc" },
+    take: limit * 3, // over-fetch to allow for de-duplication by listing
+    select: { metadata: true, createdAt: true },
+  });
+
+  const viewedAtByListing = new Map<string, Date>();
+  const orderedIds: string[] = [];
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtByListing.has(listingId)) continue;
+    viewedAtByListing.set(listingId, event.createdAt);
+    orderedIds.push(listingId);
+    if (orderedIds.length >= limit) break;
+  }
+  if (orderedIds.length === 0) return [];
+
+  const listings = await getListingsByIds(orderedIds);
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return orderedIds
+    .map((id) => byId.get(id))
+    .filter((l): l is ListingDTO => !!l)
+    .map((listing) => ({ listing, viewedAt: viewedAtByListing.get(listing.id)!.toISOString() }));
 }
 
 /**

@@ -14,7 +14,10 @@ import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
 type SortMode = "value" | "price_asc" | "price_desc";
-type CategoryWithTrendsDTO = CategoryWithListingsDTO & { trends: Record<string, PriceTrend | null> };
+type CategoryWithTrendsDTO = CategoryWithListingsDTO & {
+  trends: Record<string, PriceTrend | null>;
+  savedIds: string[];
+};
 
 export function ExploreClient({
   sectorSlug,
@@ -64,6 +67,8 @@ export function ExploreClient({
     () => (data ? computeDecisionScores(data.listings, data.attributeSchema, data.trends) : {}),
     [data],
   );
+
+  const savedIds = useMemo(() => new Set(data?.savedIds ?? []), [data]);
 
   const sortedListings = useMemo(() => {
     if (!data) return [];
@@ -128,6 +133,7 @@ export function ExploreClient({
             sectorSlug={sectorSlug}
             selected={data ? isSelected(data.id, listing.id) : false}
             onToggleSelect={toggleSelect}
+            initialSaved={savedIds.has(listing.id)}
             requirements={data ? getListingRequirements(listing, data.attributeSchema) : undefined}
           />
         ))}

@@ -23,6 +23,7 @@ export function ListingCard({
   selected,
   onToggleSelect,
   requirements,
+  initialSaved,
 }: {
   listing: ListingDTO;
   score: number;
@@ -31,8 +32,9 @@ export function ListingCard({
   selected: boolean;
   onToggleSelect: (listing: ListingDTO) => void;
   requirements?: Requirement[];
+  initialSaved?: boolean;
 }) {
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(initialSaved ?? false);
   const { display } = useCurrency();
 
   async function toggleSaved() {

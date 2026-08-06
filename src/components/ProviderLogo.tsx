@@ -38,13 +38,19 @@ export function ProviderLogo({
 
   if (logoUrl && !failed) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
+      // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-curated HTTPS URLs, not confined to one CDN next/image could optimize
       <img
         src={logoUrl}
         alt={`${name} logo`}
         width={size}
         height={size}
         onError={() => setFailed(true)}
+        // This renders dozens of times per page (every listing card, compare
+        // row, tray chip) — most are off-screen on load, so lazy-loading and
+        // deprioritizing them matters far more here than for a one-off image.
+        loading="lazy"
+        decoding="async"
+        fetchPriority="low"
         className="shrink-0 rounded-full border border-border bg-bg-surface-raised object-contain"
         style={{ width: size, height: size }}
       />

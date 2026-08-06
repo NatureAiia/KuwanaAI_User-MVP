@@ -20,20 +20,16 @@ const INTAKE_SCHEMA = {
 };
 
 const SYSTEM_PROMPT =
-  "You route a Zimbabwean consumer's need — described in plain language or shown in a photo of a " +
-  "product/item — to the single best-matching sector and category from a closed list — never invent a " +
-  "slug not present in the list. If nothing plausibly matches, return null for both. A vague need like " +
-  "\"I need internet\" should still map to the closest live sector/category (telecom data bundles) even " +
-  "if imperfect, as long as it's a reasonable interpretation — only return null when the need is " +
-  "genuinely unrelated to anything in the list (e.g. a general question, a photo of something Kuwana " +
-  "doesn't sell, or a sector Kuwana doesn't cover).";
+  "You route a Zimbabwean consumer's plain-language need to the single best-matching sector and " +
+  "category from a closed list — never invent a slug not present in the list. If nothing plausibly " +
+  "matches, return null for both. A vague need like \"I need internet\" should still map to the " +
+  "closest live sector/category (telecom data bundles) even if imperfect, as long as it's a " +
+  "reasonable interpretation — only return null when the need is genuinely unrelated to anything " +
+  "in the list (e.g. a general question, or a sector Kuwana doesn't cover).";
 
 export type IntakeResult = { sectorSlug: string | null; categorySlug: string | null; confidence: number };
 
-type Base64Image = { mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"; data: string };
-
-/** Shared by the text ("what do you need?") and photo intake routes — same catalog, schema, and validation either way. */
-export async function classifyIntake(input: { text: string } | { image: Base64Image }): Promise<IntakeResult> {
+export async function classifyIntake(query: string): Promise<IntakeResult> {
   const sectorsWithCategories = await Promise.all(
     LIVE_SECTORS.map(async (slug) => ({
       slug,
@@ -47,28 +43,18 @@ export async function classifyIntake(input: { text: string } | { image: Base64Im
     sector_name: s.name,
     categories: s.categories.map((c) => ({ category_slug: c.slug, category_name: c.name })),
   }));
-  const catalogText = `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\n`;
-
-  const content =
-    "text" in input
-      ? `${catalogText}User's need: "${input.text}"`
-      : ([
-          {
-            type: "text" as const,
-            text: `${catalogText}The user submitted a photo of a product or item. Identify what it most likely is and route it to the best-matching sector and category from the list above.`,
-          },
-          {
-            type: "image" as const,
-            source: { type: "base64" as const, media_type: input.image.mediaType, data: input.image.data },
-          },
-        ]);
 
   const message = await anthropic.messages.create({
     model: RECOMMENDATION_MODEL,
     max_tokens: 300,
     output_config: { effort: "low", format: { type: "json_schema", schema: INTAKE_SCHEMA } },
     system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content }],
+    messages: [
+      {
+        role: "user",
+        content: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
+      },
+    ],
   });
 
   const textBlock = message.content.find((b) => b.type === "text");

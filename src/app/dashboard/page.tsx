@@ -2,12 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTopListings, getPersonalizedSpecials } from "@/lib/catalog";
+import { getTopListings, getPersonalizedSpecials, getRecentlyViewed } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
+import { RecentlyViewedRow } from "@/components/dashboard/RecentlyViewedRow";
 import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 
@@ -25,7 +26,7 @@ export default async function DashboardPage() {
   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
   if (roleRedirect) redirect(roleRedirect);
 
-  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials] = await Promise.all([
+  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials, recentlyViewed] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
     prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
     getTopListings("telecom", "data-bundles", 4),
     getTopListings("banking", "savings-accounts", 4),
     getPersonalizedSpecials(user.id, 4),
+    getRecentlyViewed(user.id),
   ]);
 
   const firstName = profile?.fullName?.split(" ")[0];
@@ -52,7 +54,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <NeedIntake />
+      <NeedIntake enableImageSearch />
 
       <div className="mt-4">
         <GamificationStrip
@@ -64,6 +66,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6 space-y-6">
+        <RecentlyViewedRow items={recentlyViewed} />
         {specials.length > 0 ? (
           specials.map((s) => (
             <HeroCarousel

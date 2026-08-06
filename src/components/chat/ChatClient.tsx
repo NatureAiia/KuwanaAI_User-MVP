@@ -11,6 +11,7 @@ import { DateDivider } from "@/components/chat/DateDivider";
 import { MessageBubble, type ChatMessage } from "@/components/chat/MessageBubble";
 import { notifyGamification } from "@/lib/gamification/client";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
+import { takePendingChatImage } from "@/lib/chatHandoff";
 
 const ERROR_REPLY = "Sorry, I couldn't reach the assistant just now. Please try again.";
 // Covers a marker split across two chunk reads at the boundary.
@@ -43,6 +44,18 @@ export function ChatClient() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, sending]);
+
+  // Picks up a photo handed off from the dashboard search bar's camera
+  // button (see chatHandoff.ts) and sends it as the opening message, so
+  // landing here from an image search behaves like Gemini: the AI reasons
+  // about the photo first, then the user can ask follow-ups normally.
+  useEffect(() => {
+    if (hydrating) return;
+    const pending = takePendingChatImage();
+    if (!pending) return;
+    sendMessage(pending.text, { mediaType: pending.mediaType, data: pending.data });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendMessage intentionally omitted: it's redefined every render and only the hydrating transition should trigger this handoff, not every render.
+  }, [hydrating]);
 
   async function sendMessage(content: string, image?: ComposerImage) {
     const pendingId = `local-${Date.now()}`;

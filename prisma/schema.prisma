@@ -554,3 +554,19 @@ model RateLimitHit {
   @@index([key, createdAt])
   @@map("rate_limit_hits")
 }
+
+// Caches /api/recommendations' Claude output per distinct listing-set (not
+// per-user — the recommendation is a pure function of the listing set, the
+// route doesn't factor in the caller's footprint). Comparing the same 2-3
+// listings repeatedly is common while a user is deciding; this skips the
+// re-bill on a cache hit. Deliberately separate from the Recommendation
+// table, which stays the audit-grade "this user got this recommendation at
+// this time" record and is still written on every request, cache hit or not.
+model RecommendationCache {
+  cacheKey  String   @id @map("cache_key")
+  payload   Json
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("recommendation_cache")
+}

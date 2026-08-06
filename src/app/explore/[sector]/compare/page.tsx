@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getListingsByIds, getListingPriceTrends } from "@/lib/catalog";
+import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { CompareClient } from "@/components/explore/CompareClient";
@@ -32,6 +33,18 @@ export default async function ComparePage({
 
   const trends = await getListingPriceTrends(listingIds);
 
+  // Browsing/comparing without an account is supported, so this can't
+  // require auth — just show nothing pre-saved for anonymous visitors.
+  const user = await requireUser();
+  const initialSavedIds = user
+    ? (
+        await prisma.savedListing.findMany({
+          where: { userId: user.id, listingId: { in: listingIds } },
+          select: { listingId: true },
+        })
+      ).map((s) => s.listingId)
+    : [];
+
   const attributeSchema: AttributeSchemaFieldDTO[] = category.attributeSchema.map((a) => ({
     key: a.key,
     label: a.label,
@@ -52,6 +65,7 @@ export default async function ComparePage({
         listings={listings}
         attributeSchema={attributeSchema}
         trends={trends}
+        initialSavedIds={initialSavedIds}
       />
       <BottomTabBar />
     </div>

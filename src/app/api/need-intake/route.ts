@@ -20,6 +20,6 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const result = await classifyIntake({ text: parsed.data.query });
+  const result = await classifyIntake(parsed.data.query);
   return NextResponse.json(result);
 }
