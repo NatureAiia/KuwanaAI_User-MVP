@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import {
   MAX_COMPARE,
+  getCompareTrayServerSnapshot,
   readCompareTray,
   subscribeToCompareTray,
   writeCompareTray,
@@ -11,12 +12,7 @@ import {
 } from "@/lib/compareTray";
 
 export function useCompareTray() {
-  const [tray, setTray] = useState<CompareTrayState | null>(null);
-
-  useEffect(() => {
-    setTray(readCompareTray());
-    return subscribeToCompareTray(() => setTray(readCompareTray()));
-  }, []);
+  const tray = useSyncExternalStore(subscribeToCompareTray, readCompareTray, getCompareTrayServerSnapshot);
 
   const toggle = useCallback(
     (sectorSlug: string, categoryId: string, categoryName: string, item: CompareTrayItem) => {

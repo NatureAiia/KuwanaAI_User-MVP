@@ -10,6 +10,8 @@ import { Header } from "@/components/Header";
 import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { ListingActions } from "@/components/ListingActions";
+import { CompareToggleButton } from "@/components/explore/CompareToggleButton";
+import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { FormattedPrice } from "@/components/FormattedPrice";
 import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
@@ -167,8 +169,21 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+        <CompareToggleButton
+          listingId={listing.id}
+          listingName={listing.name}
+          providerName={listing.provider.name}
+          providerLogoUrl={listing.provider.logoUrl}
+          sectorSlug={listing.category.sector.slug}
+          categoryId={listing.category.id}
+          categoryName={listing.category.name}
+        />
+      </div>
+
       <ListingActions listingId={listing.id} sourceUrl={listing.sourceUrl} providerName={listing.provider.name} />
 
+      <CompareTrayBar />
       <BottomTabBar />
     </div>
   );

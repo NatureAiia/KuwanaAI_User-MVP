@@ -25,17 +25,34 @@ export type CompareTrayState = {
   items: CompareTrayItem[];
 };
 
+// Cached alongside the raw string so repeated reads between actual changes
+// return the same object reference — required by useSyncExternalStore's
+// getSnapshot contract (a snapshot that's `!==` on every call, even when
+// nothing changed, causes an infinite re-render loop).
+let cachedRaw: string | null = null;
+let cachedState: CompareTrayState | null = null;
+
 export function readCompareTray(): CompareTrayState | null {
   if (typeof window === "undefined") return null;
+  let raw: string | null;
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CompareTrayState;
-    if (!parsed?.items?.length) return null;
-    return parsed;
+    raw = window.sessionStorage.getItem(STORAGE_KEY);
   } catch {
-    return null;
+    raw = null;
   }
+  if (raw === cachedRaw) return cachedState;
+  cachedRaw = raw;
+  try {
+    const parsed = raw ? (JSON.parse(raw) as CompareTrayState) : null;
+    cachedState = parsed?.items?.length ? parsed : null;
+  } catch {
+    cachedState = null;
+  }
+  return cachedState;
+}
+
+export function getCompareTrayServerSnapshot(): CompareTrayState | null {
+  return null;
 }
 
 export function writeCompareTray(state: CompareTrayState | null) {
