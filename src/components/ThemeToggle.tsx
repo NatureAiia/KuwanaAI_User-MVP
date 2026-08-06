@@ -5,16 +5,16 @@ import { Moon, Sun } from "lucide-react";
 import { clsx } from "clsx";
 
 export function ThemeToggle({ className }: { className?: string }) {
-  // Default matches layout.tsx's hardcoded `className="dark"` and its
-  // pre-hydration theme-init script, whose default is also dark — this must
+  // Default matches layout.tsx's SSR markup (no "dark" class) and its
+  // pre-hydration theme-init script, whose default is also light — this must
   // stay in sync with that SSR default, or this button's aria-label/icon
   // will mismatch between server and client render and trigger a hydration
   // error (see layout.tsx's THEME_INIT_SCRIPT).
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
     // Reconciles with the actual class the pre-hydration script set from
-    // localStorage — only differs from the SSR default when it's "light".
+    // localStorage — only differs from the SSR default when it's "dark".
     const actual = document.documentElement.classList.contains("dark");
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the DOM class an external script set before hydration, not deriving render output
     if (actual !== isDark) setIsDark(actual);

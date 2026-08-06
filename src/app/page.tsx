@@ -256,6 +256,18 @@ export default function LandingPage() {
                 </li>
               </ul>
             </div>
+            <div>
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                Trust
+              </h4>
+              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
+                <li>
+                  <Link href="/trust" className="hover:text-text-primary">
+                    Our promises
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
 

@@ -11,8 +11,8 @@ const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var theme = localStorage.getItem("kuwana-theme");
-    if (theme === "light") document.documentElement.classList.remove("dark");
-    else document.documentElement.classList.add("dark");
+    if (theme === "dark") document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
   } catch (e) {}
 })();
 `;
@@ -48,7 +48,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`dark ${bricolage.variable} ${manrope.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${manrope.variable} ${plexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-body">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, ShieldCheck } from "lucide-react";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
@@ -74,6 +74,19 @@ export default function SettingsPage() {
             {unreadCount > 0 && <span className="h-2 w-2 rounded-full bg-accent-coral" />}
             <ChevronRight size={16} className="text-text-muted" />
           </div>
+        </Link>
+        <Link
+          href="/trust"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4 py-3"
+        >
+          <div className="flex items-center gap-3">
+            <ShieldCheck size={18} className="text-text-secondary" />
+            <div>
+              <p className="text-[14px] font-medium">Trust &amp; transparency</p>
+              <p className="text-[12px] text-text-muted">Our promises, and how we keep them</p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
         </Link>
       </div>
 

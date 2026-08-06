@@ -1,22 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { ArrowUpDown } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
-import { Button } from "@/components/ui/Button";
+import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingRequirements } from "@/lib/eligibility";
 import { createClient } from "@/lib/supabase/client";
+import { useCompareTray } from "@/lib/useCompareTray";
 import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
 type SortMode = "value" | "price_asc" | "price_desc";
 type CategoryWithTrendsDTO = CategoryWithListingsDTO & { trends: Record<string, PriceTrend | null> };
-
-const MIN_COMPARE = 2;
-const MAX_COMPARE = 4;
 
 export function ExploreClient({
   sectorSlug,
@@ -25,7 +23,6 @@ export function ExploreClient({
   sectorSlug: string;
   categories: CategoryDTO[];
 }) {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const requestedCategorySlug = searchParams.get("category");
   const initialCategorySlug =
@@ -36,7 +33,7 @@ export function ExploreClient({
   const [data, setData] = useState<CategoryWithTrendsDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("value");
-  const [selected, setSelected] = useState<string[]>([]);
+  const { toggle, isSelected } = useCompareTray();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -49,7 +46,6 @@ export function ExploreClient({
     if (!activeCategorySlug) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting view state for the incoming fetch, not deriving render output
     setLoading(true);
-    setSelected([]);
     fetch(`/api/listings?sector=${sectorSlug}&category=${activeCategorySlug}`)
       .then((r) => r.json())
       .then((d: CategoryWithTrendsDTO) => setData(d))
@@ -78,23 +74,14 @@ export function ExploreClient({
     return listings;
   }, [data, sort, scores]);
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= MAX_COMPARE) return prev;
-      return [...prev, id];
+  function toggleSelect(listing: (typeof sortedListings)[number]) {
+    if (!data) return;
+    toggle(sectorSlug, data.id, data.name, {
+      id: listing.id,
+      name: listing.name,
+      providerName: listing.provider.name,
+      providerLogoUrl: listing.provider.logoUrl,
     });
-  }
-
-  function goCompare() {
-    if (!data || selected.length < MIN_COMPARE) return;
-    if (isAuthed === false) {
-      router.push(`/signup?next=${encodeURIComponent(window.location.pathname)}`);
-      return;
-    }
-    router.push(
-      `/explore/${sectorSlug}/compare?category=${data.id}&ids=${selected.join(",")}`,
-    );
   }
 
   return (
@@ -139,27 +126,14 @@ export function ExploreClient({
             score={scores[listing.id]?.total ?? 0}
             trend={data?.trends[listing.id] ?? null}
             sectorSlug={sectorSlug}
-            selected={selected.includes(listing.id)}
+            selected={data ? isSelected(data.id, listing.id) : false}
             onToggleSelect={toggleSelect}
             requirements={data ? getListingRequirements(listing, data.attributeSchema) : undefined}
           />
         ))}
       </div>
 
-      {selected.length >= 1 && (
-        <div className="fixed bottom-16 left-0 right-0 z-40 flex justify-center px-5 md:bottom-6">
-          <div className="flex items-center gap-4 rounded-full border border-accent-sky bg-bg-surface px-5 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.3)]">
-            <span className="text-[13px] font-medium">
-              {selected.length < MIN_COMPARE
-                ? `Select ${MIN_COMPARE - selected.length} more to compare`
-                : `${selected.length} selected${selected.length >= MAX_COMPARE ? ` (max ${MAX_COMPARE})` : ""}`}
-            </span>
-            <Button size="md" onClick={goCompare} disabled={selected.length < MIN_COMPARE}>
-              Compare
-            </Button>
-          </div>
-        </div>
-      )}
+      <CompareTrayBar />
     </div>
   );
 }

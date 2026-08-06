@@ -29,7 +29,7 @@ export function ListingCard({
   trend?: PriceTrend | null;
   sectorSlug: string;
   selected: boolean;
-  onToggleSelect: (id: string) => void;
+  onToggleSelect: (listing: ListingDTO) => void;
   requirements?: Requirement[];
 }) {
   const [saved, setSaved] = useState(false);
@@ -70,7 +70,7 @@ export function ListingCard({
         </button>
         <button
           type="button"
-          onClick={() => onToggleSelect(listing.id)}
+          onClick={() => onToggleSelect(listing)}
           aria-pressed={selected}
           aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
           className={clsx(

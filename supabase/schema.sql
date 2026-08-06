@@ -1,14 +1,43 @@
--- Kuwana MVP — schema for Supabase (Postgres)
--- Paste this into Supabase Dashboard → SQL Editor → New query → Run.
--- This is the same schema Prisma migrations create; kept here as a single
--- pasteable script for setting up a fresh Supabase project by hand.
+-- Kuwana — full database architecture (Postgres DDL)
 --
--- After running this, seed mock listings/providers/gamification rules with:
---   DATABASE_URL="<your Supabase connection string>" npm run db:seed
+-- Portable by design: standard Postgres only (uuid text ids generated
+-- app-side, jsonb, native enums, btree/GIN indexes, plain FKs). No
+-- Supabase-specific objects — verified 2026-08-06 against the live project
+-- (iguhrpbnnrdeplnbzyxc) via pg_indexes/pg_policies/pg_trigger/pg_extension:
+-- zero RLS policies, zero triggers, zero functions, zero views, and the
+-- only Supabase-only extension present (supabase_vault) is unused by any
+-- table here. That means this same file runs unmodified on Supabase today
+-- and on plain Postgres / RDS / Neon / self-hosted later — nothing to
+-- strip out when you move.
 --
--- NOTE: `public.users.id` is written by the app to match the Supabase Auth
--- user id (auth.users.id) — see src/app/api/onboarding/route.ts. The FK
--- below ties them together so deleting an Auth user cascades cleanly.
+-- HOW TO RUN
+--   Fresh Supabase project (no repo/Node needed):
+--     Supabase Dashboard → SQL Editor → New query → paste this file → Run.
+--     Then seed reference data (sectors/categories/providers/listings/
+--     gamification rules) with:
+--       DATABASE_URL="<connection string>" npm run db:seed
+--
+--   From this repo (preferred once you have Node + the codebase checked out):
+--     Point DATABASE_URL/DIRECT_URL at the target Postgres instance and run
+--       npx prisma migrate deploy
+--     This replays prisma/migrations/*/migration.sql, which is the
+--     authoritative, versioned source this file is generated from — the two
+--     are kept in sync (confirmed byte-for-byte equivalent via
+--     `prisma migrate diff` against the live DB, 2026-08-06). If you ever
+--     touch the schema going forward, edit prisma/schema.prisma and run a
+--     migration — then regenerate this file with:
+--       npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+--
+--   Moving to a non-Supabase platform later:
+--     Same file, same command. The only Supabase-specific thing this
+--     project *could* add (and currently does not) is a foreign key tying
+--     public.users.id to auth.users.id for cascade-delete-on-signup-removal
+--     — see the commented-out block at the very end. Leave it commented out
+--     if you're not on Supabase.
+--
+-- NOTE: id columns are TEXT (app-generated UUIDv4 strings via Prisma's
+-- @default(uuid()), not Postgres-native `uuid`/gen_random_uuid()) — kept as
+-- TEXT here to match exactly what's live and what Prisma's client sends.
 
 BEGIN;
 
@@ -16,14 +45,16 @@ BEGIN;
 -- Enums
 -- ---------------------------------------------------------------------
 CREATE TYPE "Role" AS ENUM ('consumer', 'corporate', 'regulator', 'provider');
-CREATE TYPE "Sector" AS ENUM ('telecom', 'banking', 'insurance', 'education', 'healthcare');
+CREATE TYPE "Sector" AS ENUM ('telecom', 'banking', 'insurance', 'education', 'healthcare', 'transport', 'utilities', 'pharmacy', 'electronics', 'fashion');
 CREATE TYPE "SectorStatus" AS ENUM ('live', 'coming_soon');
 CREATE TYPE "AttributeDataType" AS ENUM ('number', 'string', 'enum', 'boolean');
 CREATE TYPE "FreshnessStatus" AS ENUM ('fresh', 'stale', 'unverified');
-CREATE TYPE "EventType" AS ENUM (
-  'profile_completed', 'comparison_viewed', 'comparison_completed',
-  'recommendation_viewed', 'item_saved', 'action_taken', 'daily_visit'
-);
+CREATE TYPE "ListingStatus" AS ENUM ('draft', 'pending_review', 'published', 'rejected');
+CREATE TYPE "NotificationType" AS ENUM ('price_drop', 'listing_approved', 'listing_rejected');
+CREATE TYPE "ChatRole" AS ENUM ('user', 'assistant');
+CREATE TYPE "EventType" AS ENUM ('profile_completed', 'comparison_viewed', 'comparison_completed', 'recommendation_viewed', 'item_saved', 'action_taken', 'daily_visit', 'chat_started');
+CREATE TYPE "SocialPlatform" AS ENUM ('telegram', 'reddit');
+CREATE TYPE "AdminAuditAction" AS ENUM ('listing_approved', 'listing_rejected', 'listing_deleted', 'provider_linked', 'provider_unlinked', 'user_role_changed');
 
 -- ---------------------------------------------------------------------
 -- 4.1 Identity & onboarding
@@ -31,7 +62,7 @@ CREATE TYPE "EventType" AS ENUM (
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "password_hash" TEXT,
+    "password_hash" TEXT, -- Supabase Auth owns real credentials; kept for local/dev fallback
     "role" "Role" NOT NULL DEFAULT 'consumer',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
@@ -44,6 +75,7 @@ CREATE TABLE "user_profiles" (
     "location" TEXT,
     "full_name" TEXT,
     "nickname" TEXT,
+    "social_platforms" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
     CONSTRAINT "user_profiles_pkey" PRIMARY KEY ("user_id")
 );
 
@@ -58,7 +90,7 @@ CREATE TABLE "sector_footprints" (
 CREATE TABLE "consents" (
     "id" TEXT NOT NULL,
     "user_id" TEXT NOT NULL,
-    "consent_type" TEXT NOT NULL,
+    "consent_type" TEXT NOT NULL, -- 'research_use' | 'leaderboard_participation'
     "granted" BOOLEAN NOT NULL,
     "granted_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "consents_pkey" PRIMARY KEY ("id")
@@ -100,6 +132,10 @@ CREATE TABLE "providers" (
     "name" TEXT NOT NULL,
     "logo_url" TEXT,
     "verified" BOOLEAN NOT NULL DEFAULT true,
+    -- Nullable: seeded reference providers have no login of their own — set
+    -- only when a "provider" role account is admin-linked to self-manage
+    -- this provider's listings.
+    "owner_user_id" TEXT,
     CONSTRAINT "providers_pkey" PRIMARY KEY ("id")
 );
 
@@ -114,6 +150,11 @@ CREATE TABLE "listings" (
     "source_url" TEXT,
     "last_verified_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "freshness_status" "FreshnessStatus" NOT NULL DEFAULT 'fresh',
+    -- Provider self-submission workflow: draft -> pending_review ->
+    -- published/rejected. Defaults to "published" so admin-created listings
+    -- behave as before; only /provider submissions start at "draft".
+    "status" "ListingStatus" NOT NULL DEFAULT 'published',
+    "rejection_reason" TEXT,
     CONSTRAINT "listings_pkey" PRIMARY KEY ("id")
 );
 
@@ -150,8 +191,42 @@ CREATE TABLE "recommendations" (
     "listing_id" TEXT NOT NULL,
     "explanation" TEXT NOT NULL,
     "confidence" DECIMAL(4,3) NOT NULL,
+    "score_version" TEXT NOT NULL DEFAULT 'v1',
     "generated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "recommendations_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "notifications" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "listing_id" TEXT NOT NULL,
+    "type" "NotificationType" NOT NULL DEFAULT 'price_drop',
+    "message" TEXT NOT NULL,
+    "change_percent" DOUBLE PRECISION, -- only meaningful for price_drop
+    "read" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "notifications_pkey" PRIMARY KEY ("id")
+);
+
+-- ---------------------------------------------------------------------
+-- 4.4 AI chat assistant
+-- ---------------------------------------------------------------------
+CREATE TABLE "conversations" (
+    "id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "last_message_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "conversations_pkey" PRIMARY KEY ("id")
+);
+
+CREATE TABLE "messages" (
+    "id" TEXT NOT NULL,
+    "conversation_id" TEXT NOT NULL,
+    "role" "ChatRole" NOT NULL,
+    "content" TEXT NOT NULL,
+    "listing_ids" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "messages_pkey" PRIMARY KEY ("id")
 );
 
 -- ---------------------------------------------------------------------
@@ -224,12 +299,65 @@ CREATE TABLE "user_streaks" (
 );
 
 -- ---------------------------------------------------------------------
+-- Free social-media price intelligence (read-only feed, admin-reviewed)
+-- ---------------------------------------------------------------------
+CREATE TABLE "social_price_mentions" (
+    "id" TEXT NOT NULL,
+    "platform" "SocialPlatform" NOT NULL,
+    "channel" TEXT NOT NULL, -- Telegram channel username, or subreddit name
+    "source_url" TEXT NOT NULL,
+    "posted_at" TIMESTAMP(3),
+    "discovered_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "text" TEXT NOT NULL,
+    "matched_provider" TEXT,
+    "extracted_prices" JSONB NOT NULL,
+    "reviewed" BOOLEAN NOT NULL DEFAULT false,
+    CONSTRAINT "social_price_mentions_pkey" PRIMARY KEY ("id")
+);
+
+-- ---------------------------------------------------------------------
+-- Live FX reference rates (units per 1 USD)
+-- ---------------------------------------------------------------------
+CREATE TABLE "fx_rates" (
+    "code" TEXT NOT NULL,
+    "per_usd" DOUBLE PRECISION NOT NULL,
+    "source" TEXT NOT NULL,
+    "fetched_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "fx_rates_pkey" PRIMARY KEY ("code")
+);
+
+-- ---------------------------------------------------------------------
+-- Admin audit log (no FK to acted-on rows — must survive their deletion)
+-- ---------------------------------------------------------------------
+CREATE TABLE "admin_audit_log" (
+    "id" TEXT NOT NULL,
+    "admin_email" TEXT NOT NULL,
+    "action" "AdminAuditAction" NOT NULL,
+    "target_type" TEXT NOT NULL, -- "listing" | "provider" | "user"
+    "target_id" TEXT NOT NULL,
+    "detail" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "admin_audit_log_pkey" PRIMARY KEY ("id")
+);
+
+-- ---------------------------------------------------------------------
+-- Rate limiting for public unauthenticated endpoints (self-cleaning:
+-- the app deletes a key's own expired hits on every call)
+-- ---------------------------------------------------------------------
+CREATE TABLE "rate_limit_hits" (
+    "id" TEXT NOT NULL,
+    "key" TEXT NOT NULL, -- e.g. "need-intake:203.0.113.5"
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "rate_limit_hits_pkey" PRIMARY KEY ("id")
+);
+
+-- ---------------------------------------------------------------------
 -- Healthcare "coming soon" waitlist
 -- ---------------------------------------------------------------------
 CREATE TABLE "waitlist_signups" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "sector" TEXT NOT NULL,
+    "sector" TEXT NOT NULL, -- 'healthcare' for MVP; kept generic for future coming-soon sectors
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "waitlist_signups_pkey" PRIMARY KEY ("id")
 );
@@ -238,12 +366,63 @@ CREATE TABLE "waitlist_signups" (
 -- Indexes
 -- ---------------------------------------------------------------------
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
 CREATE UNIQUE INDEX "sector_footprints_user_id_sector_key" ON "sector_footprints"("user_id", "sector");
+
+-- Leaderboard query filters exactly this combination before joining UserXp.
+CREATE INDEX "consents_consent_type_granted_idx" ON "consents"("consent_type", "granted");
 CREATE UNIQUE INDEX "consents_user_id_consent_type_key" ON "consents"("user_id", "consent_type");
+
 CREATE UNIQUE INDEX "sectors_slug_key" ON "sectors"("slug");
 CREATE UNIQUE INDEX "categories_sector_id_slug_key" ON "categories"("sector_id", "slug");
 CREATE UNIQUE INDEX "attribute_schema_category_id_key_key" ON "attribute_schema"("category_id", "key");
+CREATE UNIQUE INDEX "providers_owner_user_id_key" ON "providers"("owner_user_id");
+
+-- (category_id, status, price): the consumer catalog hot path. status
+-- alone: the admin review queue filters by status with no category_id.
+-- provider_id: the provider portal's "my listings" query.
+CREATE INDEX "listings_category_id_status_price_idx" ON "listings"("category_id", "status", "price");
+CREATE INDEX "listings_status_idx" ON "listings"("status");
+CREATE INDEX "listings_provider_id_idx" ON "listings"("provider_id");
+
+-- Price-trend/forecast reads a listing's full history ordered by time.
+CREATE INDEX "listing_price_history_listing_id_recorded_at_idx" ON "listing_price_history"("listing_id", "recorded_at");
+
+-- Every quest-progress check queries userId + a created_at range.
+CREATE INDEX "comparisons_user_id_created_at_idx" ON "comparisons"("user_id", "created_at" DESC);
+-- getAlsoCompared's listing_ids array-containment query needs a GIN index.
+CREATE INDEX "comparisons_listing_ids_idx" ON "comparisons" USING GIN ("listing_ids");
+
+CREATE INDEX "saved_listings_user_id_saved_at_idx" ON "saved_listings"("user_id", "saved_at" DESC);
+
+CREATE INDEX "recommendations_listing_id_idx" ON "recommendations"("listing_id");
+CREATE INDEX "recommendations_user_id_generated_at_idx" ON "recommendations"("user_id", "generated_at" DESC);
+
+CREATE INDEX "notifications_listing_id_idx" ON "notifications"("listing_id");
+CREATE INDEX "notifications_user_id_read_created_at_idx" ON "notifications"("user_id", "read", "created_at" DESC);
+CREATE UNIQUE INDEX "notifications_user_id_listing_id_type_key" ON "notifications"("user_id", "listing_id", "type");
+
+CREATE INDEX "conversations_user_id_created_at_idx" ON "conversations"("user_id", "created_at");
+CREATE INDEX "messages_conversation_id_created_at_idx" ON "messages"("conversation_id", "created_at");
+
+-- Every badge-trigger check queries exactly this combination.
+CREATE INDEX "user_events_user_id_event_type_created_at_idx" ON "user_events"("user_id", "event_type", "created_at" DESC);
+
+-- Leaderboard ORDER BY total_xp DESC.
+CREATE INDEX "user_xp_total_xp_idx" ON "user_xp"("total_xp" DESC);
 CREATE UNIQUE INDEX "badges_name_key" ON "badges"("name");
+
+-- quest-rotation checks "is anything active right now" via active_to.
+CREATE INDEX "quests_active_to_idx" ON "quests"("active_to");
+
+CREATE INDEX "social_price_mentions_matched_provider_idx" ON "social_price_mentions"("matched_provider");
+CREATE INDEX "social_price_mentions_reviewed_discovered_at_idx" ON "social_price_mentions"("reviewed", "discovered_at" DESC);
+CREATE UNIQUE INDEX "social_price_mentions_platform_source_url_key" ON "social_price_mentions"("platform", "source_url");
+
+CREATE INDEX "admin_audit_log_created_at_idx" ON "admin_audit_log"("created_at" DESC);
+
+CREATE INDEX "rate_limit_hits_key_created_at_idx" ON "rate_limit_hits"("key", "created_at");
+
 CREATE UNIQUE INDEX "waitlist_signups_email_sector_key" ON "waitlist_signups"("email", "sector");
 
 -- ---------------------------------------------------------------------
@@ -254,6 +433,7 @@ ALTER TABLE "sector_footprints" ADD CONSTRAINT "sector_footprints_user_id_fkey" 
 ALTER TABLE "consents" ADD CONSTRAINT "consents_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "categories" ADD CONSTRAINT "categories_sector_id_fkey" FOREIGN KEY ("sector_id") REFERENCES "sectors"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "attribute_schema" ADD CONSTRAINT "attribute_schema_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "providers" ADD CONSTRAINT "providers_owner_user_id_fkey" FOREIGN KEY ("owner_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 ALTER TABLE "listings" ADD CONSTRAINT "listings_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "listings" ADD CONSTRAINT "listings_provider_id_fkey" FOREIGN KEY ("provider_id") REFERENCES "providers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "listing_price_history" ADD CONSTRAINT "listing_price_history_listing_id_fkey" FOREIGN KEY ("listing_id") REFERENCES "listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -263,6 +443,10 @@ ALTER TABLE "saved_listings" ADD CONSTRAINT "saved_listings_user_id_fkey" FOREIG
 ALTER TABLE "saved_listings" ADD CONSTRAINT "saved_listings_listing_id_fkey" FOREIGN KEY ("listing_id") REFERENCES "listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "recommendations" ADD CONSTRAINT "recommendations_listing_id_fkey" FOREIGN KEY ("listing_id") REFERENCES "listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_listing_id_fkey" FOREIGN KEY ("listing_id") REFERENCES "listings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "conversations" ADD CONSTRAINT "conversations_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "user_events" ADD CONSTRAINT "user_events_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "user_xp" ADD CONSTRAINT "user_xp_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "user_badges" ADD CONSTRAINT "user_badges_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -271,8 +455,15 @@ ALTER TABLE "user_quest_progress" ADD CONSTRAINT "user_quest_progress_user_id_fk
 ALTER TABLE "user_quest_progress" ADD CONSTRAINT "user_quest_progress_quest_id_fkey" FOREIGN KEY ("quest_id") REFERENCES "quests"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "user_streaks" ADD CONSTRAINT "user_streaks_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- Ties public.users to Supabase Auth so deleting an Auth user cascades
--- through the whole app schema (profile, xp, badges, events, etc.)
-ALTER TABLE "users" ADD CONSTRAINT "users_auth_id_fkey" FOREIGN KEY ("id") REFERENCES auth.users("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
 COMMIT;
+
+-- ---------------------------------------------------------------------
+-- OPTIONAL, Supabase-only, NOT currently applied on the live project:
+-- ties public.users.id to Supabase's own auth.users so deleting an Auth
+-- user cascades through the whole app schema automatically. The app
+-- already writes public.users.id to match auth.users.id itself (see
+-- src/app/api/onboarding/route.ts), this just enforces it in the DB.
+-- Skip this block entirely when running on a non-Supabase Postgres —
+-- there is no auth.users table there.
+-- ---------------------------------------------------------------------
+-- ALTER TABLE "users" ADD CONSTRAINT "users_auth_id_fkey" FOREIGN KEY ("id") REFERENCES auth.users("id") ON DELETE CASCADE ON UPDATE CASCADE;
