@@ -258,10 +258,18 @@ depth. Real gaps if that changes:
 - No org/seat/multi-user model for Corporate — schema has no
   `Organization`/`OrgMember` concept, so "Corporate" is currently just a
   single user account with a role flag, not a team.
-- No audit log for Regulator (compliance/audit-trail features from the
-  build plan's Section 14 aren't started).
-- No procurement-specific features (downloadable evidence, shortlist
-  comparison reports) mentioned in the AI4I proposal's SME persona.
+- ~~No audit log for Regulator~~ **closed 2026-08-06**: `getComplianceActivity()`
+  (`src/lib/catalog.ts`) surfaces every currently-rejected listing,
+  most recent first, as a "Recent compliance actions" section on
+  `/regulator` — computed from `Listing.status`/`rejectionReason`
+  directly, no new tracking.
+- **Downloadable evidence half closed 2026-08-06**: `/corporate`'s
+  by-sector rollup table now has a CSV export
+  (`src/components/corporate/ExportCsvButton.tsx`). **Shortlist
+  comparison reports still not started** — Corporate accounts have no
+  comparison history of their own to build a "shortlist" from (that's
+  a consumer-only concept today), so this needs a product decision on
+  what a Corporate shortlist even means before it's buildable.
 
 ### Admin — solid but not complete
 - Admin auth is still an email allowlist (`ADMIN_EMAILS`), not a real
