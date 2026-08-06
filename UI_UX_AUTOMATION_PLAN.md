@@ -39,8 +39,10 @@ Verified against the shipped code, not assumed:
 
 1. **No search anywhere.** `ExploreClient` and the listing detail page have zero search input —
    users can only browse by category tabs. Every inspiration source above leads with a search bar.
-2. **No desktop navigation.** `BottomTabBar` is `md:hidden` — on tablet/desktop, authenticated
-   pages currently have **no persistent nav at all**.
+2. ~~No desktop navigation.~~ **Stale — already shipped.** `BottomTabBar` is indeed `md:hidden`,
+   but `Header.tsx` (used across essentially every authenticated page) has its own `md:flex`
+   `<nav aria-label="Primary">` with the same primary links — desktop nav exists, just as part of
+   Header rather than a separate component. Confirmed 2026-08-06.
 3. ~~`ListingPriceHistory` table exists in the schema and is never written to or read from.~~
    **Half-stale, half-real, closed 2026-08-06:** the *read* side (price trend/sparkline,
    price-drop notifications) had already shipped in an earlier session — this gap description was
@@ -147,7 +149,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
   3. New route `GET /api/saved/alerts` returning listings with an active price-drop flag.
 - **Priority: P1** — the schema already exists; this is mostly wiring, not new design.
 
-### 3.6 Desktop navigation — *Dial a Delivery hamburger drawer, ride-app side drawer*
+### 3.6 Desktop navigation — *Dial a Delivery hamburger drawer, ride-app side drawer* — **stale, already shipped via `Header.tsx`**
 
 - **UI:** a persistent top bar on `md:` and above with the Kuwana wordmark, primary nav links
   (Dashboard/Explore/Profile), and a right-aligned account menu — closing the gap where
@@ -228,9 +230,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
 ## 4. Suggested build order
 
 1. **P0 batch** — global search (3.1, **still open**), recently-viewed carousel (3.2, **closed**),
-   desktop nav (3.6, **still open** — skipped 2026-08-06 specifically to avoid colliding with
-   another session actively working the theme/layout/nav area; genuinely a P0 functional gap,
-   pick this up next if nothing else has claimed it).
+   desktop nav (3.6, **stale, already shipped** — `Header.tsx` has its own `md:flex` primary nav).
 2. **P1 batch** — cross-sell rail (3.3, **already shipped, was stale**), trending signal (3.4,
    **still open**), price-drop alerts (3.5, **read side already shipped, write-side bug closed**),
    recommendation caching (3.9, **closed**).
