@@ -16,6 +16,7 @@ export type ExistingListing = {
   id: string;
   categoryId: string;
   name: string;
+  description: string | null;
   attributes: Record<string, unknown>;
   price: number;
   currency: string;

@@ -148,11 +148,16 @@ CREATE TABLE "listings" (
     "category_id" TEXT NOT NULL,
     "provider_id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "description" TEXT,
     "attributes" JSONB NOT NULL,
     "price" DECIMAL(12,2) NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'USD',
     "source_url" TEXT,
     "images" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    -- Real user reviews aren't collected anywhere in the app yet — these
+    -- stay null/0 until that exists. Never backfilled/estimated.
+    "rating" DECIMAL(2,1),
+    "review_count" INTEGER NOT NULL DEFAULT 0,
     "last_verified_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "freshness_status" "FreshnessStatus" NOT NULL DEFAULT 'fresh',
     -- Provider self-submission workflow: draft -> pending_review ->

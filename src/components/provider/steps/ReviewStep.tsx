@@ -8,6 +8,7 @@ import type { AttributeField } from "@/components/provider/types";
 
 export function ReviewStep({
   name,
+  description,
   price,
   currency,
   images,
@@ -21,6 +22,7 @@ export function ReviewStep({
   onSubmit,
 }: {
   name: string;
+  description: string;
   price: string;
   currency: CurrencyCode;
   images: string[];
@@ -60,6 +62,7 @@ export function ReviewStep({
             {symbol}
             {price || "0.00"} {currency}
           </p>
+          {description && <p className="line-clamp-2 text-text-secondary">{description}</p>}
           {attributeFields.map((f) => {
             const v = attributeValues[f.key];
             if (!v) return null;

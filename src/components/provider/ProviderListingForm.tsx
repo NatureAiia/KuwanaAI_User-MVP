@@ -36,6 +36,7 @@ export function ProviderListingForm({
   const [furthestStep, setFurthestStep] = useState(mode === "edit" ? STEPS.length - 1 : 0);
   const [categoryId, setCategoryId] = useState<string | null>(listing?.categoryId ?? null);
   const [name, setName] = useState(listing?.name ?? "");
+  const [description, setDescription] = useState(listing?.description ?? "");
   const [price, setPrice] = useState(listing ? String(listing.price) : "");
   const [currency, setCurrency] = useState<CurrencyCode>((listing?.currency as CurrencyCode) ?? "USD");
   const [images, setImages] = useState<string[]>(listing?.images ?? []);
@@ -77,10 +78,20 @@ export function ProviderListingForm({
           field.dataType === "number" ? Number(raw) : field.dataType === "boolean" ? raw === "yes" : raw;
       }
 
+      const trimmedDescription = description.trim() || null;
       const body =
         mode === "create"
-          ? { categoryId, name, price: Number(price), currency, attributes, images, status }
-          : { name, price: Number(price), currency, attributes, images, status };
+          ? {
+              categoryId,
+              name,
+              description: trimmedDescription ?? undefined,
+              price: Number(price),
+              currency,
+              attributes,
+              images,
+              status,
+            }
+          : { name, description: trimmedDescription, price: Number(price), currency, attributes, images, status };
 
       const res = await fetch(
         mode === "create" ? "/api/provider/listings" : `/api/provider/listings/${listing!.id}`,
@@ -163,6 +174,8 @@ export function ProviderListingForm({
           <DetailsStep
             name={name}
             onNameChange={setName}
+            description={description}
+            onDescriptionChange={setDescription}
             price={price}
             onPriceChange={setPrice}
             currency={currency}
@@ -185,6 +198,7 @@ export function ProviderListingForm({
         {step === "review" && (
           <ReviewStep
             name={name}
+            description={description}
             price={price}
             currency={currency}
             images={images}

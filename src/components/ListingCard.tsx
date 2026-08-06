@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
 import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
@@ -16,7 +16,15 @@ import type { ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import type { Requirement } from "@/lib/eligibility";
 
-export function ListingCard({
+// Memoized: this renders once per listing in a grid that can run to dozens
+// of cards, and profiling (4x CPU throttle, approximating a mid-range
+// Android) showed every card re-rendering on a single card's own selection
+// toggle or a sort-order change was pushing interaction latency into Core
+// Web Vitals' "needs improvement" band (~300ms). Only pays off because the
+// parent (ExploreClient) also keeps `onToggleSelect` and `requirements`
+// referentially stable — an inline arrow function or a fresh array on every
+// parent render would defeat this for every card, not just the changed one.
+export const ListingCard = memo(function ListingCard({
   listing,
   score,
   trend,
@@ -159,4 +167,4 @@ export function ListingCard({
       </div>
     </div>
   );
-}
+});

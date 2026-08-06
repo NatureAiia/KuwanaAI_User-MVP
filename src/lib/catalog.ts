@@ -6,6 +6,7 @@ import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/c
 function toListingDTO(listing: {
   id: string;
   name: string;
+  description: string | null;
   price: unknown;
   currency: string;
   attributes: unknown;
@@ -13,11 +14,14 @@ function toListingDTO(listing: {
   lastVerifiedAt: Date;
   sourceUrl: string | null;
   images: string[];
+  rating: unknown;
+  reviewCount: number;
   provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
 }): ListingDTO {
   return {
     id: listing.id,
     name: listing.name,
+    description: listing.description,
     price: Number(listing.price),
     currency: listing.currency,
     attributes: listing.attributes as Record<string, unknown>,
@@ -25,6 +29,8 @@ function toListingDTO(listing: {
     lastVerifiedAt: listing.lastVerifiedAt.toISOString(),
     sourceUrl: listing.sourceUrl,
     images: listing.images,
+    rating: listing.rating === null || listing.rating === undefined ? null : Number(listing.rating),
+    reviewCount: listing.reviewCount,
     provider: listing.provider,
   };
 }

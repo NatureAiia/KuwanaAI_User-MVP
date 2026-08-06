@@ -9,6 +9,7 @@ import { recordPriceChange } from "@/lib/catalog";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
+  description: z.string().max(2000).nullable().optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
   price: z.number().positive().optional(),
   currency: z.string().optional(),

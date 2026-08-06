@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 export function DetailsStep({
   name,
   onNameChange,
+  description,
+  onDescriptionChange,
   price,
   onPriceChange,
   currency,
@@ -19,6 +21,8 @@ export function DetailsStep({
 }: {
   name: string;
   onNameChange: (v: string) => void;
+  description: string;
+  onDescriptionChange: (v: string) => void;
   price: string;
   onPriceChange: (v: string) => void;
   currency: CurrencyCode;
@@ -40,6 +44,18 @@ export function DetailsStep({
         onChange={(e) => onNameChange(e.target.value)}
         placeholder="e.g. Prepaid Data Bundle — 5GB"
         className="tap-target mt-1.5 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
+      />
+
+      <label className="mt-4 block text-[12.5px] font-medium text-text-secondary">
+        Description <span className="font-normal text-text-muted">(optional)</span>
+      </label>
+      <textarea
+        value={description}
+        onChange={(e) => onDescriptionChange(e.target.value)}
+        placeholder="What makes this worth buying — coverage, materials, what's included…"
+        rows={4}
+        maxLength={2000}
+        className="tap-target mt-1.5 w-full resize-none rounded-xl border border-border bg-bg-surface-raised px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
       />
 
       <label className="mt-4 block text-[12.5px] font-medium text-text-secondary">Price</label>

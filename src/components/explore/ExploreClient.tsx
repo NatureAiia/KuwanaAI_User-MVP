@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { ArrowUpDown } from "lucide-react";
@@ -10,7 +10,7 @@ import { computeDecisionScores } from "@/lib/scoring";
 import { getListingRequirements } from "@/lib/eligibility";
 import { createClient } from "@/lib/supabase/client";
 import { useCompareTray } from "@/lib/useCompareTray";
-import type { CategoryDTO, CategoryWithListingsDTO } from "@/types/catalog";
+import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
 type SortMode = "value" | "price_asc" | "price_desc";
@@ -70,6 +70,16 @@ export function ExploreClient({
 
   const savedIds = useMemo(() => new Set(data?.savedIds ?? []), [data]);
 
+  // Computed once per fetch rather than inline in the JSX below — an inline
+  // `getListingRequirements(...)` call produces a brand-new array reference
+  // on every render, which would defeat ListingCard's memoization below just
+  // as effectively as not memoizing it at all.
+  const requirementsById = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof getListingRequirements>>();
+    if (data) for (const listing of data.listings) map.set(listing.id, getListingRequirements(listing, data.attributeSchema));
+    return map;
+  }, [data]);
+
   const sortedListings = useMemo(() => {
     if (!data) return [];
     const listings = [...data.listings];
@@ -79,15 +89,22 @@ export function ExploreClient({
     return listings;
   }, [data, sort, scores]);
 
-  function toggleSelect(listing: (typeof sortedListings)[number]) {
-    if (!data) return;
-    toggle(sectorSlug, data.id, data.name, {
-      id: listing.id,
-      name: listing.name,
-      providerName: listing.provider.name,
-      providerLogoUrl: listing.provider.logoUrl,
-    });
-  }
+  // Stable across renders (via useCallback) for the same reason as
+  // requirementsById above — ListingCard is memoized, and an inline function
+  // recreated on every ExploreClient render would defeat that for every card,
+  // not just the one actually being toggled.
+  const toggleSelect = useCallback(
+    (listing: ListingDTO) => {
+      if (!data) return;
+      toggle(sectorSlug, data.id, data.name, {
+        id: listing.id,
+        name: listing.name,
+        providerName: listing.provider.name,
+        providerLogoUrl: listing.provider.logoUrl,
+      });
+    },
+    [data, sectorSlug, toggle],
+  );
 
   return (
     <div className="pb-28">
@@ -134,7 +151,7 @@ export function ExploreClient({
             selected={data ? isSelected(data.id, listing.id) : false}
             onToggleSelect={toggleSelect}
             initialSaved={savedIds.has(listing.id)}
-            requirements={data ? getListingRequirements(listing, data.attributeSchema) : undefined}
+            requirements={requirementsById.get(listing.id)}
           />
         ))}
       </div>

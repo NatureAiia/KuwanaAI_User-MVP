@@ -202,11 +202,17 @@ model Listing {
   providerId      String          @map("provider_id")
   provider        Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
   name            String
+  description     String?
   attributes      Json
   price           Decimal         @db.Decimal(12, 2)
   currency        String          @default("USD")
   sourceUrl       String?         @map("source_url")
   images          String[]        @default([]) @map("images")
+  // Real user reviews aren't collected anywhere in the app yet — these stay
+  // null until that exists. Never backfill/estimate a value here; the UI
+  // must render "No reviews yet" rather than invent a number.
+  rating          Decimal?        @db.Decimal(2, 1)
+  reviewCount     Int             @default(0) @map("review_count")
   lastVerifiedAt  DateTime        @default(now()) @map("last_verified_at")
   freshnessStatus FreshnessStatus @default(fresh) @map("freshness_status")
   // Provider self-submission workflow (build plan 15.2): draft -> pending_review

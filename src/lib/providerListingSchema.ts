@@ -23,6 +23,7 @@ const listingImageUrl = z
 export const providerCreateListingSchema = z.object({
   categoryId: z.string(),
   name: z.string().min(1),
+  description: z.string().max(2000).optional(),
   attributes: z.record(z.string(), z.unknown()),
   price: z.number().positive(),
   currency: z.string().default("USD"),
@@ -37,6 +38,7 @@ export const providerCreateListingSchema = z.object({
 // allows which transition, not this schema.
 export const providerUpdateListingSchema = z.object({
   name: z.string().min(1).optional(),
+  description: z.string().max(2000).nullable().optional(),
   attributes: z.record(z.string(), z.unknown()).optional(),
   price: z.number().positive().optional(),
   currency: z.string().optional(),

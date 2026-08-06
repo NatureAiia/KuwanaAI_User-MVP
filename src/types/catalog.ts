@@ -10,6 +10,7 @@ export type AttributeSchemaFieldDTO = {
 export type ListingDTO = {
   id: string;
   name: string;
+  description: string | null;
   price: number;
   currency: string;
   attributes: Record<string, unknown>;
@@ -17,6 +18,9 @@ export type ListingDTO = {
   lastVerifiedAt: string;
   sourceUrl: string | null;
   images: string[];
+  // Null/0 until real review collection exists — never a fabricated number.
+  rating: number | null;
+  reviewCount: number;
   provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
 };
 

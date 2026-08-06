@@ -35,6 +35,7 @@ export default async function EditProviderListingPage({ params }: { params: Prom
             id: listing.id,
             categoryId: listing.categoryId,
             name: listing.name,
+            description: listing.description,
             attributes: listing.attributes as Record<string, unknown>,
             price: Number(listing.price),
             currency: listing.currency,
