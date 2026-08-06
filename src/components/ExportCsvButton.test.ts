@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { csvField } from "@/components/corporate/ExportCsvButton";
+import { csvField } from "@/components/ExportCsvButton";
 
 describe("csvField", () => {
   it("leaves a plain value unquoted", () => {

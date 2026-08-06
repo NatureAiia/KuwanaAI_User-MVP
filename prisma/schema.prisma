@@ -207,6 +207,7 @@ model Listing {
   price           Decimal         @db.Decimal(12, 2)
   currency        String          @default("USD")
   sourceUrl       String?         @map("source_url")
+  images          String[]        @default([]) @map("images")
   lastVerifiedAt  DateTime        @default(now()) @map("last_verified_at")
   freshnessStatus FreshnessStatus @default(fresh) @map("freshness_status")
   // Provider self-submission workflow (build plan 15.2): draft -> pending_review

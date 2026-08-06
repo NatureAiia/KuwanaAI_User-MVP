@@ -7,7 +7,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
-import { ExportCsvButton } from "@/components/corporate/ExportCsvButton";
+import { ExportCsvButton } from "@/components/ExportCsvButton";
 
 export default async function CorporateDashboardPage({
   searchParams,

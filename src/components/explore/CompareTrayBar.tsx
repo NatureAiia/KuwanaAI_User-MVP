@@ -55,7 +55,7 @@ export function CompareTrayBar() {
               <button
                 type="button"
                 onClick={() => remove(item.id)}
-                aria-label={`Remove ${item.name} from comparison`}
+                aria-label={`Deselect ${item.name}`}
                 className="tap-target flex h-6 w-6 items-center justify-center rounded-full text-text-muted hover:text-accent-coral"
               >
                 <X size={13} />

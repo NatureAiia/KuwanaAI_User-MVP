@@ -7,6 +7,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
 import { Card, Badge } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
 
 export default async function RegulatorDashboardPage({
@@ -156,7 +157,23 @@ export default async function RegulatorDashboardPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="font-display text-[16px] font-semibold">Unverified provider listings</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-[16px] font-semibold">Unverified provider listings</h2>
+          {unverifiedListings.length > 0 && (
+            <ExportCsvButton
+              filename={`kuwana-unverified-listings${activeSector ? `-${activeSector}` : ""}.csv`}
+              headers={["Listing", "Sector", "Category", "Provider", "Price", "Currency"]}
+              rows={unverifiedListings.map(({ listing, sectorName, categoryName }) => [
+                listing.name,
+                sectorName,
+                categoryName,
+                listing.provider.name,
+                listing.price,
+                listing.currency,
+              ])}
+            />
+          )}
+        </div>
         <div className="mt-3 flex flex-col gap-2">
           {unverifiedListings.length === 0 && (
             <p className="text-[13px] text-text-muted">Every live listing&apos;s provider is verified.</p>
@@ -176,7 +193,23 @@ export default async function RegulatorDashboardPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="font-display text-[16px] font-semibold">Recent compliance actions</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-[16px] font-semibold">Recent compliance actions</h2>
+          {complianceActivity.length > 0 && (
+            <ExportCsvButton
+              filename={`kuwana-compliance-activity${activeSector ? `-${activeSector}` : ""}.csv`}
+              headers={["Listing", "Sector", "Category", "Provider", "Rejection reason", "Rejected date"]}
+              rows={complianceActivity.map(({ listing, sectorName, categoryName, rejectionReason, rejectedAt }) => [
+                listing.name,
+                sectorName,
+                categoryName,
+                listing.provider.name,
+                rejectionReason ?? "",
+                new Date(rejectedAt).toLocaleDateString("en-ZA", { dateStyle: "medium" }),
+              ])}
+            />
+          )}
+        </div>
         <p className="mt-1 text-[12px] text-text-muted">
           Listings an admin rejected on review, most recent first — the trail of what got pulled and why.
         </p>
