@@ -1,0 +1,14 @@
+import { chromium } from "@playwright/test";
+const shotDir = "C:/Users/markn/AppData/Local/Temp/claude/d--Aiia-CodeHub-Kuwana-KuwanaAI-User-MVP/16db7162-0c41-4191-be8b-1cbd7c20622a/scratchpad";
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+await page.goto("http://localhost:3000/explore", { waitUntil: "networkidle" });
+await page.getByPlaceholder(/What do you need/).fill("a cheap data bundle");
+await page.getByRole("button", { name: "Search" }).click();
+await page.waitForTimeout(1000);
+await page.screenshot({ path: `${shotDir}/need-intake-loading.png` });
+await page.waitForResponse((r) => r.url().includes("/api/need-intake"), { timeout: 30000 }).catch(() => {});
+await page.waitForTimeout(500);
+console.log("URL:", page.url());
+await page.screenshot({ path: `${shotDir}/need-intake-result2.png` });
+await browser.close();
