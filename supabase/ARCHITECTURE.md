@@ -39,7 +39,7 @@ Checked directly against the live Supabase project's `pg_indexes`,
 ## Table groups
 
 | Domain | Tables |
-|---|---|
+| --- | --- |
 | Identity & onboarding | `users`, `user_profiles`, `sector_footprints`, `consents` |
 | Sector catalog (schema-driven) | `sectors`, `categories`, `attribute_schema`, `providers`, `listings`, `listing_price_history` |
 | User activity | `comparisons`, `saved_listings`, `recommendations`, `recommendation_cache`, `notifications` |
@@ -122,15 +122,6 @@ then dropped) before this file was written. The trigger section was
 verified separately: applied live, then behaviorally tested with a rolled-
 back transaction confirming a `users` insert with no matching `auth.users`
 row is correctly rejected.
-
-## Known gap: `Listing.images`
-
-`prisma/schema.prisma`'s `Listing` model has an `images String[]` field
-(added in commit `07581ff`) with **no migration for it** — it is not in the
-live database and therefore not in `schema.sql` either, which reflects what's
-actually deployed rather than what's mid-flight in the model file. Whoever
-owns that change needs to generate and apply its migration before
-`prisma migrate diff` against `schema.prisma` reports clean again.
 
 ## When you rebuild on another platform
 

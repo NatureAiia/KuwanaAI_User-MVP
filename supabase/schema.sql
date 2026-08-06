@@ -38,14 +38,11 @@
 -- @default(uuid()), not Postgres-native `uuid`/gen_random_uuid()) — kept as
 -- TEXT here to match exactly what's live and what Prisma's client sends.
 --
--- The `images` column below is part of the same in-progress change that
--- left the gap noted above when this file was last regenerated. Its
--- migration (prisma/migrations/<ts>_add_listing_images) exists locally but,
--- as of this edit, has not yet been applied to the live database — a
--- concurrent session was mid-migration against the same database, so
--- applying it was deliberately deferred rather than risk colliding. Run
--- `npx prisma migrate dev` once that's clear to bring the live DB in sync
--- with this file.
+-- The `images` column on `listings` (added via
+-- prisma/migrations/20260806033248_add_listing_images) was applied to the
+-- live database after the coordination gap above was noted — re-verified
+-- 2026-08-06: column present live, `prisma migrate diff` reports zero
+-- difference between prisma/schema.prisma and the live database.
 
 BEGIN;
 
