@@ -38,13 +38,14 @@
 -- @default(uuid()), not Postgres-native `uuid`/gen_random_uuid()) — kept as
 -- TEXT here to match exactly what's live and what Prisma's client sends.
 --
--- KNOWN GAP (not introduced by this file, flagging so it isn't missed):
--- prisma/schema.prisma's Listing model has an `images String[]` field
--- (commit 07581ff) with no migration for it — it is NOT in the live
--- database and therefore NOT in this file either, which reflects what's
--- actually deployed. Whoever owns that change needs to generate and apply
--- its migration before `prisma migrate diff` against schema.prisma will
--- report clean again.
+-- The `images` column below is part of the same in-progress change that
+-- left the gap noted above when this file was last regenerated. Its
+-- migration (prisma/migrations/<ts>_add_listing_images) exists locally but,
+-- as of this edit, has not yet been applied to the live database — a
+-- concurrent session was mid-migration against the same database, so
+-- applying it was deliberately deferred rather than risk colliding. Run
+-- `npx prisma migrate dev` once that's clear to bring the live DB in sync
+-- with this file.
 
 BEGIN;
 
@@ -155,6 +156,7 @@ CREATE TABLE "listings" (
     "price" DECIMAL(12,2) NOT NULL,
     "currency" TEXT NOT NULL DEFAULT 'USD',
     "source_url" TEXT,
+    "images" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "last_verified_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "freshness_status" "FreshnessStatus" NOT NULL DEFAULT 'fresh',
     -- Provider self-submission workflow: draft -> pending_review ->
