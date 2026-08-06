@@ -1,0 +1,55 @@
+version: '3.8'
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    # pgvector + timescaledb - use custom build in prod: timescale/timescaledb-ha:pg16-latest + vector
+    environment:
+      POSTGRES_DB: kuwana
+      POSTGRES_USER: kuwana
+      POSTGRES_PASSWORD: kuwana_dev
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data", "./init.sql:/docker-entrypoint-initdb.d/init.sql"]
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb,vector", "-c", "cron.database_name=kuwana"]
+
+  pgbouncer:
+    image: pgbouncer/pgbouncer
+    environment:
+      DATABASES_HOST: postgres
+      DATABASES_PORT: 5432
+      DATABASES_USER: kuwana
+      DATABASES_PASSWORD: kuwana_dev
+      DATABASES_DBNAME: kuwana
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+    ports: ["6432:5432"]
+    depends_on: [postgres]
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes: ["redisdata:/data"]
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.6
+    environment:
+      MEILI_MASTER_KEY: dev_master_key_change_in_prod
+      MEILI_ENV: development
+    ports: ["7700:7700"]
+    volumes: ["meilidata:/meili_data"]
+
+  # Optional: Debezium for CDC Tier1 -> Tier2
+  # kafka:
+  #   image: bitnami/kafka
+  #   ...
+
+volumes:
+  pgdata:
+  redisdata:
+  meilidata:
+
+# Tier mapping:
+# Tier 1 OLTP: postgres:5432 + pgbouncer:6432 (primary source)
+# Tier 2 Analytics: same postgres, schema analytics, TimescaleDB hypertables
+# Tier 3 Serving: redis:6379 + meilisearch:7700 + pgvector in postgres
