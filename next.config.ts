@@ -44,7 +44,24 @@ const CSP_HEADER = [
   "upgrade-insecure-requests",
 ].join("; ");
 
+// Provider-uploaded listing images live in exactly one origin we control
+// (our own Supabase Storage bucket) — unlike ProviderLogo's arbitrary
+// admin-curated URLs above, this is precisely the case remotePatterns is
+// for, so these get next/image instead of a plain <img>.
+const supabaseHostname = (() => {
+  try {
+    return new URL(SUPABASE_URL).hostname;
+  } catch {
+    return undefined;
+  }
+})();
+
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: supabaseHostname
+      ? [{ protocol: "https", hostname: supabaseHostname, port: "", pathname: "/storage/v1/object/public/**", search: "" }]
+      : [],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: CSP_HEADER }] },
