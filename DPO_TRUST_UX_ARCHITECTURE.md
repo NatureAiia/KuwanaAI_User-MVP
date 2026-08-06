@@ -27,7 +27,7 @@ This file is analysis and recommendations, not an implementation. Two reasons:
 DPO Trust is a Zimbabwe-focused data-protection compliance platform serving three distinct audiences from one codebase:
 
 | User type | Goal | Verification requirement |
-|---|---|---|
+| --- | --- | --- |
 | **Customer** | Understand and manage their personal data footprint across telecom, banking, insurance, health | None — self-serve signup |
 | **Regulator** | Monitor sector-wide compliance, review applicant/corporate submissions | Government/public-domain email (`.gov.zw`, `.co.zw`) matched against a regulator list (POTRAZ, RBZ, IPEC, SECZIM, ZERA) |
 | **Corporate** | Manage their organization's compliance posture, DPO declarations, data-subject requests | Corporate email domain matching the company name |
@@ -62,6 +62,7 @@ flowchart LR
 ```
 
 Notable UX mechanics:
+
 - **Progressive disclosure per step** — selecting a telecom/bank/insurer/health-provider card reveals inline sub-fields (contract type, tenure) only for the selected option, keeping the form short until it's needed.
 - **"Did you know?" trivia modal** — every time a real provider is chosen, a themed fact fires (auto-advancing progress bar, 5s timeout, dismiss/continue options). This is a delight/education layer that also disguises the lack of a real backend call. **See §4 — this specific mechanic cannot be ported as-is into Kuwana.**
 - **Stepper header** persists across all 5 steps with completed/current/upcoming states, so users always know where they are and can't skip ahead.
@@ -186,23 +187,39 @@ disagreeing palette to the pile HANDOFF.md already flags as unresolved.
 
 ## 6. Where this actually applies in Kuwana today
 
-Grounded in the real repo (`src/app/*`), not the abstract "recommended architecture" a generic
-teardown would suggest:
+**Update, verified against the live repo (not HANDOFF.md's text, which is stale on this one
+point):** Corporate/Regulator self-serve onboarding — the exact gap this section originally
+analyzed — has since been built, independently of this document, in
+`feat: implement server-side checks for Corporate/Regulator self-registration; enhance onboarding
+schema and tests` (and a preceding `fix: close role self-escalation vulnerability in public signup
+endpoint`). HANDOFF.md's "Corporate/Regulator — intentionally left thin" section still says
+"both roles only reachable via `/admin/users`, no invite-flow UI" — that's no longer accurate, but
+fixing HANDOFF.md's text is left to whoever owns that document, per §0.
 
-| Portal | Current state | Gap this prototype is a reference for |
-|---|---|---|
-| `src/app/corporate/page.tsx` | Single page, reachable only via `/admin/users` role assignment — no self-serve signup, no org/seat model (HANDOFF.md, "Corporate/Regulator — intentionally left thin") | DPO Trust's Corporate flow (Identity → Applicant w/ domain-matched email → Business Context, with a live completion meter) is a solid shape for a future self-serve Corporate onboarding, *if and when* that becomes in-scope — it is not today. |
-| `src/app/regulator/page.tsx` | Same — admin-assigned only, no invite-flow UI | DPO Trust's regulator domain-allowlist pattern (`Er` list: POTRAZ/RBZ/IPEC/SECZIM/ZERA + `.gov.zw`/`.co.zw` matching) is directly analogous to what Kuwana would need for a self-serve regulator request flow — the *validation logic* (a small `{label, domain}[]` table + a pure function checking the submitted email's domain) is genuinely portable, independent of the trivia-content issue in §4. |
-| `src/app/signup/page.tsx` | Generic signup, role-agnostic | The prototype's Get Started → Role Select fork (pick persona *after* basic account creation, not before) is a pattern to consider if/when Kuwana adds self-serve Corporate/Regulator signup — it keeps the initial form identical for all users and defers the heavier, persona-specific fields. |
-| `src/app/api/onboarding/route.ts` | Exists — handles the Consumer need-intake onboarding, the most mature portal already | Not a gap; mentioned here only so it's clear the Consumer portal doesn't need anything from this document — it's already ahead of what DPO Trust demonstrates. |
-| Zod (`zod@4` already a dependency) | Available, not yet used for a Corporate/Regulator email-domain-matching schema | DPO Trust does this validation with ad hoc string methods (`si` no form library at all). Kuwana already has Zod installed — a domain-allowlist check is a `refine()` away, no new dependency needed. |
-| React Hook Form / TanStack Query | **Not installed** | Don't add either speculatively. The prototype's forms are small enough that Zod + native `useState`/`useActionState` is proportionate; only reach for a form library if/when a Corporate/Regulator self-serve flow is actually scoped and the field count justifies it. |
+What's actually there, mapped against what this section originally recommended:
 
-**No recommendation in this table implies immediate work.** Corporate/Regulator self-serve
-onboarding is explicitly listed in HANDOFF.md as a deferred, "backlog, not current scope" item —
-this section exists so that *when* it is picked up, the reference prototype's validation logic and
-form shape don't need to be rediscovered from scratch, and so nobody accidentally carries over the
-fabricated trivia content from §4 while doing it.
+| Recommendation this doc made | Real implementation |
+| --- | --- |
+| Get Started → Role Select fork, persona-specific fields deferred until after account creation | `src/app/signup/page.tsx` — a single-page state machine (`role → account → orgDetails → consent → processing`) with a 4-card role picker (Consumer/Corporate/Provider/Regulator) matching this prototype's shape closely, icons and all. |
+| A small `{label, domain}[]` regulator table + a pure domain-match function | `src/lib/orgVerification.ts` — `REGULATORS` (POTRAZ/RBZ/IPEC, each with a verified `.gov.zw`/`.co.zw` domain) + `emailMatchesRegulator()`. Corporate gets the mirror-image check, `isPersonalEmailDomain()` against a personal-email-provider denylist. |
+| Zod for the validation schema (already a dependency, no new one needed) | `src/lib/onboardingSchema.ts`, covered by `src/lib/onboardingSchema.test.ts`. |
+| — (this doc didn't anticipate it, but it's the right call) | **The verification boundary lives server-side in `src/app/api/onboarding/route.ts`, keyed off the authenticated Supabase session email — never the client-supplied role.** This is stronger than what DPO Trust's prototype does (its domain check is client-side only, informational) and closes a real vulnerability class: the commit history shows this was already exploited-and-fixed once (role self-escalation via the public signup endpoint), which is exactly the kind of gap a client-only version of this check would reopen. |
+
+React Hook Form / TanStack Query are still not installed, and the existing implementation doesn't
+need them — confirms the "don't add speculatively" call in the earlier version of this section was
+right.
+
+**One residual, smaller version of the §4 issue remains**: `src/lib/onboarding-facts.ts` (the
+"saving your profile…" screen's fact queue — this codebase's answer to DPO Trust's trivia modal,
+and a much better one, since it's provider-personalized rather than generic) still asserts specific
+unsourced founding years and scale claims as fact (*"CBZ Bank traces back to 1980"*, *"Old Mutual
+has operated in Zimbabwe since 1902, over 120 years"*). A prior commit (`fix: correct inaccurate/
+unverified claims in onboarding trivia facts`) already removed the worst offenders (e.g. a specific
+invented user-count for EcoCash), so this has real attention on it already — flagged here only
+because `src/app/trust/page.tsx` makes "we don't invent statistics... including the small stuff,
+like onboarding tips" a public promise, and a few of these dates/figures still read as claims
+without a citable source. Not fixed unilaterally in this pass — it's copy content, not a doc or
+architecture question, and belongs to whoever owns `onboarding-facts.ts` next.
 
 ---
 
