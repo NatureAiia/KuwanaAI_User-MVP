@@ -21,6 +21,13 @@ database indexing).
 
 ## Where the vision lives
 
+- **In-repo proposal docs (check these before starting new feature work):**
+  `UI_UX_AUTOMATION_PLAN.md` (partially implemented 2026-08-06 — see its own status notes;
+  global search, desktop nav, two-choice CTA, "Ask Kuwana," branded loading states still open)
+  and `KUWANA_DECISION_INTELLIGENCE_PLAN.md` (a superset/successor to the UI/UX plan — proposes a
+  navy/gold color palette explicitly marked "confirm or override," not yet actioned; see the
+  "Left for a future session" color-palette entry below). `DPO_TRUST_UX_ARCHITECTURE.md` is
+  docs-only UX research for Corporate/Regulator onboarding, scoped not to touch admin.
 - `E:\plan\KUWANA_MVP_BUILD_PLAN.md` — the authoritative build plan
   (supersedes the copy in `E:\documentation kuwana`, which is older).
 - `E:\documentation kuwana\KUWANA_DECISION_INTELLIGENCE_PLAN.md` — the

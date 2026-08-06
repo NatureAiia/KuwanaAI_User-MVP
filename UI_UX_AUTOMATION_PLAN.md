@@ -1,10 +1,15 @@
 # Kuwana — UI/UX & Automation Enhancement Plan
 
-**Status:** proposal — nothing in this document is implemented yet. It extends the shipped MVP
-(`KUWANA_MVP_BUILD_PLAN.md`, Phases 0–5, already built) with a second wave of UI/UX patterns
-borrowed from reference apps, plus the backend automation needed to power them honestly (no
-invented numbers — every "trending," "price drop," or "also compared" signal must trace back to
-real seeded/user data, per the original plan's Section 9 rule).
+**Status:** partially implemented (2026-08-06) — see the per-item status notes below. This
+extends the shipped MVP (`KUWANA_MVP_BUILD_PLAN.md`, Phases 0–5, already built) with a second wave
+of UI/UX patterns borrowed from reference apps, plus the backend automation needed to power them
+honestly (no invented numbers — every "trending," "price drop," or "also compared" signal must
+trace back to real seeded/user data, per the original plan's Section 9 rule).
+
+**2026-08-06 audit note:** several of the "gaps" in Section 2 were already stale by the time this
+pass started — cross-sell (`getAlsoCompared`) and price-drop notifications had shipped in an
+earlier session that this plan didn't know about. Always re-check against current code before
+treating a gap list like this as current; it drifts fast with multiple sessions working the repo.
 
 ---
 
@@ -36,20 +41,29 @@ Verified against the shipped code, not assumed:
    users can only browse by category tabs. Every inspiration source above leads with a search bar.
 2. **No desktop navigation.** `BottomTabBar` is `md:hidden` — on tablet/desktop, authenticated
    pages currently have **no persistent nav at all**.
-3. **`ListingPriceHistory` table exists in the schema and is never written to or read from.** The
-   price-drop/urgency pattern (SHEIN, Takealot) has no data source yet.
-4. **No cross-sell.** `Comparison.listingIds` already captures which listings get compared
-   together — nobody queries it for "customers who compared this also compared…"
-5. **No "recently viewed."** `comparison_viewed` events are logged but never surfaced back to the
-   user (Takealot's "Pick up where you left off").
-6. **No trending signal.** Nothing aggregates `UserEvent`/`Comparison` volume into a "127 people
-   compared this this week" style signal (EcoCash's Trending tab, Takealot's "Trending in Sport").
-7. **Single generic CTA on listing detail.** `ListingActions` shows one dynamic button; Dial a
-   Delivery's two-clear-choices pattern (Delivery vs. Click & Collect) maps well to Kuwana's
-   telecom/banking reality (dial USSD vs. visit branch/app), currently collapsed into one button.
-8. **Recommendation calls are not cached.** Comparing the same 2–3 listings twice re-calls Claude
-   and re-bills — Amazon/Takealot-style "automation" implies caching computed results, not
-   recomputing them.
+3. ~~`ListingPriceHistory` table exists in the schema and is never written to or read from.~~
+   **Half-stale, half-real, closed 2026-08-06:** the *read* side (price trend/sparkline,
+   price-drop notifications) had already shipped in an earlier session — this gap description was
+   out of date. The *write* side was a real, live bug though: nothing wrote to this table outside
+   `prisma/seed.ts`, so every live price edit via `/api/admin/listings/[id]` or
+   `/api/provider/listings/[id]` was silently invisible to those already-shipped read-side
+   features. Fixed via `recordPriceChange()` (`src/lib/catalog.ts`), wired into both PATCH routes.
+4. ~~No cross-sell.~~ **Stale — already shipped** in an earlier session (`getAlsoCompared` in
+   `src/lib/catalog.ts`, used on `/listing/[id]`). This gap description was out of date by the
+   time this plan was written.
+5. ~~No "recently viewed."~~ **Closed 2026-08-06**, but scoped down from the original description:
+   `comparison_viewed` (fired from `ExploreClient`) doesn't actually carry a `listingId` in the
+   current implementation, so it can't drive a listing-scoped feed. Built `getRecentlyViewed()`
+   off `action_taken` instead (which does carry `listingId`, fired on every CTA click from
+   `ListingActions`) — narrower coverage (under-counts real views) but never a fabricated signal.
+   Surfaced as "Pick up where you left off" on `/dashboard`.
+6. **No trending signal.** Still open — genuinely missing, not attempted this pass. `trendingUp`/
+   `trendingDown` already exist on `MarketOverview` but those are price-*direction* counts, not
+   the comparison-*volume* social-proof signal this item describes.
+7. **Single generic CTA on listing detail.** Still open — not attempted this pass (needs new
+   `Listing` fields for USSD code / branch locator, populated in seed data; a real feature, not a
+   quick win).
+8. ~~Recommendation calls are not cached.~~ **Closed 2026-08-06** — see 3.9 below.
 
 ---
 
@@ -76,7 +90,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
     per-device, not account state).
 - **Priority: P0.**
 
-### 3.2 "Pick up where you left off" — *Takealot*
+### 3.2 "Pick up where you left off" — *Takealot* — **closed 2026-08-06** (scoped down, see Section 2 item 5)
 
 - **UI:** a dashboard carousel above the sector tile grid showing the last 4–6 distinct listings
   the user viewed, most recent first.
@@ -88,7 +102,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
   `src/lib/catalog.ts`, mirroring the existing `getTopListings` helper.
 - **Priority: P0** (cheap — pure read against data already being logged).
 
-### 3.3 "Customers who compared this also compared…" — *Amazon / Takealot*
+### 3.3 "Customers who compared this also compared…" — *Amazon / Takealot* — **already shipped, this section was stale**
 
 - **UI:** a rail on `/listing/[id]` below the spec table, matching the `HeroCarousel` visual
   language already established on the dashboard.
@@ -114,7 +128,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
   view refreshed hourly — flagged here as a scaling note, not built now.
 - **Priority: P1.**
 
-### 3.5 Price-drop alerts — *SHEIN "Price Drop" tag, Takealot "Price & back-in-stock notifications"*
+### 3.5 Price-drop alerts — *SHEIN "Price Drop" tag, Takealot "Price & back-in-stock notifications"* — **read side already shipped; write-side bug closed 2026-08-06**
 
 - **UI:** a "Price dropped X%" badge on listing cards and in `/profile/saved`; a small red dot on
   the bottom-tab Profile icon when a saved listing has a new drop.
@@ -185,7 +199,7 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
     concern this feature introduces.
 - **Priority: P2** — valuable but the largest single build in this plan; sequence after 3.1–3.6.
 
-### 3.9 Recommendation result caching — *Amazon/Takealot-style automation, not UI*
+### 3.9 Recommendation result caching — *Amazon/Takealot-style automation, not UI* — **closed 2026-08-06**
 
 - **What:** cache `/api/recommendations` output keyed by `(sorted listingIds, categoryId)` for a
   short TTL (e.g. 1 hour) before calling Claude again for the same comparison set.
@@ -213,14 +227,18 @@ needed) → **Source** → **Priority** (P0 = do first, P2 = nice-to-have).
 
 ## 4. Suggested build order
 
-1. **P0 batch** — global search (3.1), recently-viewed carousel (3.2), desktop nav (3.6). These
-   fix real functional gaps, not just add polish, and none require new schema.
-2. **P1 batch** — cross-sell rail (3.3), trending signal (3.4), price-drop alerts (3.5),
-   recommendation caching (3.9). These are where "Takealot/Amazon automation" actually lands —
-   mostly backend queries over data already being collected, wired into UI that already exists.
-3. **P2 batch** — two-choice action CTA (3.7), "Ask Kuwana" assistant (3.8), branded loading
-   states (3.10). Higher build cost or lower urgency; the assistant in particular deserves its own
-   focused pass rather than being squeezed in alongside the others.
+1. **P0 batch** — global search (3.1, **still open**), recently-viewed carousel (3.2, **closed**),
+   desktop nav (3.6, **still open** — skipped 2026-08-06 specifically to avoid colliding with
+   another session actively working the theme/layout/nav area; genuinely a P0 functional gap,
+   pick this up next if nothing else has claimed it).
+2. **P1 batch** — cross-sell rail (3.3, **already shipped, was stale**), trending signal (3.4,
+   **still open**), price-drop alerts (3.5, **read side already shipped, write-side bug closed**),
+   recommendation caching (3.9, **closed**).
+3. **P2 batch** — two-choice action CTA (3.7, **still open**), "Ask Kuwana" assistant (3.8,
+   **not attempted 2026-08-06** — `/chat` already exists as a distinct feature, and
+   `/api/need-intake`'s intake-classification code was under active concurrent development by
+   another session during this pass; re-scope against whatever that session shipped before
+   starting this), branded loading states (3.10, **still open**).
 
 ## 5. Guardrails carried over from the original build plan
 
