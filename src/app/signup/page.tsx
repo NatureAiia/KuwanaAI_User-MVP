@@ -92,7 +92,13 @@ type Step = "role" | ConsumerStep | "orgDetails" | "processing";
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
   const pct = ((index + 1) / CONSUMER_STEPS.length) * 100;
-  return <DynamicBar value={pct} color="sky" />;
+  return (
+    <DynamicBar
+      value={pct}
+      color="sky"
+      ariaLabel={`Signup progress: step ${index + 1} of ${CONSUMER_STEPS.length}`}
+    />
+  );
 }
 
 function ChipGroup({
@@ -111,6 +117,7 @@ function ChipGroup({
           key={opt}
           type="button"
           onClick={() => onChange(opt)}
+          aria-pressed={value === opt}
           className={clsx(
             "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             value === opt
@@ -141,6 +148,7 @@ function MultiChipGroup({
           key={opt}
           type="button"
           onClick={() => onToggle(opt)}
+          aria-pressed={values.includes(opt)}
           className={clsx(
             "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             values.includes(opt)
@@ -380,6 +388,7 @@ export default function SignupPage() {
                     key={option.id}
                     type="button"
                     onClick={() => setRole(option.id)}
+                    aria-pressed={selected}
                     className={clsx(
                       "tap-target relative rounded-[var(--radius-card)] border p-5 text-left transition-all",
                       selected
@@ -493,6 +502,7 @@ export default function SignupPage() {
                       key={r.name}
                       type="button"
                       onClick={() => setRegulatorName(r.name)}
+                      aria-pressed={regulatorName === r.name}
                       className={clsx(
                         "tap-target rounded-xl border p-4 text-left transition-all",
                         regulatorName === r.name

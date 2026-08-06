@@ -20,11 +20,13 @@ export function DynamicBar({
   color = "teal",
   className,
   trackClassName,
+  ariaLabel,
 }: {
   value: number;
   color?: keyof typeof COLOR_CLASSES;
   className?: string;
   trackClassName?: string;
+  ariaLabel?: string;
 }) {
   const fillRef = useRef<HTMLDivElement | null>(null);
   const pct = Math.max(0, Math.min(100, value));
@@ -43,6 +45,7 @@ export function DynamicBar({
         aria-valuenow={Math.round(pct)}
         aria-valuemin={0}
         aria-valuemax={100}
+        aria-label={ariaLabel}
         className={clsx(
           "h-1.5 rounded-full transition-[width] duration-500 ease-out [width:var(--dynamic-bar-fill,0%)]",
           COLOR_CLASSES[color],

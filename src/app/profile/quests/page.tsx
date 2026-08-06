@@ -44,7 +44,11 @@ export default async function QuestsPage() {
               </div>
               <p className="mt-1 text-[13px] text-text-secondary">{quest.description}</p>
               <div className="mt-3">
-                <DynamicBar value={pct} color="teal" />
+                <DynamicBar
+                  value={pct}
+                  color="teal"
+                  ariaLabel={`${quest.name} progress: ${progress} of ${target}`}
+                />
               </div>
               <p className="mt-1.5 text-[11px] text-text-muted">
                 {progress}/{target} · ends {quest.activeTo.toLocaleDateString()}
