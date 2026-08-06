@@ -7,6 +7,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
+import { ExportCsvButton } from "@/components/corporate/ExportCsvButton";
 
 export default async function CorporateDashboardPage({
   searchParams,
@@ -148,7 +149,30 @@ export default async function CorporateDashboardPage({
       )}
 
       <section className="mt-8">
-        <h2 className="font-display text-[16px] font-semibold">By sector</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-[16px] font-semibold">By sector</h2>
+          {bySector.length > 0 && (
+            <ExportCsvButton
+              filename={`kuwana-market-intelligence${activeSector ? `-${activeSector}` : ""}.csv`}
+              headers={[
+                "Sector",
+                "Avg price (USD)",
+                "Listing count",
+                "Trending down",
+                "Trending up",
+                "Unverified provider listings",
+              ]}
+              rows={bySector.map((s) => [
+                s.sectorName,
+                s.avgPrice.toFixed(2),
+                s.listingCount,
+                s.trendingDown,
+                s.trendingUp,
+                s.unverifiedCount,
+              ])}
+            />
+          )}
+        </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {bySector.map((s) => (
             <Card key={s.sectorSlug}>

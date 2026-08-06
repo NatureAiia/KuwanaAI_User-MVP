@@ -376,7 +376,48 @@ export async function getMarketOverview(sectorSlug?: string): Promise<MarketOver
 
   return {
     bySector: [...bySector.values()].map((s) => ({ ...s, avgPrice: Math.round(s.avgPrice * 100) / 100 })),
-    anomalies: anomalies.slice(0, 10),
+    // 25, not the whole set — this is "biggest swings worth a look", not a
+    // full history. Regulator's compliance trail (getComplianceActivity,
+    // below) is the actual full-history view.
+    anomalies: anomalies.slice(0, 25),
     unverifiedListings,
   };
+}
+
+export type ComplianceActivity = {
+  listing: ListingDTO;
+  sectorName: string;
+  categoryName: string;
+  rejectionReason: string | null;
+  // lastVerifiedAt, not a dedicated rejectedAt column — admin's reject
+  // action bumps lastVerifiedAt (markVerifiedNow defaults true on any admin
+  // edit, see /api/admin/listings/[id]), so this is an accurate proxy for
+  // "when this rejection happened" without needing a schema change.
+  rejectedAt: string;
+};
+
+/**
+ * Regulator-facing compliance trail: every currently-rejected listing, most
+ * recent first — the actual audit-trail feature HANDOFF.md's "no audit log
+ * for Regulator" gap was about. Computed straight from Listing.status,
+ * nothing invented or separately tracked.
+ */
+export async function getComplianceActivity(sectorSlug?: string, limit = 50): Promise<ComplianceActivity[]> {
+  const rows = await prisma.listing.findMany({
+    where: {
+      status: "rejected",
+      category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
+    },
+    include: { provider: true, category: { include: { sector: true } } },
+    orderBy: { lastVerifiedAt: "desc" },
+    take: limit,
+  });
+
+  return rows.map((row) => ({
+    listing: toListingDTO(row),
+    sectorName: row.category.sector.name,
+    categoryName: row.category.name,
+    rejectionReason: row.rejectionReason,
+    rejectedAt: row.lastVerifiedAt.toISOString(),
+  }));
 }

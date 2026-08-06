@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getMarketOverview } from "@/lib/catalog";
+import { getMarketOverview, getComplianceActivity } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
 import { Card, Badge } from "@/components/ui/Card";
@@ -26,7 +26,10 @@ export default async function RegulatorDashboardPage({
       ? (sectorFilter as SectorSlug)
       : undefined;
 
-  const { bySector, anomalies, unverifiedListings } = await getMarketOverview(activeSector);
+  const [{ bySector, anomalies, unverifiedListings }, complianceActivity] = await Promise.all([
+    getMarketOverview(activeSector),
+    getComplianceActivity(activeSector),
+  ]);
 
   // Key Insights: which live sector currently carries the most compliance risk —
   // the one with the most unverified-provider listings — computed from the
@@ -167,6 +170,32 @@ export default async function RegulatorDashboardPage({
                 </p>
               </div>
               <Badge tone="coral">Unverified</Badge>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-display text-[16px] font-semibold">Recent compliance actions</h2>
+        <p className="mt-1 text-[12px] text-text-muted">
+          Listings an admin rejected on review, most recent first — the trail of what got pulled and why.
+        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          {complianceActivity.length === 0 && (
+            <p className="text-[13px] text-text-muted">No rejected listings in this view.</p>
+          )}
+          {complianceActivity.map(({ listing, sectorName, categoryName, rejectionReason, rejectedAt }) => (
+            <Card key={listing.id} className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-display text-[14px] font-semibold">{listing.name}</p>
+                <p className="text-[11px] text-text-muted">
+                  {sectorName} · {categoryName} · {listing.provider.name}
+                </p>
+                {rejectionReason && <p className="mt-1 text-[12px] text-accent-coral">Reason: {rejectionReason}</p>}
+              </div>
+              <span className="shrink-0 text-[11px] text-text-muted">
+                {new Date(rejectedAt).toLocaleDateString("en-ZA", { dateStyle: "medium" })}
+              </span>
             </Card>
           ))}
         </div>
