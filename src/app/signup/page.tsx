@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
+import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 import { buildFactQueue } from "@/lib/onboarding-facts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
@@ -165,6 +167,7 @@ function MultiChipGroup({
 
 export default function SignupPage() {
   const router = useRouter();
+  const isDesktop = useIsDesktop();
   const [role, setRole] = useState<Role | null>(null);
   const [step, setStep] = useState<Step>("role");
   const historyRef = useRef<Step[]>([]);
@@ -360,7 +363,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center px-5 py-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center px-5 py-10">
       <AuthTopBar />
       <div className={clsx("w-full", step === "role" ? "max-w-[960px]" : "max-w-[460px]")}>
         <div className="flex items-center gap-2">
@@ -802,9 +805,26 @@ export default function SignupPage() {
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
-              <Button onClick={startProcessing} className="flex-1">
-                {role === "consumer" ? "Save my profile" : "Create account"}
-              </Button>
+              {isDesktop ? (
+                <WaterButton
+                  label={role === "consumer" ? "Save my profile" : "Create account"}
+                  onClick={startProcessing}
+                  paddingX={0}
+                  paddingY={13}
+                  rounded={14}
+                  style={{ flex: 1 }}
+                  waterColor="#3E9BD6"
+                  textColor="#ffffff"
+                  font={{ fontSize: 14, fontWeight: 600 }}
+                  glass={{ tint: "rgba(62, 155, 214, 0.18)", blur: 24, frost: 10 }}
+                  borderOptions={{ color: "rgba(62, 155, 214, 0.5)", stroke: 1 }}
+                  shadowOptions={{ color: "#141A1F", intensity: 40 }}
+                />
+              ) : (
+                <Button onClick={startProcessing} className="flex-1">
+                  {role === "consumer" ? "Save my profile" : "Create account"}
+                </Button>
+              )}
             </div>
           </div>
         )}

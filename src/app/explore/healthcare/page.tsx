@@ -24,7 +24,7 @@ export default function HealthcareComingSoonPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center px-5 pb-24 pt-6 text-center md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col items-center px-5 pb-24 pt-6 text-center md:px-10">
       <Header />
       <HeartPulse size={40} className="mt-10 text-accent-teal" />
       <h1 className="mt-4 font-display text-[26px] font-bold">Healthcare is coming to Kuwana</h1>

@@ -39,7 +39,7 @@ export default async function ExploreSectorPage({
   ]);
 
   return (
-    <div className="flex flex-1 flex-col px-5 pt-5 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pt-5 md:px-10">
       <Header />
       <h1 className="mt-4 font-display text-[24px] font-bold">{meta.name}</h1>
       <p className="mt-1 text-[13px] text-text-secondary">{meta.blurb}</p>

@@ -4,6 +4,8 @@ import Script from "next/script";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { PageTransition } from "@/components/PageTransition";
+import { SkipLink } from "@/components/SkipLink";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -55,6 +57,8 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}
         </Script>
+        <OfflineBanner />
+        <SkipLink />
         <GamificationToastHost />
         <CurrencyProvider>
           <PageTransition>{children}</PageTransition>

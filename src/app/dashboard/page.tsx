@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   const firstName = profile?.fullName?.split(" ")[0];
 
   return (
-    <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <DailyVisitPing />
       <Header />
 

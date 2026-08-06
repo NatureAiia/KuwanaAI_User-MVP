@@ -28,6 +28,28 @@ function buildPriceHistory(currentPrice: number, seedKey: string) {
   return points;
 }
 
+// Composes a short description from the listing's own attribute values (not
+// invented copy) so the listing detail page has real content to render.
+function buildDescription(name: string, provider: string, attrs: Record<string, unknown>, attrDefs: AttrDef[]) {
+  const parts = attrDefs
+    .filter((a) => a.dataType !== "boolean" && attrs[a.key] !== undefined && attrs[a.key] !== null)
+    .slice(0, 3)
+    .map((a) => `${attrs[a.key]}${a.unit ? ` ${a.unit}` : ""} ${a.label.toLowerCase()}`);
+  return `${name} from ${provider}${parts.length ? ` — ${parts.join(", ")}.` : "."}`;
+}
+
+// Deterministic synthetic rating/review-count, same spirit as buildPriceHistory —
+// re-seeding produces the same numbers every time. ~15% of listings come back
+// with no reviews at all (reviewCount 0, rating null) so the "No reviews yet"
+// state has real examples too, instead of every seeded listing looking reviewed.
+function buildRating(seedKey: string) {
+  const rand = seededRandom(`${seedKey}-rating`);
+  if (rand() < 0.15) return { rating: null, reviewCount: 0 };
+  const rating = Math.round((3.6 + rand() * 1.4) * 10) / 10;
+  const reviewCount = Math.floor(4 + rand() * 240);
+  return { rating, reviewCount };
+}
+
 type AttrDef = {
   key: string;
   label: string;
@@ -428,22 +450,25 @@ async function main() {
         const existing = await prisma.listing.findFirst({
           where: { categoryId: category.id, name: listing.name },
         });
+        const seedKey = `${category.slug}-${listing.provider}-${listing.name}`;
         const data = {
           categoryId: category.id,
           providerId,
           name: listing.name,
+          description: buildDescription(listing.name, listing.provider, listing.attrs, catSeed.attributes),
           attributes: listing.attrs as Prisma.InputJsonValue,
           price: listing.price,
           currency: "USD",
           freshnessStatus: "fresh" as const,
           lastVerifiedAt: new Date(),
+          ...buildRating(seedKey),
         };
         const listingRecord = existing
           ? await prisma.listing.update({ where: { id: existing.id }, data })
           : await prisma.listing.create({ data });
 
         await prisma.listingPriceHistory.deleteMany({ where: { listingId: listingRecord.id } });
-        const history = buildPriceHistory(listing.price, `${category.slug}-${listing.provider}-${listing.name}`);
+        const history = buildPriceHistory(listing.price, seedKey);
         await prisma.listingPriceHistory.createMany({
           data: history.map((h) => ({ listingId: listingRecord.id, price: h.price, recordedAt: h.recordedAt })),
         });

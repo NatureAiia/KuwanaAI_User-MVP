@@ -36,7 +36,7 @@ export default async function CorporateDashboardPage({
   const mostRisk = [...bySector].sort((a, b) => b.unverifiedCount - a.unverifiedCount)[0];
 
   return (
-    <div className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
       <Header />
       <div className="mt-4 flex items-center justify-between">
         <div>

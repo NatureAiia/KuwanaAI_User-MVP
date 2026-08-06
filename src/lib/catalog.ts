@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeDecisionScores } from "@/lib/scoring";
+import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
@@ -326,6 +327,41 @@ export async function getAlsoCompared(listingId: string, limit = 4): Promise<Lis
   const listings = await getListingsByIds(rankedIds);
   const byId = new Map(listings.map((l) => [l.id, l]));
   return rankedIds.map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
+}
+
+/**
+ * Cross-provider substitutes for one listing, ranked by comparable-attribute
+ * closeness rather than usage history — available immediately (unlike
+ * getAlsoCompared, which needs real Comparison rows to exist first) since it's
+ * computed straight from the category's own AttributeSchemaFields. See
+ * findClosestMatches in similarListings.ts for the scoring itself.
+ */
+export async function getClosestMatches(listingId: string, limit = 3): Promise<ListingDTO[]> {
+  const listing = await prisma.listing.findUnique({
+    where: { id: listingId },
+    include: {
+      provider: true,
+      category: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } },
+    },
+  });
+  if (!listing) return [];
+
+  const siblings = await prisma.listing.findMany({
+    where: { categoryId: listing.categoryId, status: "published", id: { not: listingId } },
+    include: { provider: true },
+  });
+
+  const attributeSchema = listing.category.attributeSchema.map((a) => ({
+    key: a.key,
+    label: a.label,
+    dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+    unit: a.unit,
+    isComparable: a.isComparable,
+    sortOrder: a.sortOrder,
+  }));
+
+  const matches = findClosestMatches(toListingDTO(listing), siblings.map(toListingDTO), attributeSchema, limit);
+  return matches.map((m) => m.listing);
 }
 
 export type TrendingListing = { listing: ListingDTO; comparisonCount: number };

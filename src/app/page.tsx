@@ -10,6 +10,7 @@ import { LandingFX } from "@/components/landing/LandingFX";
 import { HeroDeviceMockup } from "@/components/landing/HeroDeviceMockup";
 import { ScrollButtons } from "@/components/landing/ScrollButtons";
 import { WaitlistInline } from "@/components/landing/WaitlistInline";
+import { GetStartedButton } from "@/components/landing/GetStartedButton";
 
 const WEEKLY_PICKS = [
   { title: "Best value data bundles this week", sub: "Econet · NetOne · Telecel", score: 92 },
@@ -57,7 +58,7 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1">
         <section
           id="landing-hero-fx"
           className="relative isolate px-5 pt-6 md:px-10 md:pt-10"
@@ -83,9 +84,7 @@ export default function LandingPage() {
               </p>
 
               <div className="mt-6 flex items-center gap-3">
-                <LinkButton href="/signup" variant="primary" size="lg">
-                  Get started
-                </LinkButton>
+                <GetStartedButton />
                 <LinkButton href="/login" variant="ghost" size="lg">
                   Log in
                 </LinkButton>

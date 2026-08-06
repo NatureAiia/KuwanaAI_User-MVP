@@ -10,7 +10,7 @@ export default async function ChatPage() {
   if (!user) redirect("/login");
 
   return (
-    <div className="flex flex-1 flex-col px-5 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pt-6 md:px-10">
       <Header />
       <Suspense fallback={null}>
         <ChatClient />

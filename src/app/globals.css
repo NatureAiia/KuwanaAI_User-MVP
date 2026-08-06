@@ -15,8 +15,13 @@
   --accent-primary: #1e3a8a;
   --accent-sky: #0369a1;
   --text-on-accent-sky: #ffffff;
-  --accent-teal: #0f8a7a;
-  --accent-coral: #d14a3a;
+  /* Darkened from the original #0f8a7a/#d14a3a brand values — those measured
+     4.25:1 and 4.42:1 on white respectively (axe-core, see
+     e2e/accessibility.spec.ts) and dropped to ~3.5:1 on the Badge
+     component's own 15%-tint background, below WCAG 2.1 AA's 4.5:1 floor
+     for normal-weight 11-16px text. These pass both cases with margin. */
+  --accent-teal: #0d7568;
+  --accent-coral: #b93a2b;
   --text-primary: #14181d;
   --text-secondary: #334155;
   --text-muted: #6b7280;
@@ -37,7 +42,11 @@
   --accent-sky: #38bdf8;
   --text-on-accent-sky: #0b1512;
   --accent-teal: #2dd4bf;
-  --accent-coral: #e1553d;
+  /* Lightened from #e1553d — that measured 3.97:1 on the Badge component's
+     own 15%-tint background (axe-core, see e2e/accessibility.spec.ts),
+     below WCAG 2.1 AA's 4.5:1 floor for normal-weight 11-16px text. This
+     passes on both bg-surface and bg-surface-raised tints with margin. */
+  --accent-coral: #ff7a5c;
   --text-primary: #f5f3ee;
   --text-secondary: #b7bec7;
   --text-muted: #8b93a0;

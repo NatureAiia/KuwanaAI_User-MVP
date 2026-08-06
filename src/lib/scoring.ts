@@ -1,7 +1,7 @@
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
-function normalize(value: number, min: number, max: number, invert: boolean) {
+export function normalize(value: number, min: number, max: number, invert: boolean) {
   if (max === min) return 100;
   const t = (value - min) / (max - min);
   return Math.round((invert ? 1 - t : t) * 100);

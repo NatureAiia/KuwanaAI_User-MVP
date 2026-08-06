@@ -35,7 +35,7 @@ export default async function ProviderPortalPage({
 
   if (!provider) {
     return (
-      <div className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+      <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
         <Header />
         <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
           <h1 className="font-display text-[20px] font-bold">Not linked yet</h1>
@@ -92,7 +92,7 @@ export default async function ProviderPortalPage({
   }
 
   return (
-    <div className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
       <Header />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>

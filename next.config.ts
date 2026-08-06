@@ -62,6 +62,20 @@ const nextConfig: NextConfig = {
       ? [{ protocol: "https", hostname: supabaseHostname, port: "", pathname: "/storage/v1/object/public/**", search: "" }]
       : [],
   },
+  experimental: {
+    // Every route already has a loading.tsx shell (app-wide PageLoading
+    // spinner), so this works without also opting into Cache Components /
+    // Partial Prefetching — see Next's "Without Cache Components" offline
+    // guide section. A dropped connection mid-navigation keeps the pending
+    // request queued instead of throwing, and shows a banner via OfflineBanner
+    // instead of a blank/broken page. Verified against a real production
+    // build (next build && next start) in an isolated worktree: navigating
+    // offline correctly falls back to the loading shell with no hard error.
+    // The documented auto-retry-on-reconnect behavior did NOT verify
+    // successfully in that same test (Playwright's synthetic offline mode,
+    // 24s+ wait) — worth re-checking on a real device before relying on it.
+    useOffline: true,
+  },
   async headers() {
     return [
       { source: "/:path*", headers: [...SECURITY_HEADERS, { key: "Content-Security-Policy", value: CSP_HEADER }] },

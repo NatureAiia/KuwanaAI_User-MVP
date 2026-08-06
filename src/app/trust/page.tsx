@@ -50,7 +50,7 @@ const PROMISES = [
 
 export default function TrustPage() {
   return (
-    <div className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
 
       <span className="mt-4 text-[12px] font-semibold uppercase tracking-wide text-text-muted">

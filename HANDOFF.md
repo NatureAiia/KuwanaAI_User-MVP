@@ -240,6 +240,17 @@ assignment, provider listing creation/update).
   Supabase. Needs: pick a provider (OpenAI Images, Stability, fal.ai, etc.),
   add the key, then wire a "Generate cover art" action into the provider
   form/route.
+- **The new "Add a photo?" step in `NewProviderListingForm` is
+  typecheck/lint/code-review-verified only, not browser click-through
+  verified.** Same category of gap as the `ANTHROPIC_API_KEY` placeholder
+  above: `/provider` requires a real logged-in, provider-linked session, and
+  a signup attempt to create a disposable test account hit Supabase's own
+  email-confirmation rate limit (429 "email rate limit exceeded") before any
+  account was created — so this remains genuinely unverified end-to-end, not
+  silently skipped. To actually click through it: either supply a real
+  provider-role login, or disable "Confirm email" under Supabase → Auth →
+  Providers → Email on the dev project so a fresh signup logs straight in
+  without hitting that limit.
 
 ### Provider portal — real gaps, not just "more features"
 - ~~A provider cannot edit a published listing at all~~ **closed

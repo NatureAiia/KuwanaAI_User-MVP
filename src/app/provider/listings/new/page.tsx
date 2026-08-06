@@ -21,7 +21,7 @@ export default async function NewProviderListingPage() {
   });
 
   return (
-    <div className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
       <Header />
       <div className="mt-6">
         <ProviderListingForm mode="create" categories={categories} />
