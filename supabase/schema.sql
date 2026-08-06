@@ -67,7 +67,6 @@ CREATE TYPE "AdminAuditAction" AS ENUM ('listing_approved', 'listing_rejected', 
 CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "password_hash" TEXT, -- Supabase Auth owns real credentials; kept for local/dev fallback
     "role" "Role" NOT NULL DEFAULT 'consumer',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
