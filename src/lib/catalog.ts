@@ -1,8 +1,30 @@
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
+import { CATALOG_TAG, PRICE_HISTORY_TAG } from "@/lib/cacheTags";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
+
+/**
+ * How long a cached catalog read may serve without a write invalidating it.
+ * Writes call revalidateCatalog() and drop the entry immediately, so this is
+ * only the backstop for changes made outside the app (a direct SQL edit, a
+ * seed re-run, the freshness cron marking listings stale).
+ */
+const CATALOG_TTL_SECONDS = 300;
+
+/**
+ * How far back a price trend looks. 90 days is long enough for
+ * computePriceForecast to have the 3+ points it needs to fit a line, and
+ * short enough that a listing with years of history does not drag its whole
+ * table into memory on every explore page render.
+ */
+const TREND_WINDOW_DAYS = 90;
+
+function trendWindowStart() {
+  return new Date(Date.now() - TREND_WINDOW_DAYS * 86_400_000);
+}
 
 /**
  * The single Prisma-row -> ListingDTO mapper.
@@ -46,7 +68,7 @@ export function toListingDTO(listing: {
   };
 }
 
-export async function getSectorCategories(sectorSlug: string): Promise<CategoryDTO[]> {
+async function readSectorCategories(sectorSlug: string): Promise<CategoryDTO[]> {
   const sector = await prisma.sectorConfig.findUnique({
     where: { slug: sectorSlug },
     include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
@@ -67,7 +89,7 @@ export async function getSectorCategories(sectorSlug: string): Promise<CategoryD
   }));
 }
 
-export async function getCategoryWithListings(
+async function readCategoryWithListings(
   sectorSlug: string,
   categorySlug: string,
 ): Promise<CategoryWithListingsDTO | null> {
@@ -227,11 +249,14 @@ export async function getPersonalizedSpecials(
  * to a PriceTrend (or null if there's no history yet). Keyed by listing id
  * so callers can look up a listing's trend alongside its other data.
  */
-export async function getListingPriceTrends(listingIds: string[]): Promise<Record<string, PriceTrend | null>> {
+async function readListingPriceTrends(listingIds: string[]): Promise<Record<string, PriceTrend | null>> {
   if (listingIds.length === 0) return {};
 
   const rows = await prisma.listingPriceHistory.findMany({
-    where: { listingId: { in: listingIds } },
+    // Bounded to the trend window rather than every row ever recorded: the
+    // table grows one row per price change per listing forever, and
+    // computePriceTrend only ever looks at recent movement.
+    where: { listingId: { in: listingIds }, recordedAt: { gte: trendWindowStart() } },
     orderBy: { recordedAt: "asc" },
   });
 
@@ -262,7 +287,7 @@ export async function recordPriceChange(listingId: string, previousPrice: number
   await prisma.listingPriceHistory.create({ data: { listingId, price: previousPrice } });
 }
 
-export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
+async function readListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   const listings = await prisma.listing.findMany({
     where: { id: { in: ids }, status: "published" },
     include: { provider: true },
@@ -315,7 +340,7 @@ export async function getRecentlyViewed(userId: string, limit = 6): Promise<Rece
  * it most often, and returns the top few in rank order. No separate
  * aggregation table — computed from Comparison rows that already exist.
  */
-export async function getAlsoCompared(listingId: string, limit = 4): Promise<ListingDTO[]> {
+async function readAlsoCompared(listingId: string, limit = 4): Promise<ListingDTO[]> {
   const comparisons = await prisma.comparison.findMany({
     where: { listingIds: { has: listingId } },
     select: { listingIds: true },
@@ -469,7 +494,7 @@ export type MarketOverview = {
  * no separate aggregation tables. Pass sectorSlug to drill down into a
  * single sector (the "Explore" stage) instead of the full market.
  */
-export async function getMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
+async function readMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
   const rows = await prisma.listing.findMany({
     where: {
       status: "published",
@@ -564,3 +589,48 @@ export async function getComplianceActivity(sectorSlug?: string, limit = 50): Pr
     rejectedAt: row.lastVerifiedAt.toISOString(),
   }));
 }
+
+/* ------------------------------------------------------------------ */
+/* Cached read layer                                                    */
+/*                                                                      */
+/* The catalog is the hottest read path in the app and one of the       */
+/* coldest write paths — it changes only when an admin edits content or */
+/* a provider submission is published. That asymmetry is what makes it  */
+/* worth caching; a user's own data (saved, XP, notifications) is       */
+/* deliberately never cached here.                                      */
+/*                                                                      */
+/* Tagged rather than TTL-only, so a write calls revalidateCatalog()    */
+/* and the next read is correct immediately, instead of serving a stale */
+/* price until the backstop expires.                                    */
+/* ------------------------------------------------------------------ */
+
+export const getSectorCategories = unstable_cache(readSectorCategories, ["sector-categories"], {
+  tags: [CATALOG_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getCategoryWithListings = unstable_cache(readCategoryWithListings, ["category-with-listings"], {
+  tags: [CATALOG_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getListingPriceTrends = unstable_cache(readListingPriceTrends, ["listing-price-trends"], {
+  tags: [PRICE_HISTORY_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getListingsByIds = unstable_cache(readListingsByIds, ["listings-by-ids"], {
+  tags: [CATALOG_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getAlsoCompared = unstable_cache(readAlsoCompared, ["also-compared"], {
+  tags: [CATALOG_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+
+export const getMarketOverview = unstable_cache(readMarketOverview, ["market-overview"], {
+  tags: [CATALOG_TAG, PRICE_HISTORY_TAG],
+  revalidate: CATALOG_TTL_SECONDS,
+});
+

@@ -1,0 +1,37 @@
+version: 2
+
+# Grouped weekly updates. Ungrouped, this repository would open a dozen PRs a
+# week and every one of them would be ignored — which is worse than not
+# running it, because it looks like coverage while providing none.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Next + React move together; splitting them produces PRs that cannot
+      # pass CI on their own.
+      framework:
+        patterns: ["next", "react", "react-dom", "eslint-config-next", "@types/react*"]
+      prisma:
+        patterns: ["prisma", "@prisma/*"]
+      dev-dependencies:
+        dependency-type: development
+      production-minor-patch:
+        dependency-type: production
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

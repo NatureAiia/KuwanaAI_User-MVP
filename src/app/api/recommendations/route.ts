@@ -8,6 +8,7 @@ import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { getCachedRecommendation, recommendationCacheKey, setCachedRecommendation } from "@/lib/recommendationCache";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { Sector } from "@prisma/client";
 
@@ -40,6 +41,12 @@ export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  // Every miss here is a billed Claude call. Keyed on the user id rather
+  // than the IP: the caller is authenticated, so it cannot be sidestepped by
+  // rotating a forwarded-for header.
+  const limited = await enforceRateLimit(`recommendations:${user.id}`, RATE_LIMITS.authedAi);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {

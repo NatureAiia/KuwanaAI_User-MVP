@@ -41,6 +41,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# rendered Helm output (CI writes here before schema/policy validation)
+/rendered
+*.tgz
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

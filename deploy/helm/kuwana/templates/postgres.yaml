@@ -1,0 +1,194 @@
+{{- if .Values.postgresql.enabled }}
+{{- $name := include "kuwana.postgresFullname" . -}}
+{{- $auth := .Values.postgresql.auth -}}
+{{/*
+Password resolution, in order: an out-of-band Secret, an explicit value, the
+password already stored from a previous install, or a fresh random one. The
+lookup is what keeps `helm upgrade` from rotating the password out from under
+a database that still expects the old one.
+*/}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $name -}}
+{{- $stored := "" -}}
+{{- if and $existing $existing.data (hasKey $existing.data "password") -}}
+{{- $stored = index $existing.data "password" | b64dec -}}
+{{- end -}}
+{{- $password := default (default (randAlphaNum 32) $stored) $auth.password -}}
+{{- if not $auth.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+type: Opaque
+stringData:
+  username: {{ $auth.username | quote }}
+  password: {{ $password | quote }}
+  # Composed here so nothing has to hand-maintain a connection string pointing
+  # at a Service this chart named. `connection_limit` is per pod: Postgres'
+  # default max_connections is 100, and an autoscaled web tier will exhaust it
+  # long before it exhausts CPU if each pod opens an unbounded pool.
+  database-url: {{ printf "postgresql://%s:%s@%s:5432/%s?schema=public&connection_limit=%d&pool_timeout=%d" $auth.username $password $name $auth.database (int .Values.database.connectionLimit) (int .Values.database.poolTimeout) | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  # Headless: the StatefulSet needs stable per-pod DNS, and there is exactly
+  # one replica to load-balance across anyway.
+  clusterIP: None
+  ports:
+    - port: 5432
+      targetPort: postgres
+      name: postgres
+  selector:
+    app.kubernetes.io/name: {{ include "kuwana.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ $name }}
+  # Single instance. This is a portability and evaluation option, not an HA
+  # database — there is no replication, no failover and no automatic restore
+  # here. Production runs against managed Postgres (Supabase) by default for
+  # exactly that reason.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kuwana.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "kuwana.labels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        fsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: {{ .Values.postgresql.image }}
+          # Raised past the default 100 to fit the fleet's connection budget;
+          # see the `database` section in values.yaml for the arithmetic.
+          args: ["-c", "max_connections={{ .Values.postgresql.maxConnections }}"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            # Not read-only: Postgres writes its socket and stat files under
+            # /var/run/postgresql and /tmp, both mounted as emptyDir below,
+            # but the image also touches paths under /var/lib/postgresql.
+            readOnlyRootFilesystem: false
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ $auth.username | quote }}
+            - name: POSTGRES_DB
+              value: {{ $auth.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default $name $auth.existingSecret }}
+                  key: password
+            # The image only initialises a database when PGDATA is empty, and
+            # a mounted PVC root is never empty (lost+found), so the data
+            # directory must be a subdirectory of the mount.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ $auth.username | quote }}, "-d", {{ $auth.database | quote }}]
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", {{ $auth.username | quote }}, "-d", {{ $auth.database | quote }}]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.postgresql.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.postgresql.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.postgresql.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size }}
+  {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kuwana.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: postgres
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only this release's own workloads may open a connection — nothing else
+    # in the namespace, and nothing outside it.
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/instance
+                operator: In
+                values: [{{ .Release.Name | quote }}]
+              - key: app.kubernetes.io/component
+                operator: In
+                values: ["web", "migrate", "backup"]
+      ports:
+        - protocol: TCP
+          port: 5432
+{{- end }}

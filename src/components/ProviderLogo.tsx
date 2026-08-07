@@ -38,19 +38,27 @@ export function ProviderLogo({
 
   if (logoUrl && !failed) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-curated HTTPS URLs, not confined to one CDN next/image could optimize
+      // Deliberately a plain <img>, not next/image. Provider.logoUrl is an
+      // arbitrary operator-supplied URL, so next/image would require
+      // `remotePatterns` open to any host — which turns /_next/image into an
+      // unauthenticated fetch-and-resize proxy anyone can point at any URL.
+      // The optimizer wins here (a 32px avatar) are not worth that.
+      //
+      // The lazy/async/decoding attributes below get most of the benefit:
+      // logos below the fold aren't fetched until they approach the
+      // viewport, and decoding never blocks the main thread. Explicit
+      // width/height (and the matching style) reserve the box so a late logo
+      // cannot shift the row it sits in.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={logoUrl}
         alt={`${name} logo`}
         width={size}
         height={size}
-        onError={() => setFailed(true)}
-        // This renders dozens of times per page (every listing card, compare
-        // row, tray chip) — most are off-screen on load, so lazy-loading and
-        // deprioritizing them matters far more here than for a one-off image.
         loading="lazy"
         decoding="async"
-        fetchPriority="low"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
         className="shrink-0 rounded-full border border-border bg-bg-surface-raised object-contain"
         style={{ width: size, height: size }}
       />

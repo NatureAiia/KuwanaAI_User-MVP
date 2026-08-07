@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
 import { recordPriceChange } from "@/lib/catalog";
@@ -54,6 +55,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     await recordPriceChange(id, Number(existing.price));
   }
 
+  // The catalog read cache is tag-keyed, not TTL-only — without this an
+  // edited listing keeps serving stale until the backstop expires.
+  revalidateCatalog();
   return NextResponse.json({ listing });
 }
 

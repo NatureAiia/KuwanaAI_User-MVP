@@ -6,6 +6,8 @@ import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { privateJson } from "@/lib/apiResponse";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
 
 const CHAT_HISTORY_LIMIT = 20;
@@ -66,7 +68,7 @@ export async function GET() {
   const summaries = await listingSummaries(distinctListingIds);
   const summaryById = new Map(summaries.map((s) => [s.id, s]));
 
-  return NextResponse.json({
+  return privateJson({
     conversationId: conversation?.id ?? null,
     messages:
       conversation?.messages.map((m) => ({
@@ -83,6 +85,11 @@ export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  // Billed per message, and a message may carry a ~4.5MB image, which costs
+  // meaningfully more than text. Limited per user.
+  const limited = await enforceRateLimit(`chat:${user.id}`, RATE_LIMITS.authedAi);
+  if (limited) return limited;
 
   const parsed = postSchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -229,6 +236,10 @@ export async function POST(req: Request) {
   });
 
   return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Content-Type-Options": "nosniff",
+    },
   });
 }

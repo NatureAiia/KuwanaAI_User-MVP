@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const { user } = auth;
 
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   for (const [consentType, granted] of Object.entries(parsed.data)) {
     if (granted === undefined) continue;
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     });
   }
 
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }
 
 export async function GET() {
@@ -35,7 +35,7 @@ export async function GET() {
   const { user } = auth;
 
   const consents = await prisma.consent.findMany({ where: { userId: user.id } });
-  return NextResponse.json({
+  return privateJson({
     consents: Object.fromEntries(consents.map((c) => [c.consentType, c.granted])),
   });
 }

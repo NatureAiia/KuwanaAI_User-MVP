@@ -1,23 +1,13 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Manrope, IBM_Plex_Mono } from "next/font/google";
-import Script from "next/script";
 import { GamificationToastHost } from "@/components/GamificationToastHost";
 import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { PageTransition } from "@/components/PageTransition";
 import { SkipLink } from "@/components/SkipLink";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { THEME_INIT_SCRIPT } from "@/lib/themeScript";
 import "./globals.css";
-
-const THEME_INIT_SCRIPT = `
-(function () {
-  try {
-    var theme = localStorage.getItem("kuwana-theme");
-    if (theme === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
-  } catch (e) {}
-})();
-`;
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-display",
@@ -54,9 +44,22 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-body">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {THEME_INIT_SCRIPT}
-        </Script>
+        {/*
+          A plain <script>, not next/script. next/script stamps the
+          per-request CSP nonce onto whatever it renders, and browsers blank
+          that attribute out after parsing — which made React report an
+          attribute mismatch and abandon hydration on every page load. This
+          script is a compile-time constant, so it is authorised by a CSP
+          *hash* instead; see lib/themeScript.ts.
+
+          Un-deferred on purpose: it must run before the first paint, or the
+          page flashes the wrong theme, which is the whole reason it exists.
+        */}
+        <script
+          id="theme-init"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
         <OfflineBanner />
         <SkipLink />
         <GamificationToastHost />

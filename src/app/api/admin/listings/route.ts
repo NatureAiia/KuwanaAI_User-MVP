@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireAdmin } from "@/lib/auth";
+import { boundedJsonRecord } from "@/lib/zodShared";
 
 /**
  * Admin content API — an alternative to hand-editing prisma/seed.ts for
@@ -11,7 +13,7 @@ import { requireAdmin } from "@/lib/auth";
  */
 export async function GET(req: Request) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const categoryId = new URL(req.url).searchParams.get("categoryId");
 
@@ -22,25 +24,25 @@ export async function GET(req: Request) {
     take: 200,
   });
 
-  return NextResponse.json({ listings });
+  return privateJson({ listings });
 }
 
 const createSchema = z.object({
   categoryId: z.string(),
   providerId: z.string(),
-  name: z.string().min(1),
-  attributes: z.record(z.string(), z.unknown()),
-  price: z.number().positive(),
-  currency: z.string().default("USD"),
-  sourceUrl: z.string().url().optional(),
+  name: z.string().trim().min(1).max(200),
+  attributes: boundedJsonRecord(50, 16_000),
+  price: z.number().positive().max(100_000_000),
+  currency: z.string().trim().length(3).default("USD"),
+  sourceUrl: z.string().url().max(2000).optional(),
 });
 
 export async function POST(req: Request) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const parsed = createSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const listing = await prisma.listing.create({
     data: {
@@ -51,5 +53,8 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ listing });
+  // The catalog read cache is keyed by tag, not by TTL alone — without
+  // this, an edited price keeps serving stale until the 5-minute backstop.
+  revalidateCatalog();
+  return privateJson({ listing });
 }
