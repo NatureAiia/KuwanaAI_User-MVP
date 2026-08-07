@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
-import { getListingPriceTrends } from "@/lib/catalog";
+import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { getCachedRecommendation, recommendationCacheKey, setCachedRecommendation } from "@/lib/recommendationCache";
@@ -56,18 +56,10 @@ export async function POST(req: Request) {
   }
 
   const category = listings[0].category;
-  const listingDTOs: ListingDTO[] = listings.map((l) => ({
-    id: l.id,
-    name: l.name,
-    price: Number(l.price),
-    currency: l.currency,
-    attributes: l.attributes as Record<string, unknown>,
-    freshnessStatus: l.freshnessStatus,
-    lastVerifiedAt: l.lastVerifiedAt.toISOString(),
-    sourceUrl: l.sourceUrl,
-    images: l.images,
-    provider: l.provider,
-  }));
+  // Uses the shared mapper rather than rebuilding the field list here — the
+  // hand-rolled copy that used to live at this spot went stale the moment
+  // ListingDTO gained description/rating/reviewCount.
+  const listingDTOs: ListingDTO[] = listings.map(toListingDTO);
   const attributeSchema: AttributeSchemaFieldDTO[] = category.attributeSchema.map((a) => ({
     key: a.key,
     label: a.label,

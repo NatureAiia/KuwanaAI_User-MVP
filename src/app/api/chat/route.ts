@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
 import { computeDecisionScores } from "@/lib/scoring";
-import { getListingPriceTrends } from "@/lib/catalog";
+import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
 
@@ -112,18 +112,9 @@ export async function POST(req: Request) {
       const sameCategory = listings.every((l) => l.categoryId === listings[0].categoryId);
       const scores = sameCategory
         ? computeDecisionScores(
-            listings.map((l) => ({
-              id: l.id,
-              name: l.name,
-              price: Number(l.price),
-              currency: l.currency,
-              attributes: l.attributes as Record<string, unknown>,
-              freshnessStatus: l.freshnessStatus,
-              lastVerifiedAt: l.lastVerifiedAt.toISOString(),
-              sourceUrl: l.sourceUrl,
-              images: l.images,
-              provider: l.provider,
-            })),
+            // Shared mapper, not a local copy of the field list — see the note
+            // on toListingDTO in lib/catalog.ts.
+            listings.map(toListingDTO),
             listings[0].category.attributeSchema.map((a) => ({
               key: a.key,
               label: a.label,

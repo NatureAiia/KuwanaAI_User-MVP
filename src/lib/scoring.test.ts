@@ -5,6 +5,12 @@ import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 function listing(overrides: Partial<ListingDTO> & { id: string; price: number }): ListingDTO {
   return {
     name: overrides.id,
+    // rating/reviewCount are null/0 rather than invented values: the product
+    // rule is that no review figure is ever fabricated, and no review
+    // collection exists yet.
+    description: null,
+    rating: null,
+    reviewCount: 0,
     currency: "USD",
     attributes: {},
     freshnessStatus: "fresh",

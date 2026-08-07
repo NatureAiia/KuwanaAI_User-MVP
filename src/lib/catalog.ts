@@ -4,7 +4,17 @@ import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
-function toListingDTO(listing: {
+/**
+ * The single Prisma-row -> ListingDTO mapper.
+ *
+ * Exported because it was previously private, which pushed three call sites
+ * (/api/chat, /api/recommendations, and scoring.test.ts) into hand-copying
+ * the field list. When `description`, `rating` and `reviewCount` were added
+ * to ListingDTO, all three copies silently fell out of sync and stopped
+ * compiling. Anything turning a listing row into a DTO should call this
+ * rather than rebuild the mapping.
+ */
+export function toListingDTO(listing: {
   id: string;
   name: string;
   description: string | null;
