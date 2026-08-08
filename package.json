@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -11,7 +15,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@anthropic-ai/sdk": "^0.115.0",
     "@prisma/client": "^6.19.3",
     "@supabase/ssr": "^0.12.4",
@@ -41,14 +44,5 @@
     "tsx": "^4.23.4",
     "typescript": "^5",
     "vitest": "^4.1.10"
-=======
-    "@prisma/client": "^5.14.0"
-  },
-  "devDependencies": {
-    "prisma": "^5.14.0",
-    "tsx": "^4.11.0",
-    "vitest": "^1.6.0",
-    "zod": "^3.23.0"
->>>>>>> 3abce5db13eb9afe69cb0f62e1578304aa84aa9d
   }
 }
