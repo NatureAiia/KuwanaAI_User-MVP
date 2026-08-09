@@ -8,8 +8,9 @@ import { Bell } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { StreakBadge } from "@/components/StreakBadge";
 
-export function Header() {
+export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -48,6 +49,10 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          {/* Streak badge sits directly left of the bell so the three
+              chrome buttons (streak, notifications, theme) form a single
+              matched row. Hidden when there's no streak yet. */}
+          <StreakBadge currentStreak={currentStreak} />
           <Link
             href="/notifications"
             aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}

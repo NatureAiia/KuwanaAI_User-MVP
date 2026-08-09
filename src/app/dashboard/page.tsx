@@ -9,7 +9,7 @@ import { Header } from "@/components/Header";
 import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { HeroCarousel } from "@/components/dashboard/HeroCarousel";
 import { RecentlyViewedRow } from "@/components/dashboard/RecentlyViewedRow";
-import { GamificationStrip } from "@/components/dashboard/GamificationStrip";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 
 const ROLE_DASHBOARD: Partial<Record<string, string>> = {
@@ -26,14 +26,9 @@ export default async function DashboardPage() {
   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
   if (roleRedirect) redirect(roleRedirect);
 
-  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials, favoriteSpecials, recentlyViewed] = await Promise.all([
+  const [profile, streak, telecomHero, bankingHero, specials, favoriteSpecials, recentlyViewed] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
-    prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
-    prisma.quest.findFirst({
-      where: { activeTo: { gte: new Date() } },
-      orderBy: { activeTo: "asc" },
-    }),
     getTopListings("telecom", "data-bundles", 4),
     getTopListings("banking", "savings-accounts", 4),
     getPersonalizedSpecials(user.id, 4),
@@ -46,25 +41,13 @@ export default async function DashboardPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <DailyVisitPing />
-      <Header />
+      {/* Streak badge lives in the header itself (to the left of the bell),
+          so the dashboard passes the current streak through here. */}
+      <Header currentStreak={streak?.currentStreak ?? 0} />
 
-      <div className="mt-4 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] text-text-secondary">Welcome back{firstName ? "," : ""}</p>
-          <h1 className="font-display text-[24px] font-bold">{firstName ?? "there"}</h1>
-        </div>
-      </div>
+      <WelcomeBanner firstName={firstName ?? null} />
 
       <NeedIntake enableImageSearch />
-
-      <div className="mt-4">
-        <GamificationStrip
-          totalXp={xp?.totalXp ?? 0}
-          level={xp?.level ?? 1}
-          currentStreak={streak?.currentStreak ?? 0}
-          activeQuestName={activeQuest?.name ?? null}
-        />
-      </div>
 
       <div className="mt-6 space-y-6">
         <RecentlyViewedRow items={recentlyViewed} />
