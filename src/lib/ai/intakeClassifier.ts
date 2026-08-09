@@ -1,4 +1,4 @@
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { llamaChat } from "@/lib/ai/llama";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
@@ -44,25 +44,20 @@ export async function classifyIntake(query: string): Promise<IntakeResult> {
     categories: s.categories.map((c) => ({ category_slug: c.slug, category_name: c.name })),
   }));
 
-  const message = await anthropic.messages.create({
-    model: RECOMMENDATION_MODEL,
-    max_tokens: 300,
-    output_config: { effort: "low", format: { type: "json_schema", schema: INTAKE_SCHEMA } },
-    system: SYSTEM_PROMPT,
+  const content = await llamaChat({
     messages: [
+      { role: "system", content: SYSTEM_PROMPT },
       {
         role: "user",
         content: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
       },
     ],
+    // Ollama guarantees the response is a JSON object matching this schema.
+    format: INTAKE_SCHEMA,
+    options: { temperature: 0, num_predict: 300 },
   });
 
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    return { sectorSlug: null, categorySlug: null, confidence: 0 };
-  }
-
-  const result = JSON.parse(textBlock.text) as {
+  const result = JSON.parse(content) as {
     sector_slug: string | null;
     category_slug: string | null;
     confidence: number;

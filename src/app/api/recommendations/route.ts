@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { llamaChat, LlamaUnavailableError } from "@/lib/ai/llama";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
@@ -116,56 +116,62 @@ export async function POST(req: Request) {
   let result = await getCachedRecommendation(cacheKey);
 
   if (!result) {
-    let message;
+    let content: string;
     try {
-      message = await anthropic.messages.create({
-        model: RECOMMENDATION_MODEL,
-        max_tokens: 1024,
-        output_config: {
-          effort: "low",
-          format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
-        },
-        system:
-          "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
-          "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
-          "overall fit for value and needs. Each listing includes a decision_score breakdown " +
-          "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
-          "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
-          "access it) — use these as your primary evidence, and reference them concretely in your " +
-          "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
-          "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
-          "materially higher requirement than the others, say so explicitly — this is an eligibility " +
-          "signal, not just a spec difference. Only reference data present in the listings provided; " +
-          "never invent statistics. Always make clear this is an AI-assisted recommendation.",
+      content = await llamaChat({
         messages: [
+          {
+            role: "system",
+            content:
+              "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
+              "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
+              "overall fit for value and needs. Each listing includes a decision_score breakdown " +
+              "(price_score, benefit_score, freshness_adjustment, trend_adjustment, trust_adjustment, total), " +
+              "a price_trend, and requirements_to_qualify (any upfront balance/deposit or condition needed to " +
+              "access it) — use these as your primary evidence, and reference them concretely in your " +
+              "explanation (e.g. its price trend, freshness, provider trust, or a requirement that rules it " +
+              "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
+              "materially higher requirement than the others, say so explicitly — this is an eligibility " +
+              "signal, not just a spec difference. Only reference data present in the listings provided; " +
+              "never invent statistics. Always make clear this is an AI-assisted recommendation.",
+          },
           {
             role: "user",
             content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
           },
         ],
+        // Ollama guarantees the response is JSON matching the schema.
+        format: RECOMMENDATION_SCHEMA,
+        options: { temperature: 0, num_predict: 1024 },
       });
     } catch (err) {
       // Previously unhandled — the client would get a bare 500 with no JSON
       // body and silently do nothing (no error shown, no state change, just
       // the button reverting as if nothing happened). 503 signals "the AI
       // service itself is unavailable," distinct from a 400/404 caused by bad
-      // input.
-      console.error("[recommendations] Anthropic request failed:", err);
-      return NextResponse.json(
-        { error: "AI recommendation is unavailable right now — please try again shortly." },
-        { status: 503 },
-      );
-    }
-
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+      // input. LlamaUnavailableError covers network + non-2xx; a JSON parse
+      // failure on the (guaranteed-valid) schema response is a 502.
+      if (err instanceof LlamaUnavailableError) {
+        console.error("[recommendations] Llama request failed:", err);
+        return NextResponse.json(
+          { error: "AI recommendation is unavailable right now — please try again shortly." },
+          { status: 503 },
+        );
+      }
+      console.error("[recommendations] Unexpected error:", err);
       return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
     }
-    result = JSON.parse(textBlock.text) as {
-      recommended_listing_name: string;
-      explanation: string;
-      confidence: number;
-    };
+
+    try {
+      result = JSON.parse(content) as {
+        recommended_listing_name: string;
+        explanation: string;
+        confidence: number;
+      };
+    } catch (err) {
+      console.error("[recommendations] Llama returned non-JSON despite schema format:", err, content);
+      return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
+    }
     await setCachedRecommendation(cacheKey, result);
   }
 

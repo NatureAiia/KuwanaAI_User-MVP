@@ -8,9 +8,9 @@ import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 // the same read-only pages, not a consumer-identity action.
 const bodySchema = z.object({ query: z.string().trim().min(1).max(300) });
 
-// Every call here hits the paid Anthropic API unauthenticated — the tighter,
-// cost-relevant limit of the two public endpoints. Still generous for a real
-// visitor trying a few different needs while browsing.
+// Every call here hits the self-hosted Llama endpoint unauthenticated — the
+// tighter, cost-relevant limit of the two public endpoints. Still generous
+// for a real visitor trying a few different needs while browsing.
 const RATE_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 };
 
 export async function POST(req: Request) {

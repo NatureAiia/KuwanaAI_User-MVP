@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { llamaChatStream, base64FromDataUrl } from "@/lib/ai/llama";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
@@ -155,15 +155,18 @@ export async function POST(req: Request) {
     }
   }
 
-  const lastUserContent: Parameters<typeof anthropic.messages.stream>[0]["messages"][number]["content"] = image
+  const lastUserContent = image
     ? [
-        { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
-        { type: "text", text: content || "What can you tell me about this?" },
+        { type: "image" as const, image: base64FromDataUrl(image.data) },
+        { type: "text" as const, text: content || "What can you tell me about this?" },
       ]
-    : content;
+    : (content as string | { type: "text"; text: string }[]);
 
-  const claudeMessages = [
-    ...priorMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+  const llamaMessages = [
+    ...priorMessages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content as string,
+    })),
     { role: "user" as const, content: lastUserContent },
   ];
 
@@ -174,19 +177,19 @@ export async function POST(req: Request) {
     async start(controller) {
       let fullText = "";
       try {
-        const stream = anthropic.messages.stream({
-          model: RECOMMENDATION_MODEL,
-          max_tokens: 700,
-          system,
-          messages: claudeMessages,
+        const stream = llamaChatStream({
+          messages: llamaMessages,
+          options: { temperature: 0.2, num_predict: 700 },
         });
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            fullText += event.delta.text;
-            controller.enqueue(encoder.encode(event.delta.text));
+        for await (const delta of stream) {
+          if (delta) {
+            fullText += delta;
+            controller.enqueue(encoder.encode(delta));
           }
         }
-      } catch {
+      } catch (err) {
+        // Previously swallowed silently — log so production failures are diagnosable.
+        console.error("[chat] Llama stream failed:", err);
         controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
         controller.close();
         return;
