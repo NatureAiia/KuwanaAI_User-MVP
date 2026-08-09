@@ -1,553 +1,577 @@
-// KuwanaAI Database Architecture
-// One PostgreSQL schema (public), Prisma-only access
-// Principles: schema-driven catalog, JSON flexible payloads, Decimal for money, uuid() PKs, Cascade/SetNull deletes
+// Kuwana MVP — data model (see KUWANA_MVP_BUILD_PLAN.md Section 4 & 6)
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-//
-// ENUMS
-//
+model WaitlistSignup {
+  id        String   @id @default(uuid())
+  email     String
+  sector    String // 'healthcare' for MVP; kept generic for future coming-soon sectors
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([email, sector])
+  @@map("waitlist_signups")
+}
+
+// ---------------------------------------------------------------------------
+// 4.1 Identity & onboarding
+// ---------------------------------------------------------------------------
 
 enum Role {
-  CONSUMER
-  PROVIDER
-  CORPORATE
-  REGULATOR
+  consumer
+  corporate
+  regulator
+  provider
 }
-
-enum Sector {
-  TELECOMS
-  ENERGY
-  INSURANCE
-  BANKING
-  HEALTHCARE
-  RETAIL_GROCERY
-  FUEL
-  EDUCATION
-  HOUSING
-  TRANSPORT
-}
-
-enum SectorStatus {
-  ACTIVE
-  COMING_SOON
-  DISABLED
-}
-
-enum AttributeDataType {
-  STRING
-  NUMBER
-  BOOLEAN
-  ENUM
-  CURRENCY
-  DATE
-  RANGE
-}
-
-enum FreshnessStatus {
-  FRESH
-  STALE
-  EXPIRED
-}
-
-enum ListingStatus {
-  DRAFT
-  PENDING_REVIEW
-  PUBLISHED
-  REJECTED
-  ARCHIVED
-}
-
-enum NotificationType {
-  PRICE_DROP
-  NEW_LISTING
-  DEAL_EXPIRING
-  RECOMMENDATION
-  SYSTEM
-  STREAK_REMINDER
-}
-
-enum ChatRole {
-  USER
-  ASSISTANT
-  SYSTEM
-}
-
-enum EventType {
-  FOOTPRINT_CREATED
-  COMPARISON_CREATED
-  LISTING_SAVED
-  CONVERSATION_STARTED
-  RECOMMENDATION_VIEWED
-  PROFILE_COMPLETED
-  DAILY_LOGIN
-  REFERRAL_COMPLETED
-}
-
-enum SocialPlatform {
-  FACEBOOK
-  TWITTER
-  WHATSAPP
-  TELEGRAM
-  TIKTOK
-  INSTAGRAM
-}
-
-//
-// IDENTITY & ONBOARDING
-//
 
 model User {
-  id               String   @id @default(uuid()) @db.Uuid
-  email            String   @unique
-  supabaseAuthId   String?  @unique @map("supabase_auth_id")
-  role             Role     @default(CONSUMER)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(uuid())
+  email     String   @unique
+  role      Role     @default(consumer)
+  createdAt DateTime @default(now()) @map("created_at")
 
-  // relations - all cascade as user-owned data
-  profile          UserProfile?
-  footprints       SectorFootprint[]
-  consents         Consent[]
-  comparisons      Comparison[]
-  savedListings    SavedListing[]
-  recommendations  Recommendation[]
-  notifications    Notification[]
-  conversations    Conversation[]
-  events           UserEvent[]
-  xp               UserXp?
-  streak           UserStreak?
-  badges           UserBadge[]
-  questProgress    UserQuestProgress[]
-  ownedProviders   Provider[] @relation("ProviderOwner")
+  profile         UserProfile?
+  footprints      SectorFootprint[]
+  consents        Consent[]
+  comparisons     Comparison[]
+  savedListings   SavedListing[]
+  recommendations Recommendation[]
+  events          UserEvent[]
+  xp              UserXp?
+  badges          UserBadge[]
+  questProgress   UserQuestProgress[]
+  streak          UserStreak?
+  notifications   Notification[]
+  conversations   Conversation[]
+  ownedProvider   Provider?
 
   @@map("users")
 }
 
 model UserProfile {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @unique @map("user_id") @db.Uuid
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  displayName String?  @map("display_name")
-  fullName    String?  @map("full_name")
-  phone       String?
-  avatarUrl   String?  @map("avatar_url")
-  location    String?
-  preferences Json?    @default("{}") // loose JSON, zod-validated
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  userId          String   @id @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ageRange        String?  @map("age_range")
+  occupation      String?
+  location        String?
+  fullName        String?  @map("full_name")
+  nickname        String?
+  socialPlatforms String[] @default([]) @map("social_platforms")
 
   @@map("user_profiles")
 }
 
+enum Sector {
+  telecom
+  banking
+  insurance
+  education
+  healthcare
+  transport
+  utilities
+  pharmacy
+  electronics
+  fashion
+}
+
 model SectorFootprint {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sector    Sector
-  data      Json     @default("{}") // answers to sector onboarding
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector Sector
+  data   Json
 
   @@unique([userId, sector])
   @@map("sector_footprints")
 }
 
 model Consent {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String // e.g. data_processing, marketing, ai_personalization
-  granted   Boolean  @default(false)
-  grantedAt DateTime? @map("granted_at")
-  createdAt DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentType String   @map("consent_type") // 'research_use' | 'leaderboard_participation'
+  granted     Boolean
+  grantedAt   DateTime @default(now()) @map("granted_at")
 
-  @@unique([userId, type])
+  @@unique([userId, consentType])
+  // The leaderboard query filters exactly this combination to find every
+  // opted-in user before joining against UserXp.
+  @@index([consentType, granted])
   @@map("consents")
 }
 
-//
-// SECTOR CATALOG - Schema-driven, no DDL for new sectors/categories
-//
+// ---------------------------------------------------------------------------
+// 4.2 Sector catalog (schema-driven)
+// ---------------------------------------------------------------------------
+
+enum SectorStatus {
+  live
+  coming_soon
+}
 
 model SectorConfig {
-  id          String       @id @default(uuid()) @db.Uuid
-  slug        String       @unique // e.g. telecoms, energy
-  name        String
-  sector      Sector       @unique
-  status      SectorStatus @default(ACTIVE)
-  description String?
-  icon        String?
-  order       Int          @default(0)
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id     String       @id @default(uuid())
+  name   String
+  slug   String       @unique
+  status SectorStatus @default(live)
 
-  categories  Category[]
-  providers   Provider[]
-  listings    Listing[] // denormalized via category but useful for direct query
+  categories Category[]
 
-  @@map("sector_configs")
+  @@map("sectors")
 }
 
 model Category {
-  id          String   @id @default(uuid()) @db.Uuid
-  sectorId    String   @map("sector_id") @db.Uuid
-  sector      SectorConfig @relation(fields: [sectorId], references: [id], onDelete: Cascade)
-  slug        String
-  name        String
-  description String?
-  order       Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id       String       @id @default(uuid())
+  sectorId String       @map("sector_id")
+  sector   SectorConfig @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  name     String
+  slug     String
 
-  attributeSchemas AttributeSchemaField[]
-  listings         Listing[]
+  attributeSchema AttributeSchemaField[]
+  listings        Listing[]
+  comparisons     Comparison[]
 
   @@unique([sectorId, slug])
   @@map("categories")
 }
 
+enum AttributeDataType {
+  number
+  string
+  enum
+  boolean
+}
+
 model AttributeSchemaField {
-  id         String            @id @default(uuid()) @db.Uuid
-  categoryId String            @map("category_id") @db.Uuid
-  category   Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  key        String // e.g. data_limit_gb, monthly_fee
-  label      String
-  dataType   AttributeDataType @map("data_type")
-  required   Boolean           @default(false)
-  options    Json? // for ENUM: ["prepaid","postpaid"]
-  unit       String? // e.g. GB, USD, ZWG
-  order      Int               @default(0)
-  helpText   String?           @map("help_text")
-  createdAt  DateTime          @default(now()) @map("created_at")
+  id           String            @id @default(uuid())
+  categoryId   String            @map("category_id")
+  category     Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  key          String
+  label        String
+  dataType     AttributeDataType @map("data_type")
+  unit         String?
+  isComparable Boolean           @default(true) @map("is_comparable")
+  sortOrder    Int               @default(0) @map("sort_order")
 
   @@unique([categoryId, key])
-  @@map("attribute_schemas")
+  @@map("attribute_schema")
 }
 
 model Provider {
-  id         String   @id @default(uuid()) @db.Uuid
-  slug       String   @unique
-  name       String
-  logoUrl    String?  @map("logo_url")
-  website    String?
-  sectorId   String?  @map("sector_id") @db.Uuid
-  sector     SectorConfig? @relation(fields: [sectorId], references: [id], onDelete: SetNull)
-  ownerId    String?  @map("owner_id") @db.Uuid
-  owner      User?    @relation("ProviderOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  isVerified Boolean  @default(false) @map("is_verified")
-  metadata   Json?    @default("{}")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String  @id @default(uuid())
+  name        String
+  logoUrl     String? @map("logo_url")
+  verified    Boolean @default(true)
+  // Nullable: the ~15 seeded reference providers (CBZ, Econet, etc.) have no
+  // login of their own — this is only set when a "provider" role account is
+  // admin-linked to self-manage this provider's listings (see /provider,
+  // /admin/users). SetNull rather than Cascade: deleting the linked user
+  // account shouldn't delete the provider or its listings.
+  ownerUserId String? @unique @map("owner_user_id")
+  owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  listings   Listing[]
+  listings Listing[]
 
   @@map("providers")
 }
 
+enum FreshnessStatus {
+  fresh
+  stale
+  unverified
+}
+
+enum ListingStatus {
+  draft
+  pending_review
+  published
+  rejected
+}
+
 model Listing {
-  id               String              @id @default(uuid()) @db.Uuid
-  categoryId       String              @map("category_id") @db.Uuid
-  category         Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  sectorId         String?             @map("sector_id") @db.Uuid
-  sector           SectorConfig?       @relation(fields: [sectorId], references: [id], onDelete: SetNull)
-  providerId       String?             @map("provider_id") @db.Uuid
-  provider         Provider?           @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  title            String
-  slug             String?
-  description      String?             @db.Text
-  attributes       Json                @default("{}") // validated by zod against AttributeSchemaField
-  status           ListingStatus       @default(DRAFT)
-  freshnessStatus  FreshnessStatus     @default(FRESH) @map("freshness_status")
-  effectiveFrom    DateTime?           @map("effective_from")
-  effectiveTo      DateTime?           @map("effective_to")
-  createdAt        DateTime            @default(now()) @map("created_at")
-  updatedAt        DateTime            @updatedAt @map("updated_at")
+  id              String          @id @default(uuid())
+  categoryId      String          @map("category_id")
+  category        Category        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  providerId      String          @map("provider_id")
+  provider        Provider        @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  attributes      Json
+  price           Decimal         @db.Decimal(12, 2)
+  currency        String          @default("USD")
+  sourceUrl       String?         @map("source_url")
+  images          String[]        @default([]) @map("images")
+  // Real user reviews aren't collected anywhere in the app yet — these stay
+  // null until that exists. Never backfill/estimate a value here; the UI
+  // must render "No reviews yet" rather than invent a number.
+  rating          Decimal?        @db.Decimal(2, 1)
+  reviewCount     Int             @default(0) @map("review_count")
+  lastVerifiedAt  DateTime        @default(now()) @map("last_verified_at")
+  freshnessStatus FreshnessStatus @default(fresh) @map("freshness_status")
+  // Provider self-submission workflow (build plan 15.2): draft -> pending_review
+  // -> published/rejected. Defaults to "published" so every existing/admin-created
+  // listing keeps behaving exactly as before — this workflow only applies to
+  // listings a provider submits through /provider.
+  status          ListingStatus   @default(published)
+  rejectionReason String?         @map("rejection_reason")
 
-  priceHistory     ListingPriceHistory[]
-  savedBy          SavedListing[]
-  recommendations  Recommendation[]
-  notifications    Notification[]
+  priceHistory    ListingPriceHistory[]
+  savedBy         SavedListing[]
+  recommendations Recommendation[]
+  notifications   Notification[]
 
-  // HOT PATH INDEXES - added in v2 migration, originally noted as gap
-  @@index([categoryId])
-  @@index([providerId])
+  // (categoryId, status, price): the consumer-facing hot path — every
+  // catalog read filters this combination then orders by price
+  // (getCategoryWithListings et al.). status alone: the admin review queue
+  // filters by status with no categoryId, which can't use the composite
+  // index's later columns without its first. providerId: the provider
+  // portal's "my listings" query.
+  @@index([categoryId, status, price])
   @@index([status])
-  @@index([sectorId])
+  @@index([providerId])
   @@map("listings")
 }
 
 model ListingPriceHistory {
-  id         String   @id @default(uuid()) @db.Uuid
-  listingId  String   @map("listing_id") @db.Uuid
+  id         String   @id @default(uuid())
+  listingId  String   @map("listing_id")
   listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
   price      Decimal  @db.Decimal(12, 2)
-  currency   String   @default("USD")
   recordedAt DateTime @default(now()) @map("recorded_at")
-  source     String? // manual, scraped, social_mention
-  metadata   Json?    @default("{}")
 
+  // computePriceTrend/computePriceForecast read a listing's full history
+  // ordered by time — this is the exact access pattern.
   @@index([listingId, recordedAt])
   @@map("listing_price_history")
 }
 
-//
-// COMPARISON ACTIVITY
-//
+// ---------------------------------------------------------------------------
+// 4.3 User comparison activity
+// ---------------------------------------------------------------------------
 
 model Comparison {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String   @map("user_id") @db.Uuid
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  sector     Sector?
-  title      String?
-  listingIds Json     @default("[]") @map("listing_ids") // uuid[]
-  scores     Json?    // { listingId: score, breakdown }
-  metadata   Json?    @default("{}")
+  categoryId String   @map("category_id")
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  listingIds String[] @map("listing_ids")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  @@index([userId])
+  // Every quest-progress check (category_count/comparison_count/
+  // sector_diversity criteria) queries exactly userId + a createdAt range,
+  // on every comparison_completed event.
+  @@index([userId, createdAt(sort: Desc)])
+  // getAlsoCompared's `listingIds: { has: listingId }` is an array-
+  // containment query — a GIN index is the correct index type for that,
+  // not a btree.
+  @@index([listingIds], type: Gin)
   @@map("comparisons")
 }
 
 model SavedListing {
-  userId    String   @map("user_id") @db.Uuid
-  listingId String   @map("listing_id") @db.Uuid
+  userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String   @map("listing_id")
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
   savedAt   DateTime @default(now()) @map("saved_at")
 
   @@id([userId, listingId])
+  // The PK above already covers a plain userId filter (leftmost prefix),
+  // but the saved-listings page also orders by savedAt (most recent
+  // first) — a separate index matching that exact order avoids an
+  // in-memory sort.
+  @@index([userId, savedAt(sort: Desc)])
   @@map("saved_listings")
 }
 
 model Recommendation {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listingId String?  @map("listing_id") @db.Uuid
-  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  reason    String?  @db.Text
-  score     Decimal? @db.Decimal(5, 2)
-  metadata  Json?    @default("{}")
-  viewed    Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId    String   @map("listing_id")
+  listing      Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  explanation  String
+  confidence   Decimal  @db.Decimal(4, 3)
+  scoreVersion String   @default("v1") @map("score_version")
+  generatedAt  DateTime @default(now()) @map("generated_at")
 
-  @@index([userId])
+  @@index([listingId])
+  @@index([userId, generatedAt(sort: Desc)])
   @@map("recommendations")
 }
 
+enum NotificationType {
+  price_drop
+  listing_approved
+  listing_rejected
+}
+
 model Notification {
-  id        String           @id @default(uuid()) @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listingId String?          @map("listing_id") @db.Uuid
-  listing   Listing?         @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  type      NotificationType
-  title     String
-  body      String?          @db.Text
-  read      Boolean          @default(false)
-  createdAt DateTime         @default(now()) @map("created_at")
+  id            String           @id @default(uuid())
+  userId        String           @map("user_id")
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId     String           @map("listing_id")
+  listing       Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  type          NotificationType @default(price_drop)
+  message       String
+  // Only meaningful for price_drop; null for listing_approved/listing_rejected.
+  changePercent Float?           @map("change_percent")
+  read          Boolean          @default(false)
+  createdAt     DateTime         @default(now()) @map("created_at")
 
   @@unique([userId, listingId, type])
+  @@index([listingId])
+  @@index([userId, read, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
-//
-// AI CHAT
-//
+// ---------------------------------------------------------------------------
+// 4.4 AI chat assistant
+// ---------------------------------------------------------------------------
+
+enum ChatRole {
+  user
+  assistant
+}
 
 model Conversation {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title     String?
-  sector    Sector?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now()) @map("created_at")
+  lastMessageAt DateTime @default(now()) @map("last_message_at")
 
-  messages  Message[]
+  messages Message[]
 
-  @@index([userId])
+  @@index([userId, createdAt])
   @@map("conversations")
 }
 
 model Message {
-  id             String       @id @default(uuid()) @db.Uuid
-  conversationId String       @map("conversation_id") @db.Uuid
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   role           ChatRole
-  content        String       @db.Text
-  listingIds     String[]     @default([]) @map("listing_ids") @db.Uuid // grounding
-  metadata       Json?        @default("{}")
+  content        String
+  listingIds     String[]     @default([]) @map("listing_ids")
   createdAt      DateTime     @default(now()) @map("created_at")
 
-  @@index([conversationId])
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 
-//
-// GAMIFICATION - evaluated in-transaction, no queue
-//
+// ---------------------------------------------------------------------------
+// 6. Gamification
+// ---------------------------------------------------------------------------
+
+enum EventType {
+  profile_completed
+  comparison_viewed
+  comparison_completed
+  recommendation_viewed
+  item_saved
+  action_taken
+  daily_visit
+  chat_started
+}
+
+model UserEvent {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector    Sector?
+  eventType EventType @map("event_type")
+  metadata  Json?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Every badge-trigger check (event_count_in_sector/distinct_sector_count)
+  // queries exactly this combination, on every qualifying event.
+  @@index([userId, eventType, createdAt(sort: Desc)])
+  @@map("user_events")
+}
 
 model GamificationRule {
-  id          String    @id @default(uuid()) @db.Uuid
-  eventType   EventType @unique @map("event_type")
-  xpAward     Int       @map("xp_award")
-  description String?
-  criteria    Json?     @default("{}")
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now()) @map("created_at")
+  eventType    EventType @id @map("event_type")
+  xpValue      Int       @map("xp_value")
+  badgeTrigger Json?     @map("badge_trigger")
+  questTrigger Json?     @map("quest_trigger")
 
   @@map("gamification_rules")
 }
 
-model UserEvent {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  eventType EventType @map("event_type")
-  metadata  Json?     @default("{}")
-  createdAt DateTime  @default(now()) @map("created_at")
-
-  @@index([userId, eventType])
-  @@map("user_events")
-}
-
 model UserXp {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @unique @map("user_id") @db.Uuid
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  totalXp   Int      @default(0) @map("total_xp")
-  level     Int      @default(1)
-  updatedAt DateTime @updatedAt @map("updated_at")
+  userId  String @id @map("user_id")
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalXp Int    @default(0) @map("total_xp")
+  level   Int    @default(1)
 
+  // The leaderboard's ORDER BY totalXp DESC.
+  @@index([totalXp(sort: Desc)])
   @@map("user_xp")
 }
 
-model UserStreak {
-  id            String    @id @default(uuid()) @db.Uuid
-  userId        String    @unique @map("user_id") @db.Uuid
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  currentStreak Int       @default(0) @map("current_streak")
-  longestStreak Int       @default(0) @map("longest_streak")
-  lastActiveAt  DateTime? @map("last_active_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  @@map("user_streaks")
-}
-
 model Badge {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
+  id          String @id @default(uuid())
+  name        String @unique
   description String
-  iconUrl     String?  @map("icon_url")
-  criteria    Json?    // zod: { minComparisons, sectors, etc }
-  xpReward    Int?     @map("xp_reward")
-  createdAt   DateTime @default(now()) @map("created_at")
+  criteria    Json
 
-  earnedBy    UserBadge[]
+  users UserBadge[]
 
   @@map("badges")
 }
 
 model UserBadge {
-  id       String   @id @default(uuid()) @db.Uuid
-  userId   String   @map("user_id") @db.Uuid
+  userId   String   @map("user_id")
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badgeId  String   @map("badge_id") @db.Uuid
+  badgeId  String   @map("badge_id")
   badge    Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
   earnedAt DateTime @default(now()) @map("earned_at")
 
-  @@unique([userId, badgeId])
+  @@id([userId, badgeId])
   @@map("user_badges")
 }
 
 model Quest {
-  id          String   @id @default(uuid()) @db.Uuid
-  title       String
-  description String   @db.Text
-  criteria    Json?    // { type, target, count }
-  xpReward    Int      @map("xp_reward")
-  active      Boolean  @default(true)
-  startsAt    DateTime? @map("starts_at")
-  endsAt      DateTime? @map("ends_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  criteria    Json
+  activeFrom  DateTime @map("active_from")
+  activeTo    DateTime @map("active_to")
 
-  progress    UserQuestProgress[]
+  progress UserQuestProgress[]
 
+  // quest-rotation checks "is anything active right now" via activeTo.
+  @@index([activeTo])
   @@map("quests")
 }
 
 model UserQuestProgress {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
+  userId      String    @map("user_id")
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  questId     String    @map("quest_id") @db.Uuid
+  questId     String    @map("quest_id")
   quest       Quest     @relation(fields: [questId], references: [id], onDelete: Cascade)
-  progress    Json?     @default("{}")
-  completed   Boolean   @default(false)
+  progress    Int       @default(0)
   completedAt DateTime? @map("completed_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  @@unique([userId, questId])
+  @@id([userId, questId])
   @@map("user_quest_progress")
 }
 
-//
-// INTELLIGENCE FEED
-//
+model UserStreak {
+  userId         String    @id @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak  Int       @default(0) @map("current_streak")
+  longestStreak  Int       @default(0) @map("longest_streak")
+  lastActiveDate DateTime? @map("last_active_date") @db.Date
 
+  @@map("user_streaks")
+}
+
+enum SocialPlatform {
+  telegram
+  reddit
+}
+
+/// A public social post mentioning a price, found by the free social-media
+/// price scanner (see scripts/social-scan). Read-only intelligence feed —
+/// never shown to end users directly, reviewed by an admin before any
+/// listing/price data is acted on.
 model SocialPriceMention {
-  id              String         @id @default(uuid()) @db.Uuid
+  id              String         @id @default(uuid())
   platform        SocialPlatform
-  sourceUrl       String         @map("source_url") @db.Text
-  content         String         @db.Text
+  channel         String // Telegram channel username, or subreddit name
+  sourceUrl       String         @map("source_url")
+  postedAt        DateTime?      @map("posted_at")
+  discoveredAt    DateTime       @default(now()) @map("discovered_at")
+  text            String
   matchedProvider String?        @map("matched_provider")
-  extractedPrices Json?          @map("extracted_prices") // [{ amount, currency, context }]
-  sector          Sector?
-  confidence      Decimal?       @db.Decimal(3, 2)
-  createdAt       DateTime       @default(now()) @map("created_at")
+  extractedPrices Json           @map("extracted_prices") // ExtractedPrice[]
+  reviewed        Boolean        @default(false)
 
   @@unique([platform, sourceUrl])
   @@index([matchedProvider])
+  // The admin review queue's reviewed/unreviewed toggle, newest first.
+  @@index([reviewed, discoveredAt(sort: Desc)])
   @@map("social_price_mentions")
 }
 
+/// Live FX reference rates (units per 1 USD), refreshed by
+/// scripts/fx-refresh — overrides the static, hand-maintained defaults in
+/// lib/currency.ts wherever a live rate exists. `code` matches
+/// CurrencyCode ("ZiG"/"ZAR"/"GBP") even though the upstream source uses
+/// ISO codes (ZWG for ZiG) — the refresh script maps between them.
 model FxRate {
-  id             String   @id @default(uuid()) @db.Uuid
-  baseCurrency   String   @map("base_currency")
-  targetCurrency String   @map("target_currency")
-  rate           Decimal  @db.Decimal(12, 6)
-  source         String?
-  effectiveAt    DateTime @default(now()) @map("effective_at")
-  createdAt      DateTime @default(now()) @map("created_at")
+  code      String   @id
+  perUsd    Float    @map("per_usd")
+  source    String
+  fetchedAt DateTime @default(now()) @map("fetched_at")
 
-  @@unique([baseCurrency, targetCurrency, effectiveAt])
-  @@index([baseCurrency, targetCurrency])
   @@map("fx_rates")
 }
 
-//
-// WAITLIST
-//
+enum AdminAuditAction {
+  listing_approved
+  listing_rejected
+  listing_deleted
+  provider_linked
+  provider_unlinked
+  user_role_changed
+}
 
-model WaitlistSignup {
-  id        String   @id @default(uuid()) @db.Uuid
-  email     String
-  sector    Sector
-  name      String?
-  metadata  Json?    @default("{}")
+// No FK relations to the acted-on row — an audit log needs to survive the
+// row it's about being deleted (e.g. listing_deleted), which a Cascade
+// would defeat and a SetNull would silently blank out.
+model AdminAuditLog {
+  id         String           @id @default(uuid())
+  adminEmail String           @map("admin_email")
+  action     AdminAuditAction
+  targetType String           @map("target_type") // "listing" | "provider" | "user"
+  targetId   String           @map("target_id")
+  detail     String
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  // The admin audit page reads newest-first with no other filter.
+  @@index([createdAt(sort: Desc)])
+  @@map("admin_audit_log")
+}
+
+// Backs rate limiting on public unauthenticated endpoints (/api/waitlist,
+// /api/need-intake) without needing new infra (Redis/Upstash) — this app
+// deploys to Vercel (see vercel.json), where an in-memory counter wouldn't
+// reliably survive across serverless invocations, but Postgres already does.
+// Self-cleaning: checkRateLimit deletes a key's own expired hits on every
+// call, so this never needs a separate cron sweep.
+model RateLimitHit {
+  id        String   @id @default(uuid())
+  key       String // e.g. "need-intake:203.0.113.5"
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@unique([email, sector])
-  @@map("waitlist_signups")
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
+
+// Caches /api/recommendations' Claude output per distinct listing-set (not
+// per-user — the recommendation is a pure function of the listing set, the
+// route doesn't factor in the caller's footprint). Comparing the same 2-3
+// listings repeatedly is common while a user is deciding; this skips the
+// re-bill on a cache hit. Deliberately separate from the Recommendation
+// table, which stays the audit-grade "this user got this recommendation at
+// this time" record and is still written on every request, cache hit or not.
+model RecommendationCache {
+  cacheKey  String   @id @map("cache_key")
+  payload   Json
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("recommendation_cache")
 }

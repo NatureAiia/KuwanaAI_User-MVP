@@ -122,6 +122,9 @@ export async function POST(req: Request) {
               lastVerifiedAt: l.lastVerifiedAt.toISOString(),
               sourceUrl: l.sourceUrl,
               images: l.images,
+              description: l.description ?? null,
+              rating: l.rating ?? null,
+              reviewCount: l.reviewCount ?? 0,
               provider: l.provider,
             })),
             listings[0].category.attributeSchema.map((a) => ({
