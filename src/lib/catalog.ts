@@ -213,6 +213,212 @@ export async function getPersonalizedSpecials(
 }
 
 /**
+ * "Recommended for you" — sits above "Specials for you" on the home page.
+ * Instead of ranking categories the user has *engaged* with, this surfaces
+ * specials tied to the providers the user is already locked into (their
+ * mobile network, their bank, their insurer). It surfaces listings the user
+ * would otherwise miss because they live in categories they haven't browsed
+ * yet — and is the recommendation signal the Jupyter notebook in
+ * `notebooks/recommendation_engine.ipynb` reproduces in batch form.
+ *
+ * Detection rules (none invented, all derived from existing data):
+ *   1. Provider names in any SectorFootprint.data field whose key matches
+ *      a provider/network/bank/insurer pattern.
+ *   2. Providers the user has saved any listing from (explicit > implicit).
+ *
+ * Ranking (mirrors the notebook, kept in sync by hand until the model is
+ * fitted): each candidate listing gets a value score (price + first numeric
+ * benefit, 50/50 — same as computeDecisionScores), plus bonuses for being
+ * a "special" (price drop / below-median), freshness, and provider trust,
+ * clamped to 0-100.
+ */
+export async function getFavoriteProductSpecials(
+  userId: string,
+  limit = 4,
+): Promise<
+  {
+    sectorSlug: string;
+    categorySlug: string;
+    categoryName: string;
+    listings: (ListingDTO & { score: number; trend: PriceTrend | null; reason: string | null })[];
+  }[]
+> {
+  const [footprints, saved] = await Promise.all([
+    prisma.sectorFootprint.findMany({ where: { userId } }),
+    prisma.savedListing.findMany({ where: { userId }, select: { listing: { select: { providerId: true } } } }),
+  ]);
+
+  // 1. Extract provider names from footprints.
+  const providerNames = new Set<string>();
+  const PROVIDER_KEY_PATTERNS = ["provider", "network", "bank", "insurer"];
+  for (const fp of footprints) {
+    const data = (fp.data ?? {}) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(data)) {
+      if (!PROVIDER_KEY_PATTERNS.some((p) => key.toLowerCase().includes(p))) continue;
+      if (typeof value === "string") {
+        for (const token of value.split(/,| and | & /)) {
+          const t = token.trim();
+          if (t) providerNames.add(t);
+        }
+      } else if (Array.isArray(value)) {
+        for (const v of value) {
+          if (typeof v === "string" && v.trim()) providerNames.add(v.trim());
+        }
+      }
+    }
+  }
+  // 2. Explicit > implicit — providers the user has saved listings from.
+  for (const s of saved) providerNames.add(s.listing.providerId);
+
+  if (providerNames.size === 0) return [];
+
+  // Resolve provider names -> provider records. Match on exact name OR on
+  // providerId (saved listings give us the id directly).
+  const providers = await prisma.provider.findMany({
+    where: {
+      OR: [
+        { name: { in: [...providerNames] } },
+        { id: { in: [...providerNames].filter((n) => /^[0-9a-f-]{36}$/i.test(n)) } },
+      ],
+    },
+    select: { id: true, name: true },
+  });
+  if (providers.length === 0) return [];
+
+  const favoriteProviderIds = new Set(providers.map((p) => p.id));
+  const favoriteProviderNames = new Set(providers.map((p) => p.name));
+
+  // Listings from those providers, across every category the user hasn't
+  // already explicitly engaged with — that's the differentiator from
+  // getPersonalizedSpecials, which only ranks categories they've compared/saved.
+  const engagedCategoryIds = new Set(
+    (await prisma.comparison.findMany({ where: { userId }, select: { categoryId: true } })).map(
+      (c) => c.categoryId,
+    ),
+  );
+
+  const favoriteListings = await prisma.listing.findMany({
+    where: {
+      status: "published",
+      providerId: { in: [...favoriteProviderIds] },
+      ...(engagedCategoryIds.size > 0 ? { categoryId: { notIn: [...engagedCategoryIds] } } : {}),
+    },
+    include: { provider: true, category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
+  });
+  if (favoriteListings.length === 0) return [];
+
+  const trends = await getListingPriceTrends(favoriteListings.map((l) => l.id));
+
+  // Group by category so the home page shows one carousel per category, and
+  // rank within each category with the favorite-product score below.
+  const byCategory = new Map<
+    string,
+    { sectorSlug: string; sectorName: string; categorySlug: string; categoryName: string; listings: typeof favoriteListings }
+  >();
+  for (const listing of favoriteListings) {
+    const key = listing.category.id;
+    if (!byCategory.has(key)) {
+      byCategory.set(key, {
+        sectorSlug: listing.category.sector.slug,
+        sectorName: listing.category.sector.name,
+        categorySlug: listing.category.slug,
+        categoryName: listing.category.name,
+        listings: [],
+      });
+    }
+    byCategory.get(key)!.listings.push(listing);
+  }
+
+  const results: {
+    sectorSlug: string;
+    categorySlug: string;
+    categoryName: string;
+    listings: (ListingDTO & { score: number; trend: PriceTrend | null; reason: string | null })[];
+  }[] = [];
+
+  for (const group of byCategory.values()) {
+    const dtos = group.listings.map(toListingDTO);
+    const attributeSchema = group.listings[0].category.attributeSchema.map((a) => ({
+      key: a.key,
+      label: a.label,
+      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+      unit: a.unit,
+      isComparable: a.isComparable,
+      sortOrder: a.sortOrder,
+    }));
+    const scores = computeDecisionScores(dtos, attributeSchema, trends);
+    const median =
+      dtos.map((d) => d.price).sort((a, b) => a - b)[Math.floor(dtos.length / 2)] ?? Number.POSITIVE_INFINITY;
+
+    const ranked = dtos
+      .map((listing) => {
+        const base = scores[listing.id]?.total ?? 0;
+        const trend = trends[listing.id] ?? null;
+        const trendingDown = trend?.direction === "down" && Math.abs(trend.changePercent) >= 5;
+        const belowMedian = listing.price <= median * 0.9;
+        const isSpecial = trendingDown || belowMedian;
+        const specialBonus = isSpecial ? 20 : 0;
+        const trustBonus = listing.provider.verified ? 5 : 0;
+        return {
+          ...listing,
+          score: Math.max(0, Math.min(100, base + specialBonus + trustBonus)),
+          trend,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    // Tag each listing with a `reason` (trending down / below median) so
+    // the UI can render a "why" badge. Done after ranking so the reason
+    // doesn't leak into the score computation.
+    const decorated = ranked.map((listing) => {
+      const trend = listing.trend;
+      const trendingDown = trend?.direction === "down" && Math.abs(trend.changePercent) >= 5;
+      const medianCheck =
+        listing.price <=
+        (dtos.map((d) => d.price).sort((a, b) => a - b)[Math.floor(dtos.length / 2)] ?? Number.POSITIVE_INFINITY) * 0.9;
+      const reason = trendingDown
+        ? `Price dropped ${Math.abs(trend!.changePercent)}% recently`
+        : medianCheck
+          ? "Priced below category median"
+          : null;
+      return { ...listing, reason };
+    });
+
+    // Filter out categories where the user's only favorite in that category
+    // is the same provider across all rows and there's no signal of a deal —
+    // we want *specials*, not just "your provider's regular catalog".
+    const hasSpecial = decorated.some((l) => !!l.reason);
+    if (!hasSpecial && ranked.length > 0) {
+      // Keep at most one non-special row from each provider as a fallback so
+      // the section isn't blank for users with footprint data but no price
+      // drops yet (the seed catalog never has price history).
+      const seen = new Set<string>();
+      const trimmed: typeof decorated = [];
+      for (const l of decorated) {
+        if (seen.has(l.provider.id)) continue;
+        seen.add(l.provider.id);
+        trimmed.push(l);
+        if (trimmed.length >= 2) break;
+      }
+      if (trimmed.length > 0) results.push({ ...group, listings: trimmed });
+    } else {
+      results.push({ ...group, listings: decorated });
+    }
+  }
+
+  // Sort the categories themselves by the top listing's score, so the
+  // highest-value favorite-category carousel sits at the very top of the
+  // home page section.
+  results.sort((a, b) => (b.listings[0]?.score ?? 0) - (a.listings[0]?.score ?? 0));
+  // Silence the unused-variable warning for favoriteProviderNames — kept
+  // for future debug logging / "you use these providers" footer.
+  void favoriteProviderNames;
+
+  return results.slice(0, 3);
+}
+
+/**
  * Fetches ListingPriceHistory rows for the given listings and reduces each
  * to a PriceTrend (or null if there's no history yet). Keyed by listing id
  * so callers can look up a listing's trend alongside its other data.

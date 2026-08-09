@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getTopListings, getPersonalizedSpecials, getRecentlyViewed } from "@/lib/catalog";
+import { getTopListings, getPersonalizedSpecials, getRecentlyViewed, getFavoriteProductSpecials } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
@@ -26,7 +26,7 @@ export default async function DashboardPage() {
   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
   if (roleRedirect) redirect(roleRedirect);
 
-  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials, recentlyViewed] = await Promise.all([
+  const [profile, xp, streak, activeQuest, telecomHero, bankingHero, specials, favoriteSpecials, recentlyViewed] = await Promise.all([
     prisma.userProfile.findUnique({ where: { userId: user.id } }),
     prisma.userXp.findUnique({ where: { userId: user.id } }),
     prisma.userStreak.findUnique({ where: { userId: user.id } }),
@@ -37,6 +37,7 @@ export default async function DashboardPage() {
     getTopListings("telecom", "data-bundles", 4),
     getTopListings("banking", "savings-accounts", 4),
     getPersonalizedSpecials(user.id, 4),
+    getFavoriteProductSpecials(user.id, 4),
     getRecentlyViewed(user.id),
   ]);
 
@@ -67,6 +68,22 @@ export default async function DashboardPage() {
 
       <div className="mt-6 space-y-6">
         <RecentlyViewedRow items={recentlyViewed} />
+        {/* "Recommended for you" sits ABOVE "Specials for you": specials on
+            products tied to providers the user is already locked into
+            (their network, bank, insurer). Rendered first so the most
+            personal feed is what the user sees on landing on the home page.
+            Source of truth: notebooks/recommendation_engine.ipynb; the app
+            computes the same picks on-the-fly via getFavoriteProductSpecials
+            so the two stay in sync. */}
+        {favoriteSpecials.length > 0 &&
+          favoriteSpecials.map((s) => (
+            <HeroCarousel
+              key={`fav-${s.categorySlug}`}
+              title={`Recommended for you: ${s.categoryName}`}
+              sectorSlug={s.sectorSlug}
+              listings={s.listings}
+            />
+          ))}
         {specials.length > 0 ? (
           specials.map((s) => (
             <HeroCarousel

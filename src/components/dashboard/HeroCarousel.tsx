@@ -13,7 +13,7 @@ export function HeroCarousel({
 }: {
   title: string;
   sectorSlug: string;
-  listings: (ListingDTO & { score: number; trend?: PriceTrend | null })[];
+  listings: (ListingDTO & { score: number; trend?: PriceTrend | null; reason?: string | null })[];
 }) {
   if (listings.length === 0) return null;
 
@@ -39,7 +39,12 @@ export function HeroCarousel({
             <p className="mt-3 font-mono text-[18px] font-semibold">
               <FormattedPrice amount={listing.price} currency={listing.currency} />
             </p>
-            {listing.trend && listing.trend.direction !== "flat" && (
+            {listing.reason && (
+              <Badge tone="teal" className="mt-2">
+                {listing.reason}
+              </Badge>
+            )}
+            {!listing.reason && listing.trend && listing.trend.direction !== "flat" && (
               <Badge tone={TREND_TONE[listing.trend.direction]} className="mt-2">
                 {TREND_ARROW[listing.trend.direction]} {Math.abs(listing.trend.changePercent)}%
               </Badge>
