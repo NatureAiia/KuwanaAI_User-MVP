@@ -39,7 +39,11 @@ const consumerSchema = z.object({
     .optional(),
   bankingFootprint: z
     .object({
-      bank_name: z.string(),
+      // Multi-select: a user can hold accounts at any combination of the
+      // banks listed in src/lib/onboarding-options.ts (CBZ + Steward +
+      // Stanbic etc.). "I don't bank" stays out of this array — the
+      // presence of the footprint itself is the signal the user banks.
+      banks: z.array(z.string()).min(1),
       account_types: z.array(z.string()).default([]),
     })
     .optional(),

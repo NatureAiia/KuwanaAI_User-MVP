@@ -6,6 +6,7 @@ import { clsx } from "clsx";
 import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
+import { CategoryBadge } from "@/components/CategoryBadge";
 import { ListingCoverArt } from "@/components/ListingCoverArt";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { Badge } from "@/components/ui/Card";
@@ -29,6 +30,7 @@ export const ListingCard = memo(function ListingCard({
   score,
   trend,
   sectorSlug,
+  categorySlug,
   selected,
   onToggleSelect,
   requirements,
@@ -38,6 +40,7 @@ export const ListingCard = memo(function ListingCard({
   score: number;
   trend?: PriceTrend | null;
   sectorSlug: string;
+  categorySlug?: string;
   selected: boolean;
   onToggleSelect: (listing: ListingDTO) => void;
   requirements?: Requirement[];
@@ -67,8 +70,12 @@ export const ListingCard = memo(function ListingCard({
   return (
     <div
       className={clsx(
-        "relative flex flex-col overflow-hidden rounded-[var(--radius-card)] border bg-bg-surface transition-all",
-        selected ? "border-accent-sky shadow-[0_0_0_1px_var(--accent-sky)]" : "border-border",
+        // Card chrome: 12px radius, soft drop-shadow, smooth transition.
+        // The shadow + radius combination is the same as the rest of the app's
+        // surface cards (see DPO_TRUST_UX_ARCHITECTURE.md §5.2), kept here so
+        // bundle cards read as part of the same family as category tiles.
+        "bundle-card-header relative flex flex-col overflow-hidden rounded-[12px] border bg-bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_12px_-4px_rgba(0,0,0,0.08)] transition-all",
+        selected ? "border-accent-sky shadow-[0_0_0_1px_var(--accent-sky),0_4px_12px_-4px_var(--accent-sky)]" : "border-border",
       )}
     >
       <div className="relative aspect-[4/3] w-full">
@@ -110,20 +117,45 @@ export const ListingCard = memo(function ListingCard({
           </button>
         </div>
 
+        {/* Bottom-left: progress ring. Sized to match the right-side header
+            so the card has flex-space-between symmetry. */}
         <div className="absolute bottom-2 left-2">
           <SignalBloom value={score} size={40} />
         </div>
       </div>
 
+      {/* Card body — flex justify-between the provider logo (left) and the
+          category badge (right of title). The provider logo is constrained to
+          max-h: 20px / max-w: 60px via the inline `style` (Tailwind has no
+          arbitrary max-* utility for inline styles, and this guarantees the
+          layout brief is honored regardless of the image's intrinsic size). */}
       <div className="flex flex-1 flex-col p-3">
-        <div className="flex items-start gap-2">
-          <ProviderLogo name={listing.provider.name} logoUrl={listing.provider.logoUrl} size={22} />
-          <div className="min-w-0">
-            <p className="truncate font-display text-[14px] font-semibold leading-tight">{listing.name}</p>
-            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-muted">
-              {listing.provider.verified && <ShieldCheck size={11} className="text-accent-teal" />}
-              {listing.provider.name}
-            </p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <ProviderLogo
+              name={listing.provider.name}
+              logoUrl={listing.provider.logoUrl}
+              size={22}
+              className="max-h-[20px] max-w-[60px]"
+            />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                {categorySlug && (
+                  <CategoryBadge
+                    categorySlug={categorySlug}
+                    attributes={listing.attributes}
+                    size={13}
+                  />
+                )}
+                <p className="truncate font-display text-[14px] font-semibold leading-tight">
+                  {listing.name}
+                </p>
+              </div>
+              <p className="mt-0.5 flex items-center gap-1 text-[11px] text-text-muted">
+                {listing.provider.verified && <ShieldCheck size={11} className="text-accent-teal" />}
+                {listing.provider.name}
+              </p>
+            </div>
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { clsx } from "clsx";
+import { providerLogoUrl } from "@/lib/providerLogos";
 
 const BADGE_PALETTE = [
   "#1E3A8A",
@@ -25,22 +26,42 @@ function initialsFor(name: string) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
+/**
+ * Carrier/provider mark used everywhere a logo is shown: listing cards,
+ * compare rows, tray chips, signup chips. Lookup order:
+ *   1. Explicit `logoUrl` prop (DB-supplied URL).
+ *   2. `public/provider-logos/<slug>.<ext>` resolved from the provider name
+ *      (see src/lib/providerLogos.ts).
+ *   3. Colored-initials fallback — never renders a broken <img>.
+ *
+ * Sizing is constrained by the caller via the `size` prop, not by the
+ * component, so the card / chip / row can each enforce its own max
+ * dimensions. The default `size` here is 32px (≈ h-8) for the common
+ * card/row case; the listing card passes size=22 and a max-h/max-w via
+ * the wrapping class to match the 20px / 60px layout brief.
+ */
 export function ProviderLogo({
   name,
   logoUrl,
   size = 32,
+  className,
 }: {
   name: string;
   logoUrl?: string | null;
   size?: number;
+  className?: string;
 }) {
   const [failed, setFailed] = useState(false);
 
-  if (logoUrl && !failed) {
+  // Prefer the DB logoUrl (an admin-controlled URL), then fall back to
+  // the locally-fetched logo at /provider-logos/<slug>.<ext>.
+  const resolvedUrl = logoUrl && !failed ? logoUrl : providerLogoUrl(name);
+
+  if (resolvedUrl) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-curated HTTPS URLs, not confined to one CDN next/image could optimize
+      // eslint-disable-next-line @next/next/no-img-element -- arbitrary admin-curated HTTPS URLs + locally-served assets under /provider-logos/; next/image's fixed-size ceremony doesn't pay off for these small marks
       <img
-        src={logoUrl}
+        src={resolvedUrl}
         alt={`${name} logo`}
         width={size}
         height={size}
@@ -51,7 +72,10 @@ export function ProviderLogo({
         loading="lazy"
         decoding="async"
         fetchPriority="low"
-        className="shrink-0 rounded-full border border-border bg-bg-surface-raised object-contain"
+        className={clsx(
+          "shrink-0 rounded-full border border-border bg-bg-surface-raised object-contain",
+          className,
+        )}
         style={{ width: size, height: size }}
       />
     );
@@ -60,7 +84,10 @@ export function ProviderLogo({
   return (
     <div
       aria-hidden="true"
-      className={clsx("flex shrink-0 items-center justify-center rounded-full font-display font-bold text-white")}
+      className={clsx(
+        "flex shrink-0 items-center justify-center rounded-full font-display font-bold text-white",
+        className,
+      )}
       style={{ width: size, height: size, backgroundColor: BADGE_PALETTE[paletteIndexFor(name)], fontSize: size * 0.4 }}
     >
       {initialsFor(name)}

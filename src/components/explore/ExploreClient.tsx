@@ -148,6 +148,7 @@ export function ExploreClient({
             score={scores[listing.id]?.total ?? 0}
             trend={data?.trends[listing.id] ?? null}
             sectorSlug={sectorSlug}
+            categorySlug={activeCategorySlug}
             selected={data ? isSelected(data.id, listing.id) : false}
             onToggleSelect={toggleSelect}
             initialSaved={savedIds.has(listing.id)}
