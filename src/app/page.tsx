@@ -190,6 +190,42 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section
+          aria-labelledby="partners-heading"
+          className="mx-auto max-w-[1120px] px-5 pb-16 md:px-10"
+        >
+          <h2
+            id="partners-heading"
+            className="text-center text-[11px] font-semibold uppercase tracking-wide text-text-muted"
+          >
+            Partners
+          </h2>
+          <div className="mt-4 -mx-5 overflow-x-auto px-5 md:mx-0 md:overflow-visible md:px-0">
+            <ul className="flex flex-row items-center justify-start gap-8 md:justify-center md:gap-16 min-w-max md:min-w-0">
+              <li className="shrink-0">
+                <Image
+                  src="/aiia-logo.jpg"
+                  alt="Ai Institute Africa"
+                  width={366}
+                  height={307}
+                  className="h-24 w-auto md:h-36"
+                  priority={false}
+                />
+              </li>
+              <li className="shrink-0">
+                <Image
+                  src="/kuwana-mark.png"
+                  alt="Kuwana"
+                  width={240}
+                  height={240}
+                  className="h-24 w-24 md:h-36 md:w-36"
+                  priority={false}
+                />
+              </li>
+            </ul>
+          </div>
+        </section>
+
         <section className="mx-auto max-w-[1120px] px-5 pb-16 md:px-10">
           <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface-raised p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
@@ -222,7 +258,7 @@ export default function LandingPage() {
 
           <div className="flex gap-10">
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
                 Product
               </h4>
               <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
@@ -239,7 +275,7 @@ export default function LandingPage() {
               </ul>
             </div>
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
                 Account
               </h4>
               <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
@@ -256,7 +292,7 @@ export default function LandingPage() {
               </ul>
             </div>
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
                 Trust
               </h4>
               <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
@@ -270,9 +306,10 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div className="mx-auto mt-8 flex max-w-[1120px] flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto mt-8 flex max-w-[1120px] flex-col items-center gap-4 text-center">
           <p className="text-[12px] text-text-muted">
-            Kuwana — comparisons are AI-assisted and reference seed/mock listing data in this MVP.
+            <a href="https://kuwana.ai" className="hover:text-text-primary">kuwana.ai</a>{" "}
+            Proudly brought to you by Ai Institute Africa. Copyright 2026
           </p>
           <BackToTopButton />
         </div>

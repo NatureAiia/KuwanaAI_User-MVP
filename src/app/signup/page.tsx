@@ -22,6 +22,7 @@ import {
   SPEND_RANGES,
   BANKS,
   ACCOUNT_TYPES,
+  WALLETS,
   INSURERS,
   POLICY_TYPES,
   MEDICAL_AIDS,
@@ -85,6 +86,7 @@ const CONSUMER_STEPS = [
   "personal",
   "telecom",
   "banking",
+  "wallets",
   "insurance",
   "health",
   "consent",
@@ -214,8 +216,17 @@ export default function SignupPage() {
   // the account-types follow-up step stays hidden for those users.
   const [banks, setBanks] = useState<string[]>([]);
   const [accountTypes, setAccountTypes] = useState<string[]>([]);
+  // Mobile wallets (EcoCash, OneMoney, InnBucks, etc.) are tracked
+  // separately from bank account types because they're issued by telecoms /
+  // fintechs, not banks, and a user almost always has a wallet *in addition
+  // to* a bank account. Optional — pick none is a valid answer.
+  const [wallets, setWallets] = useState<string[]>([]);
 
-  const [insurer, setInsurer] = useState("");
+  // Insurance coverage — multi-select since a user can hold policies
+  // with more than one insurer (life at Old Mutual + funeral at ZIMNAT,
+  // etc.). "I don't have insurance" is an exclusive sentinel like
+  // "I don't bank" — see toggleInsurer() below.
+  const [insurers, setInsurers] = useState<string[]>([]);
   const [policyTypes, setPolicyTypes] = useState<string[]>([]);
 
   const [medicalAid, setMedicalAid] = useState("");
@@ -245,6 +256,24 @@ export default function SignupPage() {
       const withoutSentinel = prev.filter((b) => b !== "I don't bank");
       return withoutSentinel.includes(value)
         ? withoutSentinel.filter((b) => b !== value)
+        : [...withoutSentinel, value];
+    });
+  }
+
+  // Same exclusive-sentinel pattern for insurers. "I don't have insurance"
+  // is the uninsured marker; picking it clears any selected insurers, and
+  // picking a real insurer clears the sentinel. Mirrors toggleBank() above
+  // so the multi-select UX behaves consistently across the two financial
+  // steps.
+  function toggleInsurer(value: string) {
+    if (value === "I don't have insurance") {
+      setInsurers((prev) => (prev.includes(value) ? [] : [value]));
+      return;
+    }
+    setInsurers((prev) => {
+      const withoutSentinel = prev.filter((i) => i !== "I don't have insurance");
+      return withoutSentinel.includes(value)
+        ? withoutSentinel.filter((i) => i !== value)
         : [...withoutSentinel, value];
     });
   }
@@ -283,7 +312,11 @@ export default function SignupPage() {
       }
 
       const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
-      const insuranceSelected = insurer && insurer !== "I don't have insurance";
+      // `insuranceSelected` is true when the user picked at least one real
+      // insurer. "I don't have insurance" as the sole selection flips this
+      // to false — same shape as the banks step's "I don't bank" sentinel.
+      const insuranceSelected =
+        insurers.length > 0 && !insurers.includes("I don't have insurance");
 
       const consents = {
         research_use: researchConsent,
@@ -306,12 +339,12 @@ export default function SignupPage() {
                   socialPlatforms,
                   telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
                   bankingFootprint: banksSelected
-                    ? { banks, account_types: accountTypes }
+                    ? { banks, account_types: accountTypes, wallets }
                     : undefined,
                   insuranceFootprint: {
-                    provider: insurer,
+                    providers: insurers,
                     policy_types: insuranceSelected ? policyTypes : [],
-                    has_insurance: !!insuranceSelected,
+                    has_insurance: insuranceSelected,
                   },
                   healthcareFootprint: {
                     medical_aid_provider: medicalAid,
@@ -357,15 +390,14 @@ export default function SignupPage() {
     spend,
     banks,
     accountTypes,
-    insurer,
+    wallets,
+    insurers,
     policyTypes,
     medicalAid,
     chronicOptIn,
     healthDataConsent,
     researchConsent,
     leaderboardConsent,
-    banks,
-    accountTypes,
     router,
   ]);
 
@@ -379,8 +411,13 @@ export default function SignupPage() {
         return !!(network && planType && spend);
       case "banking":
         return banks.length > 0;
+      case "wallets":
+        // Optional step — picking zero wallets is valid (a user may not
+        // use mobile money at all, or only use it via the bank-linked
+        // services we already capture in the banking step).
+        return true;
       case "insurance":
-        return !!insurer;
+        return insurers.length > 0;
       case "health":
         return !!medicalAid;
       case "orgDetails":
@@ -395,7 +432,8 @@ export default function SignupPage() {
       buildFactQueue([
         network,
         ...(banks.includes("I don't bank") ? [] : banks),
-        insurer !== "I don't have insurance" ? insurer : undefined,
+        ...wallets,
+        ...(insurers.includes("I don't have insurance") ? [] : insurers),
         medicalAid !== "None" ? medicalAid : undefined,
       ]),
     );
@@ -721,8 +759,35 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go("insurance")}
+                onClick={() => go("wallets")}
                 disabled={!canContinue("banking")}
+                className="flex-1"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "wallets" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Mobile wallets</h1>
+            <p className="text-[13px] text-text-secondary">
+              Pick every mobile money or digital wallet you use. We&apos;ll factor
+              these into your banking comparisons and fee alerts. Skip if you
+              don&apos;t use any.
+            </p>
+            <MultiChipGroup
+              options={WALLETS}
+              values={wallets}
+              onToggle={(v) => toggle(wallets, setWallets, v)}
+            />
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("insurance")}
                 className="flex-1"
               >
                 Continue
@@ -734,13 +799,18 @@ export default function SignupPage() {
         {step === "insurance" && (
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Insurance coverage</h1>
-            <ChipGroup
+            <p className="text-[13px] text-text-secondary">
+              Pick every insurer you hold a policy with. We&apos;ll surface their
+              products in your comparisons and notify you on price or benefit
+              changes. Pick &quot;I don&apos;t have insurance&quot; to skip.
+            </p>
+            <MultiChipGroup
               options={INSURERS}
-              value={insurer}
-              onChange={setInsurer}
+              values={insurers}
+              onToggle={toggleInsurer}
               renderOption={(opt) => <ProviderChipMark name={opt} />}
             />
-            {insurer && insurer !== "I don't have insurance" && (
+            {insurers.length > 0 && !insurers.includes("I don't have insurance") && (
               <div>
                 <span className="text-[13px] font-medium text-text-secondary">Policy types</span>
                 <div className="mt-2">
@@ -769,7 +839,7 @@ export default function SignupPage() {
 
         {step === "health" && (
           <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Health data</h1>
+            <h1 className="font-display text-[24px] font-bold">Medical Aid</h1>
             <ChipGroup
               options={MEDICAL_AIDS}
               value={medicalAid}

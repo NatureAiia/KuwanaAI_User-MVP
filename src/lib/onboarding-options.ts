@@ -24,6 +24,9 @@ export const SPEND_RANGES = ["Under $10", "$10–$25", "$25–$50", "$50+"];
 // Steward, a USD nostro at Stanbic, etc.). "I don't bank" stays as an
 // exclusive single-select option so the rest of the flow knows to skip the
 // account-types follow-up.
+// Note: Reserve Bank of Zimbabwe (RBZ) is intentionally not in this list —
+// it's the central bank / regulator, not a retail bank, and adding it here
+// would collide with the regulator allowlist in src/lib/orgVerification.ts.
 export const BANKS = [
   "CBZ Bank",
   "Steward Bank",
@@ -32,10 +35,39 @@ export const BANKS = [
   "ZB Bank",
   "Nedbank",
   "POSB",
+  "Ecobank",
+  "First Capital",
+  "NMB",
+  "BancABC",
+  "CABS",
   "Other",
   "I don't bank",
 ];
-export const ACCOUNT_TYPES = ["Savings", "Current", "EcoCash", "OneMoney", "USD Nostro"];
+// Account types apply to the *bank* account (ZIG/Commercial/etc.). Mobile
+// wallets (EcoCash/OneMoney/etc.) live in their own step — they're issued
+// by mobile network operators, not banks, so they don't belong here.
+export const ACCOUNT_TYPES = [
+  "Savings",
+  "Current",
+  "USD Nostro",
+  "ZIG",
+  "Commercial",
+  "Building Society",
+  "DTMBs",
+  "DFIs",
+];
+// Mobile wallets issued by telecoms / fintechs. Kept separate from the bank
+// account-types list because users almost always have a wallet *in addition
+// to* a bank account, and the use cases (P2P transfer, airtime purchase,
+// bill pay) are different from "what kind of bank account do you hold".
+export const WALLETS = [
+  "OneMoney",
+  "EcoCash",
+  "InnBucks",
+  "Mukuru",
+  "O'mari",
+  "MyCash",
+];
 
 export const INSURERS = ["Old Mutual", "First Mutual", "ZIMNAT", "Fidelity Life", "I don't have insurance"];
 export const POLICY_TYPES = ["Life", "Health", "Motor", "Property", "Funeral", "Travel"];
