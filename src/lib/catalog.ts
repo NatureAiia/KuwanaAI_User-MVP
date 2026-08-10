@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
+import { loadFittedWeights, type FittedWeights } from "@/lib/fittedWeights";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
 function toListingDTO(listing: {
@@ -231,7 +232,35 @@ export async function getPersonalizedSpecials(
  * benefit, 50/50 — same as computeDecisionScores), plus bonuses for being
  * a "special" (price drop / below-median), freshness, and provider trust,
  * clamped to 0-100.
+ *
+ * If `notebooks/data/fitted_weights.json` exists with an in-sample fit for
+ * this category (see `loadFittedWeights`), the score is computed via the
+ * fitted logistic-regression formula instead of the hand-tuned blend. The
+ * heuristic stays in charge until the notebook produces a fit — which is
+ * the production behavior until enough `action_taken` / saved-listing
+ * signals have accumulated for a category.
  */
+
+function scoreWithFit(
+  fit: FittedWeights,
+  features: {
+    value_score: number;
+    special_bonus: number;
+    freshness_bonus: number;
+    trust_bonus: number;
+    trend_feature: number;
+  },
+): number {
+  return (
+    fit._intercept +
+    fit.value_score * features.value_score +
+    fit.special_bonus * features.special_bonus +
+    fit.freshness_bonus * features.freshness_bonus +
+    fit.trust_bonus * features.trust_bonus +
+    fit.trend_feature * features.trend_feature
+  );
+}
+
 export async function getFavoriteProductSpecials(
   userId: string,
   limit = 4,
@@ -309,6 +338,16 @@ export async function getFavoriteProductSpecials(
 
   const trends = await getListingPriceTrends(favoriteListings.map((l) => l.id));
 
+  // Per-category weights from the offline notebook (Section 5 of
+  // `notebooks/recommendation_engine.py`). Null when the notebook hasn't been
+  // run yet — production behavior, no error. Cached on mtime so a fresh
+  // notebook run is picked up on the next request without a server restart.
+  // Below `_accuracy < FITTED_FIT_FLOOR`, the in-sample fit isn't even a
+  // coin-flip better than random — fall through to the heuristic so the UI
+  // doesn't ship a confidently-wrong rank order.
+  const FITTED_FIT_FLOOR = 0.55;
+  const fitted = loadFittedWeights();
+
   // Group by category so the home page shows one carousel per category, and
   // rank within each category with the favorite-product score below.
   const byCategory = new Map<
@@ -350,18 +389,37 @@ export async function getFavoriteProductSpecials(
     const median =
       dtos.map((d) => d.price).sort((a, b) => a - b)[Math.floor(dtos.length / 2)] ?? Number.POSITIVE_INFINITY;
 
+    // Decide per category whether to use the logistic-regression fit or the
+    // hand-tuned heuristic. The fit must exist AND its in-sample accuracy
+    // must clear the floor; otherwise the heuristic stays in charge.
+    const fittedForCategory = fitted?.weights[group.categorySlug];
+    const useFitted = !!(fittedForCategory && fittedForCategory._accuracy >= FITTED_FIT_FLOOR);
+
     const ranked = dtos
       .map((listing) => {
-        const base = scores[listing.id]?.total ?? 0;
         const trend = trends[listing.id] ?? null;
         const trendingDown = trend?.direction === "down" && Math.abs(trend.changePercent) >= 5;
         const belowMedian = listing.price <= median * 0.9;
         const isSpecial = trendingDown || belowMedian;
         const specialBonus = isSpecial ? 20 : 0;
         const trustBonus = listing.provider.verified ? 5 : 0;
+        // Feature vector — same values the notebook fits against, so the
+        // coefficients drop in without translation.
+        const base = scores[listing.id]?.total ?? 0;
+        const trendPct = trend?.changePercent ?? 0;
+        const features = {
+          value_score: base,
+          special_bonus: specialBonus,
+          freshness_bonus: scores[listing.id]?.freshnessAdjustment ?? 0,
+          trust_bonus: trustBonus,
+          trend_feature: trendPct,
+        };
+        const score = useFitted
+          ? scoreWithFit(fittedForCategory!, features)
+          : base + specialBonus + trustBonus;
         return {
           ...listing,
-          score: Math.max(0, Math.min(100, base + specialBonus + trustBonus)),
+          score: Math.max(0, Math.min(100, score)),
           trend,
         };
       })
