@@ -355,7 +355,7 @@ export default function SignupPage() {
     network,
     planType,
     spend,
-    bank,
+    banks,
     accountTypes,
     insurer,
     policyTypes,
@@ -364,6 +364,8 @@ export default function SignupPage() {
     healthDataConsent,
     researchConsent,
     leaderboardConsent,
+    banks,
+    accountTypes,
     router,
   ]);
 
@@ -392,7 +394,7 @@ export default function SignupPage() {
     setFactQueue(
       buildFactQueue([
         network,
-        bank !== "I don't bank" ? bank : undefined,
+        ...(banks.includes("I don't bank") ? [] : banks),
         insurer !== "I don't have insurance" ? insurer : undefined,
         medicalAid !== "None" ? medicalAid : undefined,
       ]),
