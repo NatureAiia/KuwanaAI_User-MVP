@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { ListingStatus } from "@prisma/client";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
@@ -893,7 +894,7 @@ export async function getComplianceActivity(sectorSlug?: string, limit = 50): Pr
 export async function getSocialMentionsForProvider(providerName: string, limit = 20) {
   return prisma.socialPriceMention.findMany({
     where: { matchedProvider: providerName },
-    orderBy: { createdAt: "desc" },
+    orderBy: { discoveredAt: "desc" },
     take: limit,
   });
 }
@@ -901,9 +902,9 @@ export async function getSocialMentionsForProvider(providerName: string, limit =
 // Admin-only write path - enforced via requireAdmin() checking ADMIN_EMAILS allowlist
 export const AdminWrite = {
   async publishListing(id: string) {
-    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.PUBLISHED } });
+    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.published } });
   },
   async rejectListing(id: string) {
-    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.REJECTED } });
+    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.rejected } });
   },
 };

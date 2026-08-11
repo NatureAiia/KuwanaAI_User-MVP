@@ -142,7 +142,7 @@ export async function POST(req: Request) {
     sourceUrl: l.sourceUrl,
     images: l.images,
     description: l.description ?? null,
-    rating: l.rating ?? null,
+    rating: l.rating === null || l.rating === undefined ? null : Number(l.rating),
     reviewCount: l.reviewCount ?? 0,
     provider: l.provider,
   }));

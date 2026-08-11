@@ -258,9 +258,65 @@ const SECTORS: SectorSeed[] = [
           { name: "Trinity College", provider: "Trinity College", price: 950, attrs: { term_fees: 950, curriculum: "Cambridge", boarding: true, pass_rate_pct: 94, location: "Harare" } },
         ],
       },
+      {
+        slug: "universities",
+        name: "Universities & tertiary",
+        attributes: [
+          { key: "tuition_per_year", label: "Tuition (per year)", dataType: "number", unit: "USD" },
+          { key: "program_count", label: "Programmes", dataType: "number" },
+          { key: "residential", label: "On-campus accommodation", dataType: "boolean" },
+          { key: "study_mode", label: "Study mode", dataType: "enum" },
+          { key: "location", label: "Location", dataType: "string" },
+        ],
+        providers: [
+          "University of Zimbabwe",
+          "NUST",
+          "Midlands State University",
+          "Harare Institute of Technology",
+          "Great Zimbabwe University",
+          "Chinhoyi University of Technology",
+        ],
+        listings: [
+          { name: "University of Zimbabwe — Bachelor's programmes", provider: "University of Zimbabwe", price: 900, attrs: { tuition_per_year: 900, program_count: 100, residential: true, study_mode: "Full-time", location: "Harare" } },
+          { name: "NUST — Undergraduate programmes", provider: "NUST", price: 950, attrs: { tuition_per_year: 950, program_count: 60, residential: true, study_mode: "Full-time", location: "Bulawayo" } },
+          { name: "Midlands State University — Undergraduate", provider: "Midlands State University", price: 750, attrs: { tuition_per_year: 750, program_count: 85, residential: true, study_mode: "Full-time", location: "Gweru" } },
+          { name: "Harare Institute of Technology — BSc programmes", provider: "Harare Institute of Technology", price: 1100, attrs: { tuition_per_year: 1100, program_count: 30, residential: false, study_mode: "Full-time", location: "Harare" } },
+          { name: "Great Zimbabwe University — Undergraduate", provider: "Great Zimbabwe University", price: 700, attrs: { tuition_per_year: 700, program_count: 70, residential: true, study_mode: "Full-time", location: "Masvingo" } },
+          { name: "Chinhoyi University of Technology — BSc programmes", provider: "Chinhoyi University of Technology", price: 800, attrs: { tuition_per_year: 800, program_count: 40, residential: true, study_mode: "Full-time", location: "Chinhoyi" } },
+        ],
+      },
     ],
   },
-  { slug: "healthcare", name: "Healthcare", status: "coming_soon", categories: [] },
+  {
+    slug: "healthcare",
+    name: "Healthcare",
+    status: "live",
+    categories: [
+      {
+        slug: "medical-aid-plans",
+        name: "Medical aid plans",
+        attributes: [
+          { key: "monthly_contribution", label: "Monthly contribution", dataType: "number", unit: "USD" },
+          { key: "hospital_cover", label: "Hospital cover", dataType: "enum" },
+          { key: "day_to_day_cover", label: "Day-to-day cover", dataType: "enum" },
+          { key: "dependants_allowed", label: "Dependants allowed", dataType: "boolean" },
+          { key: "dental_cover", label: "Dental & optical", dataType: "boolean" },
+        ],
+        providers: ["Cimas", "PSMAS", "First Mutual Health", "Alliance Health", "Aura Medical Aid Scheme", "FLIMAS"],
+        listings: [
+          { name: "Cimas Smart Primary", provider: "Cimas", price: 45, attrs: { monthly_contribution: 45, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "Cimas Premium Plan", provider: "Cimas", price: 120, attrs: { monthly_contribution: 120, hospital_cover: "Full", day_to_day_cover: "Comprehensive", dependants_allowed: true, dental_cover: true } },
+          { name: "PSMAS ZimCare", provider: "PSMAS", price: 25, attrs: { monthly_contribution: 25, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "PSMAS MegaCare", provider: "PSMAS", price: 60, attrs: { monthly_contribution: 60, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
+          { name: "First Mutual Health Essential", provider: "First Mutual Health", price: 30, attrs: { monthly_contribution: 30, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "First Mutual Health Classic", provider: "First Mutual Health", price: 75, attrs: { monthly_contribution: 75, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
+          { name: "Alliance Health Scheme", provider: "Alliance Health", price: 35, attrs: { monthly_contribution: 35, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "Aura Medical Aid Scheme", provider: "Aura Medical Aid Scheme", price: 40, attrs: { monthly_contribution: 40, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: false } },
+          { name: "FLIMAS Family Plan", provider: "FLIMAS", price: 28, attrs: { monthly_contribution: 28, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+        ],
+      },
+    ],
+  },
   {
     slug: "transport",
     name: "Transport",
@@ -303,6 +359,57 @@ const SECTORS: SectorSeed[] = [
           { name: "ZESA Token via ZETDC USSD", provider: "ZESA ZETDC", price: 0.5, attrs: { fee_per_transaction: 0.5, processing_time: 2, channel: "USSD" } },
           { name: "ZESA Token via EcoCash", provider: "EcoCash", price: 0.3, attrs: { fee_per_transaction: 0.3, processing_time: 1, channel: "App" } },
           { name: "ZESA Token via OneMoney Agent", provider: "OneMoney", price: 1, attrs: { fee_per_transaction: 1, processing_time: 5, channel: "Agent" } },
+        ],
+      },
+      {
+        slug: "vehicle-licensing",
+        name: "Vehicle licensing",
+        attributes: [
+          { key: "license_period", label: "Period", dataType: "enum" },
+          { key: "vehicle_class", label: "Vehicle class", dataType: "enum" },
+          { key: "channel", label: "Channel", dataType: "enum" },
+          { key: "processing_time", label: "Processing time", dataType: "number", unit: "min" },
+        ],
+        providers: ["ZINARA"],
+        listings: [
+          { name: "ZINARA Private vehicle — 1 year (sedan)", provider: "ZINARA", price: 55, attrs: { license_period: "1 year", vehicle_class: "Private", channel: "ZINARA office", processing_time: 20 } },
+          { name: "ZINARA Private vehicle — 6 months (sedan)", provider: "ZINARA", price: 30, attrs: { license_period: "6 months", vehicle_class: "Private", channel: "ZINARA office", processing_time: 20 } },
+          { name: "ZINARA Commuter omnibus — 1 year", provider: "ZINARA", price: 120, attrs: { license_period: "1 year", vehicle_class: "Commercial", channel: "ZINARA office", processing_time: 25 } },
+          { name: "ZINARA Heavy truck — 1 year", provider: "ZINARA", price: 180, attrs: { license_period: "1 year", vehicle_class: "Commercial", channel: "ZINARA office", processing_time: 30 } },
+        ],
+      },
+      {
+        slug: "water-bills",
+        name: "Municipal water",
+        attributes: [
+          { key: "monthly_usage", label: "Usage", dataType: "number", unit: "kl" },
+          { key: "billing_frequency", label: "Billing", dataType: "enum" },
+          { key: "payment_channel", label: "Payment channel", dataType: "enum" },
+          { key: "prepaid_available", label: "Prepaid available", dataType: "boolean" },
+        ],
+        providers: ["City of Harare", "City of Bulawayo"],
+        listings: [
+          { name: "City of Harare water — domestic (20 kl/mo)", provider: "City of Harare", price: 35, attrs: { monthly_usage: 20, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", prepaid_available: true } },
+          { name: "City of Harare water — domestic (40 kl/mo)", provider: "City of Harare", price: 70, attrs: { monthly_usage: 40, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", prepaid_available: true } },
+          { name: "City of Bulawayo water — domestic (20 kl/mo)", provider: "City of Bulawayo", price: 32, attrs: { monthly_usage: 20, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", prepaid_available: true } },
+          { name: "City of Bulawayo water — domestic (40 kl/mo)", provider: "City of Bulawayo", price: 62, attrs: { monthly_usage: 40, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", prepaid_available: true } },
+        ],
+      },
+      {
+        slug: "property-rates",
+        name: "Property rates",
+        attributes: [
+          { key: "property_value", label: "Property value", dataType: "number", unit: "USD" },
+          { key: "billing_frequency", label: "Billing", dataType: "enum" },
+          { key: "payment_channel", label: "Payment channel", dataType: "enum" },
+          { key: "rates_percent", label: "Rate", dataType: "number", unit: "% p.a." },
+        ],
+        providers: ["City of Harare", "City of Bulawayo"],
+        listings: [
+          { name: "City of Harare rates — dwelling (val $50k)", provider: "City of Harare", price: 25, attrs: { property_value: 50000, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", rates_percent: 0.6 } },
+          { name: "City of Harare rates — dwelling (val $25k)", provider: "City of Harare", price: 13, attrs: { property_value: 25000, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", rates_percent: 0.6 } },
+          { name: "City of Bulawayo rates — dwelling (val $50k)", provider: "City of Bulawayo", price: 22, attrs: { property_value: 50000, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", rates_percent: 0.5 } },
+          { name: "City of Bulawayo rates — dwelling (val $25k)", provider: "City of Bulawayo", price: 11, attrs: { property_value: 25000, billing_frequency: "Monthly", payment_channel: "City council + EcoCash", rates_percent: 0.5 } },
         ],
       },
     ],
@@ -402,6 +509,104 @@ const SECTORS: SectorSeed[] = [
       },
     ],
   },
+  {
+    slug: "hotels",
+    name: "Hotels",
+    status: "live",
+    categories: [
+      {
+        slug: "hotel-stays",
+        name: "Hotels & stays",
+        attributes: [
+          { key: "price_per_night", label: "Price per night", dataType: "number", unit: "USD" },
+          { key: "room_type", label: "Room type", dataType: "enum" },
+          { key: "location", label: "Location", dataType: "string" },
+          { key: "breakfast_included", label: "Breakfast included", dataType: "boolean" },
+          { key: "pool", label: "Swimming pool", dataType: "boolean" },
+        ],
+        providers: ["Meikles", "Rainbow Towers", "Cresta", "Holiday Inn", "Victoria Falls Safari Lodge", "Kingdom Hotel"],
+        listings: [
+          { name: "Meikles Hotel — Standard Room", provider: "Meikles", price: 180, attrs: { price_per_night: 180, room_type: "Standard", location: "Harare", breakfast_included: true, pool: true } },
+          { name: "Meikles Hotel — Executive Room", provider: "Meikles", price: 240, attrs: { price_per_night: 240, room_type: "Executive", location: "Harare", breakfast_included: true, pool: true } },
+          { name: "Rainbow Towers — Standard Room", provider: "Rainbow Towers", price: 120, attrs: { price_per_night: 120, room_type: "Standard", location: "Harare", breakfast_included: true, pool: true } },
+          { name: "Rainbow Towers — Deluxe Room", provider: "Rainbow Towers", price: 160, attrs: { price_per_night: 160, room_type: "Deluxe", location: "Harare", breakfast_included: true, pool: true } },
+          { name: "Cresta Oasis — Standard Room", provider: "Cresta", price: 70, attrs: { price_per_night: 70, room_type: "Standard", location: "Harare", breakfast_included: true, pool: false } },
+          { name: "Holiday Inn Harare — Standard Room", provider: "Holiday Inn", price: 85, attrs: { price_per_night: 85, room_type: "Standard", location: "Harare", breakfast_included: true, pool: true } },
+          { name: "Victoria Falls Safari Lodge — Standard Room", provider: "Victoria Falls Safari Lodge", price: 350, attrs: { price_per_night: 350, room_type: "Standard", location: "Victoria Falls", breakfast_included: true, pool: true } },
+          { name: "Kingdom Hotel — Standard Room", provider: "Kingdom Hotel", price: 150, attrs: { price_per_night: 150, room_type: "Standard", location: "Victoria Falls", breakfast_included: true, pool: true } },
+          { name: "Holiday Inn Bulawayo — Standard Room", provider: "Holiday Inn", price: 80, attrs: { price_per_night: 80, room_type: "Standard", location: "Bulawayo", breakfast_included: true, pool: false } },
+          { name: "Cresta Churchill — Standard Room", provider: "Cresta", price: 60, attrs: { price_per_night: 60, room_type: "Standard", location: "Bulawayo", breakfast_included: true, pool: false } },
+        ],
+      },
+    ],
+  },
+  {
+    slug: "retail",
+    name: "Retail & Groceries",
+    status: "live",
+    categories: [
+      {
+        slug: "maize-meal",
+        name: "Maize meal (10kg)",
+        attributes: [
+          { key: "brand", label: "Brand", dataType: "string" },
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        listings: [
+          { name: "White Star Maize Meal 10kg", provider: "Pick n Pay", price: 8.5, attrs: { brand: "White Star", pack_size: "10kg", store: "Pick n Pay" } },
+          { name: "White Star Maize Meal 10kg", provider: "Spar", price: 8.2, attrs: { brand: "White Star", pack_size: "10kg", store: "Spar" } },
+          { name: "White Star Maize Meal 10kg", provider: "Bon Marché", price: 8.9, attrs: { brand: "White Star", pack_size: "10kg", store: "Bon Marché" } },
+        ],
+      },
+      {
+        slug: "cooking-oil",
+        name: "Cooking oil (2L)",
+        attributes: [
+          { key: "brand", label: "Brand", dataType: "string" },
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        listings: [
+          { name: "Dona Cooking Oil 2L", provider: "Pick n Pay", price: 6.4, attrs: { brand: "Dona", pack_size: "2L", store: "Pick n Pay" } },
+          { name: "Dona Cooking Oil 2L", provider: "Spar", price: 6.1, attrs: { brand: "Dona", pack_size: "2L", store: "Spar" } },
+          { name: "Dona Cooking Oil 2L", provider: "Bon Marché", price: 6.6, attrs: { brand: "Dona", pack_size: "2L", store: "Bon Marché" } },
+        ],
+      },
+      {
+        slug: "sugar",
+        name: "Sugar (2kg)",
+        attributes: [
+          { key: "brand", label: "Brand", dataType: "string" },
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        listings: [
+          { name: "Star Sugar 2kg", provider: "Pick n Pay", price: 3.8, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Pick n Pay" } },
+          { name: "Star Sugar 2kg", provider: "Spar", price: 3.6, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Spar" } },
+          { name: "Star Sugar 2kg", provider: "Bon Marché", price: 4.0, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Bon Marché" } },
+        ],
+      },
+      {
+        slug: "rice",
+        name: "Rice (5kg)",
+        attributes: [
+          { key: "brand", label: "Brand", dataType: "string" },
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        listings: [
+          { name: "Yummy Rice 5kg", provider: "Pick n Pay", price: 9.5, attrs: { brand: "Yummy", pack_size: "5kg", store: "Pick n Pay" } },
+          { name: "Yummy Rice 5kg", provider: "Spar", price: 9.1, attrs: { brand: "Yummy", pack_size: "5kg", store: "Spar" } },
+          { name: "Yummy Rice 5kg", provider: "Bon Marché", price: 9.8, attrs: { brand: "Yummy", pack_size: "5kg", store: "Bon Marché" } },
+        ],
+      },
+    ],
+  },
 ];
 
 async function main() {
@@ -448,7 +653,7 @@ async function main() {
       for (const listing of catSeed.listings) {
         const providerId = providerIdByName.get(listing.provider)!;
         const existing = await prisma.listing.findFirst({
-          where: { categoryId: category.id, name: listing.name },
+          where: { categoryId: category.id, name: listing.name, providerId },
         });
         const seedKey = `${category.slug}-${listing.provider}-${listing.name}`;
         const data = {

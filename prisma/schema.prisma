@@ -79,6 +79,8 @@ enum Sector {
   pharmacy
   electronics
   fashion
+  hotels
+  retail
 }
 
 model SectorFootprint {

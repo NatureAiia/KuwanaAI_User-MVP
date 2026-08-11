@@ -9,7 +9,6 @@ import { SignalBloom } from "@/components/SignalBloom";
 import { LandingFX } from "@/components/landing/LandingFX";
 import { HeroDeviceMockup } from "@/components/landing/HeroDeviceMockup";
 import { ScrollButtons } from "@/components/landing/ScrollButtons";
-import { WaitlistInline } from "@/components/landing/WaitlistInline";
 import { GetStartedButton } from "@/components/landing/GetStartedButton";
 import { HeaderGetStarted } from "@/components/landing/HeaderGetStarted";
 
@@ -179,13 +178,18 @@ export default function LandingPage() {
           <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface-raised p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-4">
             <HeartPulse size={32} className="text-accent-coral shrink-0" />
             <div className="flex-1">
-              <h2 className="font-display text-[18px] font-semibold">Healthcare is coming next</h2>
+              <h2 className="font-display text-[18px] font-semibold">Medical aid is now live</h2>
               <p className="mt-1 text-[13px] text-text-secondary max-w-[48ch]">
-                Explainable comparisons for medical aid, clinics and pharmacies. Join the waitlist
-                to be first to know.
+                Compare medical aid schemes like Cimas, PSMAS and First Mutual Health — plus new
+                Hotels and Retail &amp; Groceries sectors.
               </p>
             </div>
-            <WaitlistInline />
+            <Link
+              href="/explore/healthcare"
+              className="rounded-full bg-accent-teal px-5 py-2 text-[13px] font-semibold text-bg-base transition-opacity hover:opacity-90"
+            >
+              Compare schemes
+            </Link>
           </div>
         </section>
 

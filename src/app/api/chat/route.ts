@@ -123,7 +123,7 @@ export async function POST(req: Request) {
               sourceUrl: l.sourceUrl,
               images: l.images,
               description: l.description ?? null,
-              rating: l.rating ?? null,
+              rating: l.rating === null || l.rating === undefined ? null : Number(l.rating),
               reviewCount: l.reviewCount ?? 0,
               provider: l.provider,
             })),
@@ -163,6 +163,7 @@ export async function POST(req: Request) {
     : (content as string | { type: "text"; text: string }[]);
 
   const llamaMessages = [
+    { role: "system" as const, content: system },
     ...priorMessages.map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content as string,

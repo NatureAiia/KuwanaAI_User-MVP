@@ -70,7 +70,7 @@ export const WALLETS = [
 ];
 
 export const INSURERS = ["Old Mutual", "First Mutual", "ZIMNAT", "Fidelity Life", "I don't have insurance"];
-export const POLICY_TYPES = ["Life", "Health", "Motor", "Property", "Funeral", "Travel"];
+export const POLICY_TYPES = ["Life", "Health", "Motor", "Property", "Funeral", "Travel", "House insurance"];
 
 export const MEDICAL_AIDS = [
   "Cimas",
