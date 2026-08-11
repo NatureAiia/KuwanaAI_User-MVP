@@ -67,7 +67,12 @@ const consumerSchema = z.object({
     .optional(),
   healthcareFootprint: z
     .object({
-      medical_aid_provider: z.string(),
+      // Multi-select: a person can belong to more than one medical aid
+      // scheme (e.g. workplace PSMAS + private family cover at Cimas).
+      // "None" and "Public hospital only" are exclusive sentinels kept out
+      // of this array — whichever is present as the *only* entry signals
+      // no private scheme. Same pattern as `insuranceFootprint.providers`.
+      medical_aid_providers: z.array(z.string()).min(1),
       chronic_condition_disclosure_opt_in: z.boolean(),
     })
     .optional(),

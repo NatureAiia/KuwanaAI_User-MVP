@@ -229,7 +229,11 @@ export default function SignupPage() {
   const [insurers, setInsurers] = useState<string[]>([]);
   const [policyTypes, setPolicyTypes] = useState<string[]>([]);
 
-  const [medicalAid, setMedicalAid] = useState("");
+  // Medical aid coverage — multi-select since a person can belong to more
+  // than one scheme (a workplace PSMAS policy plus private family cover at
+  // Cimas, etc.). "Public hospital only" and "None" are exclusive sentinels
+  // like "I don't bank"/"I don't have insurance" — see toggleMedicalAid().
+  const [medicalAids, setMedicalAids] = useState<string[]>([]);
   const [chronicOptIn, setChronicOptIn] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [healthDataConsent, setHealthDataConsent] = useState(false);
@@ -274,6 +278,24 @@ export default function SignupPage() {
       const withoutSentinel = prev.filter((i) => i !== "I don't have insurance");
       return withoutSentinel.includes(value)
         ? withoutSentinel.filter((i) => i !== value)
+        : [...withoutSentinel, value];
+    });
+  }
+
+  // Same exclusive-sentinel pattern for medical aids. "None" (no coverage)
+  // and "Public hospital only" (no private scheme) are the markers that clear
+  // every scheme already chosen; picking a real scheme clears the sentinels
+  // first. Mirrors toggleBank()/toggleInsurer() so the multi-select UX behaves
+  // consistently across the financial and health steps.
+  function toggleMedicalAid(value: string) {
+    if (value === "Public hospital only" || value === "None") {
+      setMedicalAids((prev) => (prev.includes(value) ? [] : [value]));
+      return;
+    }
+    setMedicalAids((prev) => {
+      const withoutSentinel = prev.filter((m) => m !== "Public hospital only" && m !== "None");
+      return withoutSentinel.includes(value)
+        ? withoutSentinel.filter((m) => m !== value)
         : [...withoutSentinel, value];
     });
   }
@@ -338,7 +360,7 @@ export default function SignupPage() {
                     has_insurance: insuranceSelected,
                   },
                   healthcareFootprint: {
-                    medical_aid_provider: medicalAid,
+                    medical_aid_providers: medicalAids,
                     chronic_condition_disclosure_opt_in: chronicOptIn,
                   },
                   consents,
@@ -385,7 +407,7 @@ export default function SignupPage() {
     wallets,
     insurers,
     policyTypes,
-    medicalAid,
+    medicalAids,
     chronicOptIn,
     healthDataConsent,
     researchConsent,
@@ -411,7 +433,7 @@ export default function SignupPage() {
       case "insurance":
         return insurers.length > 0;
       case "health":
-        return !!medicalAid && termsAccepted;
+        return medicalAids.length > 0 && termsAccepted;
       case "orgDetails":
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "consent":
@@ -823,12 +845,14 @@ export default function SignupPage() {
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Medical Aid</h1>
             <p className="text-[13px] leading-relaxed text-text-secondary">
-              Select your medical aid scheme so we can tailor healthcare comparisons to your plan.
+              Select every medical aid scheme you belong to — many Zimbabweans hold more than one
+              (a workplace scheme plus family cover, for example). Pick &quot;None&quot; if you have
+              no coverage.
             </p>
-            <ChipGroup
+            <MultiChipGroup
               options={MEDICAL_AIDS}
-              value={medicalAid}
-              onChange={setMedicalAid}
+              values={medicalAids}
+              onToggle={toggleMedicalAid}
               renderOption={(opt) => <ProviderChipMark name={opt} />}
             />
             <div>
