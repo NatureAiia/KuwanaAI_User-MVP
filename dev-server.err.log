@@ -2862,3 +2862,7 @@ Import trace:
   Server Component:
     ./src/lib/catalog.ts
     ./src/app/explore/[sector]/page.tsx 
+⨯ Error: The destination stream closed early.
+    at ignore-listed frames {
+  digest: '3118102130'
+}
