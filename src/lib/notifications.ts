@@ -18,29 +18,34 @@ export async function syncPriceDropNotifications(userId: string): Promise<void> 
   ]);
   const existingByListing = new Map(existing.map((n) => [n.listingId, n]));
 
-  for (const listingId of listingIds) {
-    const trend = trends[listingId];
-    if (!trend || trend.direction !== "down") continue;
+  // Run the upserts concurrently — a sequential loop here is a round-trip to
+  // the (remote) DB per saved listing, which is what made the old per-page
+  // notifications sync take seconds.
+  await Promise.all(
+    listingIds.map(async (listingId) => {
+      const trend = trends[listingId];
+      if (!trend || trend.direction !== "down") return;
 
-    const prior = existingByListing.get(listingId);
-    if (prior && prior.changePercent === trend.changePercent) continue;
+      const prior = existingByListing.get(listingId);
+      if (prior && prior.changePercent === trend.changePercent) return;
 
-    await prisma.notification.upsert({
-      where: { userId_listingId_type: { userId, listingId, type: "price_drop" } },
-      update: {
-        message: `Price dropped ${Math.abs(trend.changePercent)}% over the last ${trend.periodDays} days.`,
-        changePercent: trend.changePercent,
-        read: false,
-      },
-      create: {
-        userId,
-        listingId,
-        type: "price_drop",
-        message: `Price dropped ${Math.abs(trend.changePercent)}% over the last ${trend.periodDays} days.`,
-        changePercent: trend.changePercent,
-      },
-    });
-  }
+      await prisma.notification.upsert({
+        where: { userId_listingId_type: { userId, listingId, type: "price_drop" } },
+        update: {
+          message: `Price dropped ${Math.abs(trend.changePercent)}% over the last ${trend.periodDays} days.`,
+          changePercent: trend.changePercent,
+          read: false,
+        },
+        create: {
+          userId,
+          listingId,
+          type: "price_drop",
+          message: `Price dropped ${Math.abs(trend.changePercent)}% over the last ${trend.periodDays} days.`,
+          changePercent: trend.changePercent,
+        },
+      });
+    }),
+  );
 }
 
 /**

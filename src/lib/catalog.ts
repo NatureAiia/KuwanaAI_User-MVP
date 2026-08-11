@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { cache } from "react";
 import { ListingStatus } from "@prisma/client";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
@@ -38,62 +39,122 @@ function toListingDTO(listing: {
   };
 }
 
-export async function getSectorCategories(sectorSlug: string): Promise<CategoryDTO[]> {
-  const sector = await prisma.sectorConfig.findUnique({
-    where: { slug: sectorSlug },
-    include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
-  });
-  if (!sector) return [];
-  return sector.categories.map((c) => ({
-    id: c.id,
-    slug: c.slug,
-    name: c.name,
-    attributeSchema: c.attributeSchema.map((a) => ({
-      key: a.key,
-      label: a.label,
-      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
-      unit: a.unit,
-      isComparable: a.isComparable,
-      sortOrder: a.sortOrder,
-    })),
-  }));
-}
+// Short-lived cross-request cache for the hot catalog reads below. React's
+// cache() (used above) only dedups within a single request, but every page
+// load on /explore, /compare and the listings API re-hits the same remote
+// Postgres queries. Listings/categories change only via ingestion and
+// approval flows, so a 30s window of staleness is invisible — and it turns
+// repeat navigation from ~1s of DB round-trips into a near-instant hit.
+// Also coalesces concurrent in-flight calls so a burst of requests doesn't
+// fan out into N identical queries. Deliberately not used for anything
+// user-specific (saved listings, profiles, streaks, auth).
+const CATALOG_TTL_MS = 30_000;
+const MAX_TTL_ENTRIES = 200;
 
-export async function getCategoryWithListings(
-  sectorSlug: string,
-  categorySlug: string,
-): Promise<CategoryWithListingsDTO | null> {
-  const sector = await prisma.sectorConfig.findUnique({ where: { slug: sectorSlug } });
-  if (!sector) return null;
+function ttlCache<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => Promise<TResult>,
+  ttlMs: number,
+): (...args: TArgs) => Promise<TResult> {
+  const results = new Map<string, { value: TResult; expiresAt: number }>();
+  const inflight = new Map<string, Promise<TResult>>();
 
-  const category = await prisma.category.findUnique({
-    where: { sectorId_slug: { sectorId: sector.id, slug: categorySlug } },
-    include: {
-      attributeSchema: { orderBy: { sortOrder: "asc" } },
-      listings: {
-        where: { status: "published" },
-        include: { provider: true },
-        orderBy: { price: "asc" },
-      },
-    },
-  });
-  if (!category) return null;
+  return (...args) => {
+    const key = JSON.stringify(args);
 
-  return {
-    id: category.id,
-    slug: category.slug,
-    name: category.name,
-    attributeSchema: category.attributeSchema.map((a) => ({
-      key: a.key,
-      label: a.label,
-      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
-      unit: a.unit,
-      isComparable: a.isComparable,
-      sortOrder: a.sortOrder,
-    })),
-    listings: category.listings.map(toListingDTO),
+    const hit = results.get(key);
+    if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.value);
+
+    const running = inflight.get(key);
+    if (running) return running;
+
+    const p = fn(...args);
+    inflight.set(key, p);
+    // Rejections are handled by the caller awaiting `p`; this side chain only
+    // records a successful value and cleans the in-flight slot on settle.
+    void p
+      .then((value) => {
+        if (results.size >= MAX_TTL_ENTRIES) {
+          const oldest = results.keys().next().value;
+          if (oldest !== undefined) results.delete(oldest);
+        }
+        results.set(key, { value, expiresAt: Date.now() + ttlMs });
+      })
+      .catch(() => {})
+      .finally(() => inflight.delete(key));
+    return p;
   };
 }
+
+export const getSectorCategories = cache(
+  ttlCache(async (sectorSlug: string): Promise<CategoryDTO[]> => {
+    const sector = await prisma.sectorConfig.findUnique({
+      where: { slug: sectorSlug },
+      include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
+    });
+    if (!sector) return [];
+    return sector.categories.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      attributeSchema: c.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+    }));
+  }, CATALOG_TTL_MS),
+);
+
+export const getCategoryWithListings = cache(
+  ttlCache(async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | null> => {
+    // Resolve sector + category in one query (relation filter on the join)
+    // instead of two round-trips — the caller is already waiting on this
+    // before it can render anything.
+    const category = await prisma.category.findFirst({
+      where: { slug: categorySlug, sector: { slug: sectorSlug } },
+      include: {
+        attributeSchema: { orderBy: { sortOrder: "asc" } },
+        listings: {
+          where: { status: "published" },
+          include: { provider: true },
+          orderBy: { price: "asc" },
+        },
+      },
+    });
+    if (!category) return null;
+
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      attributeSchema: category.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+      listings: category.listings.map(toListingDTO),
+    };
+  }, CATALOG_TTL_MS),
+);
+
+// Compare-page lookup by id: category + its attribute schema, with nothing
+// else attached. Static schema data, so safe for the shared TTL — and the
+// compare page is the one place that would otherwise re-fetch this raw on
+// every navigation from a listing.
+export const getCategorySchema = cache(
+  ttlCache(async (categoryId: string) => {
+    return prisma.category.findUnique({
+      where: { id: categoryId },
+      include: { attributeSchema: { orderBy: { sortOrder: "asc" } } },
+    });
+  }, CATALOG_TTL_MS),
+);
 
 export async function getTopListings(
   sectorSlug: string,
@@ -195,10 +256,15 @@ export async function getPersonalizedSpecials(
   }
 
   const engagedSectors = new Set([...candidates.values()].map((c) => c.sectorSlug));
-  for (const footprint of footprints) {
-    if (engagedSectors.has(footprint.sector)) continue;
-    const [firstCategory] = await getSectorCategories(footprint.sector);
-    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug: footprint.sector, categorySlug: firstCategory.slug });
+  // One lookup per footprint sector, in parallel — sequential awaits here
+  // would stack a DB round-trip per sector on every dashboard render.
+  const footprintFirstCategories = await Promise.all(
+    footprints
+      .filter((fp) => !engagedSectors.has(fp.sector))
+      .map(async (fp) => [fp.sector, (await getSectorCategories(fp.sector))[0]] as const),
+  );
+  for (const [sectorSlug, firstCategory] of footprintFirstCategories) {
+    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug, categorySlug: firstCategory.slug });
   }
 
   if (candidates.size === 0) return [];
@@ -499,27 +565,29 @@ export async function getFavoriteProductSpecials(
  * to a PriceTrend (or null if there's no history yet). Keyed by listing id
  * so callers can look up a listing's trend alongside its other data.
  */
-export async function getListingPriceTrends(listingIds: string[]): Promise<Record<string, PriceTrend | null>> {
-  if (listingIds.length === 0) return {};
+export const getListingPriceTrends = cache(
+  ttlCache(async (listingIds: string[]): Promise<Record<string, PriceTrend | null>> => {
+    if (listingIds.length === 0) return {};
 
-  const rows = await prisma.listingPriceHistory.findMany({
-    where: { listingId: { in: listingIds } },
-    orderBy: { recordedAt: "asc" },
-  });
+    const rows = await prisma.listingPriceHistory.findMany({
+      where: { listingId: { in: listingIds } },
+      orderBy: { recordedAt: "asc" },
+    });
 
-  const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
-  for (const row of rows) {
-    const arr = grouped.get(row.listingId) ?? [];
-    arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
-    grouped.set(row.listingId, arr);
-  }
+    const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
+    for (const row of rows) {
+      const arr = grouped.get(row.listingId) ?? [];
+      arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
+      grouped.set(row.listingId, arr);
+    }
 
-  const result: Record<string, PriceTrend | null> = {};
-  for (const id of listingIds) {
-    result[id] = computePriceTrend(grouped.get(id) ?? []);
-  }
-  return result;
-}
+    const result: Record<string, PriceTrend | null> = {};
+    for (const id of listingIds) {
+      result[id] = computePriceTrend(grouped.get(id) ?? []);
+    }
+    return result;
+  }, CATALOG_TTL_MS),
+);
 
 /**
  * Snapshots a listing's price into ListingPriceHistory before it changes.
@@ -534,13 +602,15 @@ export async function recordPriceChange(listingId: string, previousPrice: number
   await prisma.listingPriceHistory.create({ data: { listingId, price: previousPrice } });
 }
 
-export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
-  const listings = await prisma.listing.findMany({
-    where: { id: { in: ids }, status: "published" },
-    include: { provider: true },
-  });
-  return listings.map(toListingDTO);
-}
+export const getListingsByIds = cache(
+  ttlCache(async (ids: string[]): Promise<ListingDTO[]> => {
+    const listings = await prisma.listing.findMany({
+      where: { id: { in: ids }, status: "published" },
+      include: { provider: true },
+    });
+    return listings.map(toListingDTO);
+  }, CATALOG_TTL_MS),
+);
 
 export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string; pinned: boolean };
 
@@ -780,35 +850,34 @@ export type TrendingListing = { listing: ListingDTO; comparisonCount: number };
  * tally-over-Comparison-rows approach as getAlsoCompared, but time-windowed
  * and ranked across a sector rather than scoped to one listing's neighbors.
  */
-export async function getTrendingListings(
-  sectorSlug?: string,
-  limit = 6,
-  windowDays = 7,
-): Promise<TrendingListing[]> {
-  const since = new Date(Date.now() - windowDays * 86_400_000);
-  const comparisons = await prisma.comparison.findMany({
-    where: {
-      createdAt: { gte: since },
-      ...(sectorSlug ? { category: { sector: { slug: sectorSlug } } } : {}),
-    },
-    select: { listingIds: true },
-  });
+export const getTrendingListings = ttlCache<[string?, number?, number?], TrendingListing[]>(
+  async (sectorSlug?, limit = 6, windowDays = 7): Promise<TrendingListing[]> => {
+    const since = new Date(Date.now() - windowDays * 86_400_000);
+    const comparisons = await prisma.comparison.findMany({
+      where: {
+        createdAt: { gte: since },
+        ...(sectorSlug ? { category: { sector: { slug: sectorSlug } } } : {}),
+      },
+      select: { listingIds: true },
+    });
 
-  const counts = new Map<string, number>();
-  for (const comparison of comparisons) {
-    for (const id of comparison.listingIds) counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
+    const counts = new Map<string, number>();
+    for (const comparison of comparisons) {
+      for (const id of comparison.listingIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
 
-  const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
-  if (rankedIds.length === 0) return [];
+    const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+    if (rankedIds.length === 0) return [];
 
-  const listings = await getListingsByIds(rankedIds);
-  const byId = new Map(listings.map((l) => [l.id, l]));
-  return rankedIds
-    .map((id) => byId.get(id))
-    .filter((l): l is ListingDTO => !!l)
-    .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
-}
+    const listings = await getListingsByIds(rankedIds);
+    const byId = new Map(listings.map((l) => [l.id, l]));
+    return rankedIds
+      .map((id) => byId.get(id))
+      .filter((l): l is ListingDTO => !!l)
+      .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
+  },
+  CATALOG_TTL_MS,
+);
 
 export type ProviderListingStats = { comparisonAppearances: number; savedCount: number };
 

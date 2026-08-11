@@ -1,0 +1,2864 @@
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:106:2
+Error: Expected ',', got ';'
+  104 |     }));
+  105 |   },
+> 106 | );
+      |  ^
+  107 |
+  108 | export const getCategoryWithListings = cache(
+  109 |   async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | nul...
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:141:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  139 |     };
+  140 |   }, CATALOG_TTL_MS),
+> 141 | );
+      | ^
+  142 |
+  143 | export async function getTopListings(
+  144 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
+[browser] ./src/lib/catalog.ts:144:1
+Error: Unexpected token `)`. Expected yield, an identifier, [ or {
+  142 |     };
+  143 |   }, CATALOG_TTL_MS),
+> 144 | );
+      | ^
+  145 |
+  146 | export async function getTopListings(
+  147 |   sectorSlug: string,
+
+Parsing ecmascript source code failed
+
+Import trace:
+  Server Component:
+    ./src/lib/catalog.ts
+    ./src/app/explore/[sector]/page.tsx 
