@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Lightbulb, Scale, Fingerprint, Sparkles, HeartPulse } from "lucide-react";
+import { Lightbulb, Scale, Fingerprint, Sparkles } from "lucide-react";
 import { LinkButton } from "@/components/ui/Button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BackToTopButton } from "@/components/landing/BackToTopButton";
@@ -157,18 +157,28 @@ export default function LandingPage() {
             {Object.values(SECTORS).map((sector) => {
               const Icon = sector.icon;
               const live = LIVE_SECTORS.includes(sector.slug);
-              return (
+              return live ? (
                 <Link
                   key={sector.slug}
-                  href={live ? `/explore/${sector.slug}` : `/explore/healthcare`}
+                  href={`/explore/${sector.slug}`}
                   className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center transition-all hover:border-accent-sky/50 hover:shadow-[0_0_24px_-10px_var(--accent-teal)]"
                 >
                   <Icon size={28} className="text-accent-teal" />
                   <span className="font-medium text-[13px]">{sector.name}</span>
-                  <span className="text-[11px] text-text-muted">
-                    {live ? sector.blurb : "Coming soon"}
-                  </span>
+                  <span className="text-[11px] text-text-muted">{sector.blurb}</span>
                 </Link>
+              ) : (
+                <div
+                  key={sector.slug}
+                  aria-disabled="true"
+                  className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-4 text-center opacity-55"
+                >
+                  <Icon size={28} className="text-text-muted" />
+                  <span className="font-medium text-[13px] text-text-muted">{sector.name}</span>
+                  <span className="rounded-full border border-border bg-bg-base px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    Coming soon
+                  </span>
+                </div>
               );
             })}
           </div>
@@ -176,19 +186,19 @@ export default function LandingPage() {
 
         <section className="mx-auto max-w-[1120px] px-5 py-10 md:px-10">
           <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface-raised p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-4">
-            <HeartPulse size={32} className="text-accent-coral shrink-0" />
+            <Sparkles size={32} className="text-accent-teal shrink-0" />
             <div className="flex-1">
-              <h2 className="font-display text-[18px] font-semibold">Medical aid is now live</h2>
+              <h2 className="font-display text-[18px] font-semibold">Seven sectors, live today</h2>
               <p className="mt-1 text-[13px] text-text-secondary max-w-[48ch]">
-                Compare medical aid schemes like Cimas, PSMAS and First Mutual Health — plus new
-                Hotels and Retail &amp; Groceries sectors.
+                Compare Telecom, Banking, Insurance, Education, Transport, Utilities and Pharmacy
+                — with Healthcare, Hotels, Retail &amp; Groceries and more on the way.
               </p>
             </div>
             <Link
-              href="/explore/healthcare"
+              href="/explore"
               className="rounded-full bg-accent-teal px-5 py-2 text-[13px] font-semibold text-bg-base transition-opacity hover:opacity-90"
             >
-              Compare schemes
+              Start comparing
             </Link>
           </div>
         </section>

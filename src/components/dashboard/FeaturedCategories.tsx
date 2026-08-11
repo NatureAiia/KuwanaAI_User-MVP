@@ -40,9 +40,16 @@ export function FeaturedCategories() {
               </span>
             </Link>
           ) : (
-            <div key={sector.slug} className="flex w-[74px] shrink-0 flex-col items-center gap-2 opacity-60">
+            <div
+              key={sector.slug}
+              aria-disabled="true"
+              className="flex w-[74px] shrink-0 flex-col items-center gap-2 opacity-60"
+            >
               {circle}
               <span className="text-center text-[12px] font-medium text-text-muted">{sector.name}</span>
+              <span className="-mt-1.5 rounded-full border border-border bg-bg-base px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-text-muted">
+                Coming soon
+              </span>
             </div>
           );
         })}
