@@ -66,7 +66,9 @@ export default async function ComparePage({
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[22px] font-bold">Compare {category.name}</h1>
+      {/* The "Compare <category>" header row (title + share-as-PDF button)
+          lives inside CompareClient so the share button can reach the AI /
+          traditional comparison results that are generated client-side. */}
       <CompareClient
         sectorSlug={sector}
         categoryId={categoryId}

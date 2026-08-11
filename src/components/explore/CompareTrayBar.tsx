@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { createClient } from "@/lib/supabase/client";
 import { useCompareTray } from "@/lib/useCompareTray";
 import { MIN_COMPARE, MAX_COMPARE } from "@/lib/compareTray";
+import { stashPendingChatImage } from "@/lib/chatHandoff";
 
 /**
  * A floating compare selection that persists across navigation — mount it on
@@ -19,6 +20,7 @@ import { MIN_COMPARE, MAX_COMPARE } from "@/lib/compareTray";
 export function CompareTrayBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const { tray, remove, clear } = useCompareTray();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
@@ -46,6 +48,28 @@ export function CompareTrayBar() {
       return;
     }
     router.push(target);
+  }
+
+  // Photograph an item the user already knows (a product, a bill, a price
+  // tag) and hand it to chat for identification — the same camera flow the
+  // dashboard search bar uses. Sits right next to "Clear" so building a
+  // comparison can include "things I know", not just catalog listings.
+  function handleCameraChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const [header, data] = result.split(",");
+      const mediaType = header.match(/data:(.*);base64/)?.[1] ?? file.type;
+      if (!data) return;
+      stashPendingChatImage({ mediaType, data, text: "This is an item I know — help me compare it." });
+      router.push("/chat");
+    };
+    reader.onerror = () => {};
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -80,6 +104,23 @@ export function CompareTrayBar() {
         <Button size="md" onClick={goCompare} disabled={tray.items.length < MIN_COMPARE} className="shrink-0">
           Compare
         </Button>
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          aria-label="Photograph an item you know"
+          title="Add an item you already know — take a photo and chat will identify it"
+          className="tap-target shrink-0 px-1 text-text-secondary hover:text-accent-sky"
+        >
+          <Camera size={16} />
+        </button>
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          capture="environment"
+          className="hidden"
+          onChange={handleCameraChange}
+        />
         <button
           type="button"
           onClick={clear}

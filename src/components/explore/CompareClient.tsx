@@ -2,15 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Bookmark, BookmarkCheck, MessageCircle, Sparkles } from "lucide-react";
+import { clsx } from "clsx";
+import {
+  Bookmark,
+  BookmarkCheck,
+  MessageCircle,
+  Plus,
+  Scale,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { SignalBloom } from "@/components/SignalBloom";
 import { FormattedPrice } from "@/components/FormattedPrice";
+import { CompareShareButton } from "@/components/explore/CompareShareButton";
 import { computeDecisionScores } from "@/lib/scoring";
 import { buildTotalCostSummary, isCostAttribute } from "@/lib/totalCost";
 import { notifyGamification, type GamificationUpdate } from "@/lib/gamification/client";
+import type { CompareShareData } from "@/lib/comparePdf";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
@@ -54,6 +65,16 @@ type RecommendationResponse = {
   gamification?: GamificationUpdate | null;
 };
 
+type TraditionalComparisonResponse = {
+  engine: "traditional";
+  categoryName: string;
+  text: string;
+};
+
+type KnownItem = { id: string; name: string; provider: string };
+
+let knownItemCounter = 0;
+
 export function CompareClient({
   sectorSlug,
   categoryId,
@@ -80,6 +101,20 @@ export function CompareClient({
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const loggedComparison = useRef(false);
+
+  // Traditional (Python, rules-based) comparison — deliberately separate from
+  // the AI state so either engine can run independently of the other.
+  const [traditionalResult, setTraditionalResult] = useState<string | null>(null);
+  const [loadingTraditional, setLoadingTraditional] = useState(false);
+  const [traditionalError, setTraditionalError] = useState<string | null>(null);
+
+  // Items the user already knows about — client-side only, never scored,
+  // shown as a separate clearly-labelled row so nobody mistakes them for a
+  // scored option.
+  const [knownItems, setKnownItems] = useState<KnownItem[]>([]);
+  const [showKnownForm, setShowKnownForm] = useState(false);
+  const [knownName, setKnownName] = useState("");
+  const [knownProvider, setKnownProvider] = useState("");
 
   const scores = computeDecisionScores(listings, attributeSchema, trends);
 
@@ -150,15 +185,72 @@ export function CompareClient({
     }
   }
 
+  async function getTraditionalComparison() {
+    setLoadingTraditional(true);
+    setTraditionalError(null);
+    try {
+      const res = await fetch("/api/traditional-comparison", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingIds: listings.map((l) => l.id) }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as TraditionalComparisonResponse;
+        setTraditionalResult(data.text);
+      } else {
+        const data = await res.json().catch(() => null);
+        setTraditionalError(
+          typeof data?.error === "string" ? data.error : "The comparison engine didn't return results — try again.",
+        );
+      }
+    } catch {
+      setTraditionalError("Couldn't reach the comparison engine — check your connection and try again.");
+    } finally {
+      setLoadingTraditional(false);
+    }
+  }
+
+  function addKnownItem(e: React.FormEvent) {
+    e.preventDefault();
+    const name = knownName.trim();
+    if (!name) return;
+    setKnownItems((prev) => [
+      ...prev,
+      { id: `known-${++knownItemCounter}`, name, provider: knownProvider.trim() },
+    ]);
+    setKnownName("");
+    setKnownProvider("");
+    setShowKnownForm(false);
+  }
+
+  function removeKnownItem(id: string) {
+    setKnownItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
   const listingById = new Map(listings.map((l) => [l.id, l]));
   const alternatives = recommendation?.alternative_options ?? [];
   const requirementRows = (recommendation?.eligibility_requirements ?? []).filter(
     (r) => r.requirements_to_qualify.length > 0,
   );
 
+  const shareData: CompareShareData = {
+    categoryName,
+    listings,
+    attributeSchema,
+    trends,
+    recommendation,
+    traditionalText: traditionalResult,
+  };
+
   return (
     <div className="mt-4">
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Header row: title on the left, share-as-PDF action on the right. */}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-[22px] font-bold">Compare {categoryName}</h1>
+        <CompareShareButton data={shareData} />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {listings.map((l) => (
           <span
             key={l.id}
@@ -174,7 +266,77 @@ export function CompareClient({
         >
           Change selection
         </Link>
+        <button
+          type="button"
+          onClick={() => setShowKnownForm((v) => !v)}
+          aria-expanded={showKnownForm}
+          className="tap-target flex items-center gap-1 text-[12px] font-semibold text-text-secondary hover:text-accent-teal"
+        >
+          <Plus size={13} />
+          Add an item you know
+        </button>
       </div>
+
+      {showKnownForm && (
+        <form
+          onSubmit={addKnownItem}
+          className="mt-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-3"
+        >
+          <p className="w-full text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            Add a product you already use or know — it won&apos;t be scored
+          </p>
+          <input
+            type="text"
+            value={knownName}
+            onChange={(e) => setKnownName(e.target.value)}
+            placeholder="Product name, e.g. OneFusion Monthly 15GB"
+            required
+            className="min-w-0 flex-1 rounded-xl border border-border bg-bg-base px-3 py-2 text-[13px] outline-none placeholder:text-text-muted focus:border-accent-sky"
+          />
+          <input
+            type="text"
+            value={knownProvider}
+            onChange={(e) => setKnownProvider(e.target.value)}
+            placeholder="Provider (optional)"
+            className="w-36 rounded-xl border border-border bg-bg-base px-3 py-2 text-[13px] outline-none placeholder:text-text-muted focus:border-accent-sky"
+          />
+          <Button type="submit" size="md">
+            Add
+          </Button>
+          <button
+            type="button"
+            onClick={() => setShowKnownForm(false)}
+            className="tap-target text-[13px] font-medium text-text-secondary hover:text-text-primary"
+          >
+            Cancel
+          </button>
+        </form>
+      )}
+
+      {knownItems.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 rounded-[var(--radius-card)] border border-dashed border-border bg-bg-surface p-2.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            You know these (not scored)
+          </span>
+          {knownItems.map((item) => (
+            <span
+              key={item.id}
+              className="flex items-center gap-1.5 rounded-full border border-border bg-bg-surface-raised py-1 pl-2.5 pr-1 text-[12px] font-medium"
+            >
+              {item.name}
+              {item.provider ? <span className="text-text-muted">· {item.provider}</span> : null}
+              <button
+                type="button"
+                onClick={() => removeKnownItem(item.id)}
+                aria-label={`Remove ${item.name}`}
+                className="tap-target flex h-6 w-6 items-center justify-center rounded-full text-text-muted hover:text-accent-coral"
+              >
+                <X size={13} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {(budgetFlexibility || (constraints && constraints.length > 0)) && (
         <div className="mt-2 flex flex-wrap gap-1.5 text-[12px] text-text-muted">
@@ -201,6 +363,7 @@ export function CompareClient({
               <th className="p-3 text-left font-medium text-text-muted">Attribute</th>
               {listings.map((l) => {
                 const requirements = getListingRequirements(l, attributeSchema);
+                const isSaved = savedIds.has(l.id);
                 return (
                   <th key={l.id} className="p-3 text-left">
                     <div className="flex items-center justify-between gap-2">
@@ -211,19 +374,26 @@ export function CompareClient({
                           {!l.provider.verified && <span className="text-accent-coral"> · Unverified</span>}
                         </p>
                       </Link>
-                      <button
-                        onClick={() => toggleSave(l.id)}
-                        aria-label={savedIds.has(l.id) ? "Unsave" : "Save"}
-                        className="tap-target text-accent-sky"
-                      >
-                        {savedIds.has(l.id) ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
-                      </button>
                     </div>
                     {requirements.length > 0 && (
                       <Badge tone="coral" className="mt-1.5">
                         {requirements.map((r) => r.label).join(" · ")} required
                       </Badge>
                     )}
+                    <button
+                      onClick={() => toggleSave(l.id)}
+                      aria-label={isSaved ? "Unsave" : "Save"}
+                      aria-pressed={isSaved}
+                      className={clsx(
+                        "tap-target mt-1.5 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                        isSaved
+                          ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
+                          : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky",
+                      )}
+                    >
+                      {isSaved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+                      {isSaved ? "Saved" : "Save"}
+                    </button>
                   </th>
                 );
               })}
@@ -335,25 +505,44 @@ export function CompareClient({
       </div>
 
       <div className="mt-5">
-        {!recommendation && !loadingRecommendation && (
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={getRecommendation} size="lg">
-                <Sparkles size={16} />
-                Get AI recommendation
-              </Button>
-              <LinkButton
-                variant="secondary"
-                size="lg"
-                href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
-              >
-                <MessageCircle size={16} />
-                Ask in chat
-              </LinkButton>
-            </div>
-            {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={getRecommendation}
+              size="lg"
+              disabled={loadingRecommendation || loadingTraditional}
+            >
+              <Sparkles size={16} />
+              Get AI recommendation
+            </Button>
+            <Button
+              onClick={getTraditionalComparison}
+              variant="secondary"
+              size="lg"
+              disabled={loadingRecommendation || loadingTraditional}
+            >
+              <Scale size={16} />
+              Traditional comparison
+            </Button>
+            <LinkButton
+              variant="ghost"
+              size="lg"
+              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+            >
+              <MessageCircle size={16} />
+              Ask in chat
+            </LinkButton>
           </div>
-        )}
+          {/* Clearly-labelled explanation of which engine is which, under the
+              buttons, so the Python-based traditional comparison isn't
+              mistaken for the AI one. */}
+          <p className="max-w-xl text-[12px] leading-snug text-text-muted">
+            AI recommendation is personalised and LLM-assisted. Traditional comparison is a deterministic
+            rules-based engine written in Python — no AI — that prints exactly how it ranked each option.
+          </p>
+          {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
+          {traditionalError && <p className="text-[13px] text-accent-coral">{traditionalError}</p>}
+        </div>
 
         {loadingRecommendation && (
           <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
@@ -367,11 +556,49 @@ export function CompareClient({
           </div>
         )}
 
+        {loadingTraditional && (
+          <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
+            <div className="h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-accent-teal border-t-transparent" />
+            <div>
+              <p className="font-display text-[14px] font-semibold">Running the traditional comparison engine…</p>
+              <p className="text-[12px] text-text-muted">
+                A deterministic Python engine is scoring {listings.length} listings — no AI involved
+              </p>
+            </div>
+          </div>
+        )}
+
+        {traditionalResult && (
+          <div className="mt-3 overflow-hidden rounded-[var(--radius-card)] border border-border bg-bg-surface">
+            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
+                <Scale size={13} />
+                Traditional comparison — Python engine output
+              </p>
+              <button
+                type="button"
+                onClick={() => setTraditionalResult(null)}
+                className="tap-target text-[12px] font-medium text-text-muted hover:text-text-primary"
+              >
+                Hide
+              </button>
+            </div>
+            <pre className="max-h-80 overflow-auto whitespace-pre-wrap p-4 font-mono text-[11.5px] leading-relaxed text-text-secondary">
+              {traditionalResult}
+            </pre>
+          </div>
+        )}
+
         {recommendation && (
           <div className="rounded-[var(--radius-card)] border border-accent-teal/40 bg-accent-teal/5 p-5">
             <div className="flex items-center gap-2">
               <SignalBloom value={recommendation.confidence * 100} size={40} color="teal" />
-              <p className="font-display text-[15px] font-semibold">Best for you because…</p>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
+                  AI recommendation — AI-assisted
+                </p>
+                <p className="font-display text-[15px] font-semibold">Best for you because…</p>
+              </div>
             </div>
 
             <div className="mt-3 rounded-xl border border-accent-teal/30 bg-bg-surface p-4">

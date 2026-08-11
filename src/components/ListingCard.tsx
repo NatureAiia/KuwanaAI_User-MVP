@@ -93,15 +93,21 @@ export const ListingCard = memo(function ListingCard({
           <ListingCoverArt seed={listing.id} className="h-full w-full" />
         )}
 
-        <div className="absolute right-2 top-2 flex items-center gap-1.5">
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
           <button
             type="button"
             onClick={toggleSaved}
             aria-pressed={saved}
             aria-label={saved ? `Remove ${listing.name} from shopping list` : `Add ${listing.name} to shopping list`}
-            className="tap-target flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-surface/90 text-accent-sky backdrop-blur"
+            className={clsx(
+              "tap-target flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur transition-colors",
+              saved
+                ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]"
+                : "border-border bg-bg-surface/95 text-accent-sky hover:border-accent-sky/60",
+            )}
           >
-            {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}
+            {saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+            {saved ? "Saved" : "Save"}
           </button>
           <button
             type="button"
@@ -109,11 +115,14 @@ export const ListingCard = memo(function ListingCard({
             aria-pressed={selected}
             aria-label={selected ? `Remove ${listing.name} from comparison` : `Add ${listing.name} to comparison`}
             className={clsx(
-              "tap-target flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur",
-              selected ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]" : "border-border bg-bg-surface/90",
+              "tap-target flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold shadow-sm backdrop-blur transition-colors",
+              selected
+                ? "border-accent-sky bg-accent-sky text-[var(--text-on-accent-sky)]"
+                : "border-border bg-bg-surface/95 text-text-secondary hover:border-accent-sky/60 hover:text-accent-sky",
             )}
           >
-            {selected && <CheckCircle2 size={16} />}
+            {selected && <CheckCircle2 size={13} />}
+            {selected ? "Added" : "Compare"}
           </button>
         </div>
 

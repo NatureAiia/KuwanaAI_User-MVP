@@ -542,7 +542,7 @@ export async function getListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   return listings.map(toListingDTO);
 }
 
-export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string };
+export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string; pinned: boolean };
 
 /**
  * The most recent distinct listings a user engaged with, sourced from
@@ -552,72 +552,145 @@ export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string };
  * actually seen, so this under-counts rather than over-claims. Listings that
  * are no longer published (unpublished/rejected/deleted since) are silently
  * excluded via getListingsByIds' own status filter.
+ *
+ * Pinned listings float to the top regardless of recency (a pin says "I'm
+ * still deciding on this one"), so a pin survives even once the listing falls
+ * out of the recent-6 window. Unpinned items keep their recency order below.
  */
 export async function getRecentlyViewed(userId: string, limit = 6): Promise<RecentlyViewedListing[]> {
-  const events = await prisma.userEvent.findMany({
-    where: { userId, eventType: "action_taken" },
-    orderBy: { createdAt: "desc" },
-    take: limit * 3, // over-fetch to allow for de-duplication by listing
-    select: { metadata: true, createdAt: true },
-  });
+  const [pinned, events] = await Promise.all([
+    prisma.pinnedListing.findMany({
+      where: { userId },
+      orderBy: { pinnedAt: "desc" },
+      select: { listingId: true, pinnedAt: true },
+    }),
+    prisma.userEvent.findMany({
+      where: { userId, eventType: "action_taken" },
+      orderBy: { createdAt: "desc" },
+      take: limit * 3, // over-fetch to allow for de-duplication by listing
+      select: { metadata: true, createdAt: true },
+    }),
+  ]);
 
-  const viewedAtByListing = new Map<string, Date>();
+  const pinnedIds = new Set(pinned.map((p) => p.listingId));
+
+  const viewedAtById = new Map<string, Date>();
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtById.has(listingId)) continue;
+    viewedAtById.set(listingId, event.createdAt);
+  }
+
+  // Pinned first, in pin order; then recency order, skipping anything pinned
+  // so it doesn't appear twice.
+  const unpinnedLimit = Math.max(limit - pinned.length, 0);
+  const pickedIds = new Set<string>();
   const orderedIds: string[] = [];
   for (const event of events) {
     const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
-    if (!listingId || viewedAtByListing.has(listingId)) continue;
-    viewedAtByListing.set(listingId, event.createdAt);
+    if (!listingId || pinnedIds.has(listingId) || pickedIds.has(listingId)) continue;
+    pickedIds.add(listingId);
     orderedIds.push(listingId);
-    if (orderedIds.length >= limit) break;
+    if (orderedIds.length >= unpinnedLimit) break;
   }
-  if (orderedIds.length === 0) return [];
+  const allIds = [...pinned.map((p) => p.listingId), ...orderedIds];
+  if (allIds.length === 0) return [];
 
-  const listings = await getListingsByIds(orderedIds);
+  const pinnedAtById = new Map(pinned.map((p) => [p.listingId, p.pinnedAt]));
+
+  const listings = await getListingsByIds(allIds);
   const byId = new Map(listings.map((l) => [l.id, l]));
-  return orderedIds
+  return allIds
     .map((id) => byId.get(id))
     .filter((l): l is ListingDTO => !!l)
-    .map((listing) => ({ listing, viewedAt: viewedAtByListing.get(listing.id)!.toISOString() }));
+    .map((listing) => ({
+      listing,
+      viewedAt: (viewedAtById.get(listing.id) ?? pinnedAtById.get(listing.id) ?? new Date()).toISOString(),
+      pinned: pinnedIds.has(listing.id),
+    }));
+}
+
+/**
+ * Pin or unpin a listing for a user. Pins are independent of recency — a
+ * pinned listing floats to the top of the recents row and the history page
+ * until explicitly unpinned. Re-pinning an already-pinned listing is a no-op
+ * (the upsert's update is empty); unpinning a never-pinned listing is also a
+ * no-op.
+ */
+export async function setListingPinned(userId: string, listingId: string, pinned: boolean): Promise<void> {
+  if (pinned) {
+    await prisma.pinnedListing.upsert({
+      where: { userId_listingId: { userId, listingId } },
+      create: { userId, listingId },
+      update: {},
+    });
+  } else {
+    await prisma.pinnedListing.deleteMany({ where: { userId, listingId } });
+  }
 }
 
 export type RecentlyViewedDetailedListing = {
   listing: ListingDTO;
   category: { id: string; slug: string; name: string; sector: { slug: string; name: string } };
   viewedAt: string;
+  pinned: boolean;
 };
 
 /**
  * History-page variant of getRecentlyViewed that also resolves each listing's
  * category and sector, so the history can be shown "no matter the category".
+ * Pinned listings are pulled to the top (the history keeps its recency order
+ * below them), so what a user pinned stays easy to find even after it scrolls
+ * off the dashboard row.
  */
 export async function getRecentlyViewedDetailed(
   userId: string,
   limit = 100,
 ): Promise<RecentlyViewedDetailedListing[]> {
-  const events = await prisma.userEvent.findMany({
-    where: { userId, eventType: "action_taken" },
-    orderBy: { createdAt: "desc" },
-    take: limit * 3, // over-fetch to allow for de-duplication by listing
-    select: { metadata: true, createdAt: true },
-  });
+  const [pinned, events] = await Promise.all([
+    prisma.pinnedListing.findMany({
+      where: { userId },
+      orderBy: { pinnedAt: "desc" },
+      select: { listingId: true, pinnedAt: true },
+    }),
+    prisma.userEvent.findMany({
+      where: { userId, eventType: "action_taken" },
+      orderBy: { createdAt: "desc" },
+      take: limit * 3, // over-fetch to allow for de-duplication by listing
+      select: { metadata: true, createdAt: true },
+    }),
+  ]);
 
-  const viewedAtByListing = new Map<string, Date>();
+  const pinnedIds = new Set(pinned.map((p) => p.listingId));
+
+  const viewedAtById = new Map<string, Date>();
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtById.has(listingId)) continue;
+    viewedAtById.set(listingId, event.createdAt);
+  }
+
+  const unpinnedLimit = Math.max(limit - pinned.length, 0);
+  const pickedIds = new Set<string>();
   const orderedIds: string[] = [];
   for (const event of events) {
     const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
-    if (!listingId || viewedAtByListing.has(listingId)) continue;
-    viewedAtByListing.set(listingId, event.createdAt);
+    if (!listingId || pinnedIds.has(listingId) || pickedIds.has(listingId)) continue;
+    pickedIds.add(listingId);
     orderedIds.push(listingId);
-    if (orderedIds.length >= limit) break;
+    if (orderedIds.length >= unpinnedLimit) break;
   }
-  if (orderedIds.length === 0) return [];
+  const allIds = [...pinned.map((p) => p.listingId), ...orderedIds];
+  if (allIds.length === 0) return [];
+
+  const pinnedAtById = new Map(pinned.map((p) => [p.listingId, p.pinnedAt]));
 
   const listings = await prisma.listing.findMany({
-    where: { id: { in: orderedIds }, status: "published" },
+    where: { id: { in: allIds }, status: "published" },
     include: { provider: true, category: { include: { sector: true } } },
   });
   const byId = new Map(listings.map((l) => [l.id, l]));
-  return orderedIds
+  return allIds
     .map((id) => byId.get(id))
     .flatMap((l) => (l ? [l] : []))
     .map((l) => ({
@@ -628,7 +701,8 @@ export async function getRecentlyViewedDetailed(
         name: l.category.name,
         sector: { slug: l.category.sector.slug, name: l.category.sector.name },
       },
-      viewedAt: viewedAtByListing.get(l.id)!.toISOString(),
+      viewedAt: (viewedAtById.get(l.id) ?? pinnedAtById.get(l.id) ?? new Date()).toISOString(),
+      pinned: pinnedIds.has(l.id),
     }));
 }
 
