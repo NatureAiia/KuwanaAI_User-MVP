@@ -19,7 +19,7 @@ export function GetStartedButton() {
   }
 
   return (
-    <MagneticWrapper magnet={30} className="inline-block">
+    <MagneticWrapper magnet={50} className="inline-block">
       <WaterButton
         label="Get started"
         onClick={() => router.push("/signup")}

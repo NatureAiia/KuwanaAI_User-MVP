@@ -6,8 +6,9 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-const RANGE_PER_POINT = 18;
-const MAX_PULL = 0.5;
+// Peak travel in px when magnet is maxed (100). The pull scales linearly with
+// magnet, so magnet=50 lets the element chase the cursor by up to half this.
+const MAX_TRAVEL = 48;
 
 export function MagneticWrapper({
   children,
@@ -30,12 +31,7 @@ export function MagneticWrapper({
     let raf = 0;
     let alive = true;
 
-    const dampen = (p: number, m: number) => {
-      const easing = 0.001;
-      const scale = 1 - Math.pow(1 - easing, m);
-      const t = RANGE_PER_POINT * (MAX_PULL * scale + 0.5 * (1 - scale));
-      return p * (t / RANGE_PER_POINT);
-    };
+    const dampen = (p: number, m: number) => p * ((m / 100) * MAX_TRAVEL);
     const update = () => {
       if (!alive) return;
       root.style.translate = `${dampen(pointer.x, limits.x)}px ${dampen(pointer.y, limits.y)}px`;
