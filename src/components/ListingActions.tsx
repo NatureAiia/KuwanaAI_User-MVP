@@ -47,7 +47,7 @@ export function ListingActions({
     <div className="mt-6 flex flex-col gap-3 sm:flex-row">
       <Button variant="secondary" onClick={toggleSave} disabled={saving} className="flex-1">
         {saved ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-        {saved ? "Saved" : "Save"}
+        {saved ? "In your list" : "Add to list"}
       </Button>
       {sourceUrl ? (
         <a href={sourceUrl} target="_blank" rel="noopener noreferrer" onClick={takeAction} className="flex-1">

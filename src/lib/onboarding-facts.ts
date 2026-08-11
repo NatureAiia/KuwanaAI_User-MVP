@@ -42,7 +42,7 @@ const PROVIDER_FACTS: Record<string, string[]> = {
   PSMAS: ["PSMAS was founded in 1930, one of Zimbabwe's longest-running medical aid societies."],
 };
 
-const GENERIC_FACTS = [
+export const GENERIC_FACTS = [
   "Zimbabwe's mobile penetration rate passed 100% in 2024 (POTRAZ) — many people carry more than one active SIM.",
   "Zimbabwe's multi-currency system makes comparing prices in USD the clearest way to see real value.",
   "Bundled data plans in Zimbabwe often expire in as little as 24 hours — validity matters as much as price.",

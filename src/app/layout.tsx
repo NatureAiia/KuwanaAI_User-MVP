@@ -6,6 +6,7 @@ import { CurrencyProvider } from "@/components/CurrencyProvider";
 import { PageTransition } from "@/components/PageTransition";
 import { SkipLink } from "@/components/SkipLink";
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { SoftNavTracker } from "@/components/SoftNavTracker";
 import { getSiteUrl } from "@/lib/siteUrl";
 import "./globals.css";
 
@@ -58,6 +59,7 @@ export default function RootLayout({
           {THEME_INIT_SCRIPT}
         </Script>
         <OfflineBanner />
+        <SoftNavTracker />
         <SkipLink />
         <GamificationToastHost />
         <CurrencyProvider>

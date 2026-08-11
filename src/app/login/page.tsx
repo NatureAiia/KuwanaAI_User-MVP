@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { markHardNav } from "@/components/SoftNavTracker";
 
 function LoginForm() {
   const router = useRouter();
@@ -31,6 +32,7 @@ function LoginForm() {
       setError(error.message);
       return;
     }
+    markHardNav();
     router.push(params.get("next") ?? "/dashboard");
     router.refresh();
   }

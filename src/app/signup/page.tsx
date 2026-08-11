@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
-import { buildFactQueue } from "@/lib/onboarding-facts";
+import { LoadingFacts } from "@/components/loading/LoadingFacts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
+import { markHardNav } from "@/components/SoftNavTracker";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
@@ -190,7 +191,6 @@ export default function SignupPage() {
   const [step, setStep] = useState<Step>("role");
   const historyRef = useRef<Step[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [factIndex, setFactIndex] = useState(0);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -231,13 +231,13 @@ export default function SignupPage() {
 
   const [medicalAid, setMedicalAid] = useState("");
   const [chronicOptIn, setChronicOptIn] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
 
   const startedProcessing = useRef(false);
-  const [factQueue, setFactQueue] = useState<string[]>([]);
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -288,15 +288,6 @@ export default function SignupPage() {
     const prev = historyRef.current.pop();
     setStep(prev ?? "role");
   }
-
-  useEffect(() => {
-    if (step !== "processing" || factQueue.length === 0) return;
-    const interval = setInterval(
-      () => setFactIndex((i) => (i + 1) % factQueue.length),
-      2200,
-    );
-    return () => clearInterval(interval);
-  }, [step, factQueue]);
 
   useEffect(() => {
     if (step !== "processing" || startedProcessing.current) return;
@@ -371,6 +362,7 @@ export default function SignupPage() {
         return;
       }
 
+      markHardNav();
       router.push(role === "consumer" ? "/dashboard" : `/${role}`);
       router.refresh();
     })();
@@ -419,7 +411,7 @@ export default function SignupPage() {
       case "insurance":
         return insurers.length > 0;
       case "health":
-        return !!medicalAid;
+        return !!medicalAid && termsAccepted;
       case "orgDetails":
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "consent":
@@ -428,16 +420,6 @@ export default function SignupPage() {
   }
 
   function startProcessing() {
-    setFactQueue(
-      buildFactQueue([
-        network,
-        ...(banks.includes("I don't bank") ? [] : banks),
-        ...wallets,
-        ...(insurers.includes("I don't have insurance") ? [] : insurers),
-        medicalAid !== "None" ? medicalAid : undefined,
-      ]),
-    );
-    setFactIndex(0);
     go("processing");
   }
 
@@ -840,37 +822,53 @@ export default function SignupPage() {
         {step === "health" && (
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Medical Aid</h1>
+            <p className="text-[13px] leading-relaxed text-text-secondary">
+              Select your medical aid scheme so we can tailor healthcare comparisons to your plan.
+            </p>
             <ChipGroup
               options={MEDICAL_AIDS}
               value={medicalAid}
               onChange={setMedicalAid}
               renderOption={(opt) => <ProviderChipMark name={opt} />}
             />
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={chronicOptIn}
-                onChange={(e) => setChronicOptIn(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Opt in to disclose chronic conditions — helps calculate a more accurate sensitivity
-                score. Stored securely and never shown publicly.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={healthDataConsent}
-                onChange={(e) => setHealthDataConsent(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Separately, allow anonymized use of my health data to improve Kuwana&apos;s
-                healthcare comparisons — distinct from the general research consent on the next
-                screen, since health data deserves its own opt-in.
-              </span>
-            </label>
+            <div>
+              <p className="text-[14px] font-semibold">Allow kuwana Team to:</p>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={chronicOptIn}
+                  onChange={(e) => setChronicOptIn(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  Selection optional: I have a chronic condition / I&apos;m a Person with a
+                  disability / Prefer not to say.
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={healthDataConsent}
+                  onChange={(e) => setHealthDataConsent(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  Separately, allow anonymized use of my data to improve Kuwana&apos;s comparisons
+                  — distinct from the general research consent on the next screen
+                </span>
+              </label>
+            </div>
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
@@ -880,9 +878,15 @@ export default function SignupPage() {
                 disabled={!canContinue("health")}
                 className="flex-1"
               >
-                Continue
+                I Agree &amp; Continue
               </Button>
             </div>
+            <p className="text-[11px] italic leading-relaxed text-text-muted">
+              By continuing, you agree to let Kuwana process your usage data, product comparisons,
+              and account information to refine our algorithms, personalize recommendations, and
+              improve app performance. You may withdraw your consent at any time in your account
+              settings under the Cyber and Data Protection Act [Chapter 12:07]
+            </p>
           </div>
         )}
 
@@ -965,12 +969,7 @@ export default function SignupPage() {
         )}
 
         {step === "processing" && (
-          <div className="mt-16 flex flex-col items-center text-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent-sky border-t-transparent" />
-            <h1 className="mt-6 font-display text-[20px] font-bold">Saving your profile…</h1>
-            <p className="mt-3 max-w-[36ch] text-[13px] text-text-secondary">
-              {factQueue[factIndex]}
-            </p>
+          <LoadingFacts title="Saving your profile" subtitle="Getting your comparison scores ready">
             {error && (
               <div className="mt-6 space-y-3">
                 <p className="text-[13px] text-accent-coral">{error}</p>
@@ -979,7 +978,7 @@ export default function SignupPage() {
                 </Button>
               </div>
             )}
-          </div>
+          </LoadingFacts>
         )}
       </div>
     </div>

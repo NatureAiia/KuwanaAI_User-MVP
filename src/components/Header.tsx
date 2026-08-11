@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, ShoppingCart } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -24,9 +24,9 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-bg-surface/95 px-5 backdrop-blur-sm md:static md:h-auto md:border-0 md:bg-transparent md:px-0 md:backdrop-blur-none">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <Image src="/kuwana-mark.png" alt="" width={32} height={32} className="rounded-full" />
-          <span className="font-display text-[16px] font-bold text-accent-teal">KuwanaAI</span>
+          <span className="font-display text-[16px] font-bold text-accent-teal">kuwana.ai</span>
         </Link>
 
         <nav aria-label="Primary" className="hidden items-center gap-6 md:flex">
@@ -49,9 +49,9 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/* Streak badge sits directly left of the bell so the three
-              chrome buttons (streak, notifications, theme) form a single
-              matched row. Hidden when there's no streak yet. */}
+          {/* Streak badge sits directly left of the bell so the four
+              chrome buttons (streak, notifications, shopping list, theme)
+              form a single matched row. Hidden when there's no streak yet. */}
           <StreakBadge currentStreak={currentStreak} />
           <Link
             href="/notifications"
@@ -64,6 +64,13 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
+          </Link>
+          <Link
+            href="/profile/saved"
+            aria-label="Shopping list"
+            className="tap-target flex items-center justify-center rounded-full border border-border bg-bg-surface text-text-secondary"
+          >
+            <ShoppingCart size={18} />
           </Link>
           <ThemeToggle />
         </div>

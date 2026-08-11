@@ -72,4 +72,17 @@ export const WALLETS = [
 export const INSURERS = ["Old Mutual", "First Mutual", "ZIMNAT", "Fidelity Life", "I don't have insurance"];
 export const POLICY_TYPES = ["Life", "Health", "Motor", "Property", "Funeral", "Travel"];
 
-export const MEDICAL_AIDS = ["Cimas", "First Mutual Health", "PSMAS", "Public hospital only", "None"];
+export const MEDICAL_AIDS = [
+  "Cimas",
+  "First Mutual Health",
+  "Alliance Health",
+  "With my Bank/Mobile Wallet",
+  "Notable Society",
+  "FLIMAS",
+  "Heritage",
+  "Aura Medical Aid Scheme",
+  "Altfin Medical Aid Scheme",
+  "PSMAS",
+  "Public hospital only",
+  "None",
+];

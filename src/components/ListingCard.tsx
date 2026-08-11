@@ -98,7 +98,7 @@ export const ListingCard = memo(function ListingCard({
             type="button"
             onClick={toggleSaved}
             aria-pressed={saved}
-            aria-label={saved ? `Remove ${listing.name} from saved` : `Save ${listing.name}`}
+            aria-label={saved ? `Remove ${listing.name} from shopping list` : `Add ${listing.name} to shopping list`}
             className="tap-target flex h-7 w-7 items-center justify-center rounded-full border border-border bg-bg-surface/90 text-accent-sky backdrop-blur"
           >
             {saved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />}

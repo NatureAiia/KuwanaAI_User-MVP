@@ -215,17 +215,15 @@ export async function getPersonalizedSpecials(
 
 /**
  * "Recommended for you" — sits above "Specials for you" on the home page.
- * Instead of ranking categories the user has *engaged* with, this surfaces
- * specials tied to the providers the user is already locked into (their
- * mobile network, their bank, their insurer). It surfaces listings the user
- * would otherwise miss because they live in categories they haven't browsed
- * yet — and is the recommendation signal the Jupyter notebook in
- * `notebooks/recommendation_engine.ipynb` reproduces in batch form.
- *
- * Detection rules (none invented, all derived from existing data):
- *   1. Provider names in any SectorFootprint.data field whose key matches
- *      a provider/network/bank/insurer pattern.
- *   2. Providers the user has saved any listing from (explicit > implicit).
+ * Recommends according to the user's profile across ALL categories, not just
+ * the ones their providers happen to have seeded:
+ *   1. Listings from the providers the user is already locked into (their
+ *      mobile network, their bank, their insurer) — across every category.
+ *   2. Top candidates from every category of each sector in their onboarding
+ *      footprint (so a banking user sees savings-account picks, an insured
+ *      user sees motor/health cover picks, etc.).
+ * Categories the user has already explicitly compared/saved are excluded so
+ * this section surfaces fresh ground rather than re-ranking what they've seen.
  *
  * Ranking (mirrors the notebook, kept in sync by hand until the model is
  * fitted): each candidate listing gets a value score (price + first numeric
@@ -259,6 +257,17 @@ function scoreWithFit(
     fit.trust_bonus * features.trust_bonus +
     fit.trend_feature * features.trend_feature
   );
+}
+
+/** All category ids across every sector present in a user's footprint. */
+async function getFootprintCategoryIds(footprints: { sector: string }[]): Promise<string[]> {
+  const sectors = new Set(footprints.map((fp) => fp.sector));
+  if (sectors.size === 0) return [];
+  const configs = await prisma.sectorConfig.findMany({
+    where: { slug: { in: [...sectors] } },
+    include: { categories: { select: { id: true } } },
+  });
+  return configs.flatMap((s) => s.categories.map((c) => c.id));
 }
 
 export async function getFavoriteProductSpecials(
@@ -299,7 +308,13 @@ export async function getFavoriteProductSpecials(
   // 2. Explicit > implicit — providers the user has saved listings from.
   for (const s of saved) providerNames.add(s.listing.providerId);
 
-  if (providerNames.size === 0) return [];
+  // Broaden beyond the user's own providers: pull candidates from every
+  // category of each sector in their onboarding footprint so the section
+  // recommends across ALL categories, not only the ones where the user's
+  // specific provider happens to have listings seeded.
+  const footprintCategoryIds = await getFootprintCategoryIds(footprints);
+
+  if (providerNames.size === 0 && footprintCategoryIds.length === 0) return [];
 
   // Resolve provider names -> provider records. Match on exact name OR on
   // providerId (saved listings give us the id directly).
@@ -312,14 +327,13 @@ export async function getFavoriteProductSpecials(
     },
     select: { id: true, name: true },
   });
-  if (providers.length === 0) return [];
 
   const favoriteProviderIds = new Set(providers.map((p) => p.id));
   const favoriteProviderNames = new Set(providers.map((p) => p.name));
 
-  // Listings from those providers, across every category the user hasn't
-  // already explicitly engaged with — that's the differentiator from
-  // getPersonalizedSpecials, which only ranks categories they've compared/saved.
+  // Listings from those providers AND from the footprint sectors' categories,
+  // excluding categories the user has already explicitly engaged with — this
+  // section surfaces fresh ground, not a re-rank of what they've compared.
   const engagedCategoryIds = new Set(
     (await prisma.comparison.findMany({ where: { userId }, select: { categoryId: true } })).map(
       (c) => c.categoryId,
@@ -329,7 +343,10 @@ export async function getFavoriteProductSpecials(
   const favoriteListings = await prisma.listing.findMany({
     where: {
       status: "published",
-      providerId: { in: [...favoriteProviderIds] },
+      OR: [
+        ...(favoriteProviderIds.size > 0 ? [{ providerId: { in: [...favoriteProviderIds] } }] : []),
+        ...(footprintCategoryIds.length > 0 ? [{ categoryId: { in: footprintCategoryIds } }] : []),
+      ],
       ...(engagedCategoryIds.size > 0 ? { categoryId: { notIn: [...engagedCategoryIds] } } : {}),
     },
     include: { provider: true, category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
@@ -560,6 +577,58 @@ export async function getRecentlyViewed(userId: string, limit = 6): Promise<Rece
     .map((id) => byId.get(id))
     .filter((l): l is ListingDTO => !!l)
     .map((listing) => ({ listing, viewedAt: viewedAtByListing.get(listing.id)!.toISOString() }));
+}
+
+export type RecentlyViewedDetailedListing = {
+  listing: ListingDTO;
+  category: { id: string; slug: string; name: string; sector: { slug: string; name: string } };
+  viewedAt: string;
+};
+
+/**
+ * History-page variant of getRecentlyViewed that also resolves each listing's
+ * category and sector, so the history can be shown "no matter the category".
+ */
+export async function getRecentlyViewedDetailed(
+  userId: string,
+  limit = 100,
+): Promise<RecentlyViewedDetailedListing[]> {
+  const events = await prisma.userEvent.findMany({
+    where: { userId, eventType: "action_taken" },
+    orderBy: { createdAt: "desc" },
+    take: limit * 3, // over-fetch to allow for de-duplication by listing
+    select: { metadata: true, createdAt: true },
+  });
+
+  const viewedAtByListing = new Map<string, Date>();
+  const orderedIds: string[] = [];
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtByListing.has(listingId)) continue;
+    viewedAtByListing.set(listingId, event.createdAt);
+    orderedIds.push(listingId);
+    if (orderedIds.length >= limit) break;
+  }
+  if (orderedIds.length === 0) return [];
+
+  const listings = await prisma.listing.findMany({
+    where: { id: { in: orderedIds }, status: "published" },
+    include: { provider: true, category: { include: { sector: true } } },
+  });
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return orderedIds
+    .map((id) => byId.get(id))
+    .flatMap((l) => (l ? [l] : []))
+    .map((l) => ({
+      listing: toListingDTO(l),
+      category: {
+        id: l.category.id,
+        slug: l.category.slug,
+        name: l.category.name,
+        sector: { slug: l.category.sector.slug, name: l.category.sector.name },
+      },
+      viewedAt: viewedAtByListing.get(l.id)!.toISOString(),
+    }));
 }
 
 /**

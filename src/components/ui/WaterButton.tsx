@@ -239,7 +239,7 @@ function roundRectPath(
  * needs something behind it: over a flat fill there is nothing to refract, so
  * Blur will look like it does nothing. Put it over a photo or a gradient.
  */
-function __OriginkitBase_WaterButton(props: WaterButtonProps) {
+function OriginkitBaseWaterButton(props: WaterButtonProps) {
     const {
         label = DEFAULTS.label,
         font,
@@ -840,5 +840,5 @@ const __originkitPresetProps = {
 };
 
 export default function WaterButton(props: Record<string, unknown>) {
-  return <__OriginkitBase_WaterButton {...(__originkitPresetProps as Record<string, unknown>)} {...props} />;
+  return <OriginkitBaseWaterButton {...(__originkitPresetProps as Record<string, unknown>)} {...props} />;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProviderLogo } from "@/components/ProviderLogo";
@@ -18,6 +18,7 @@ import { MIN_COMPARE, MAX_COMPARE } from "@/lib/compareTray";
  */
 export function CompareTrayBar() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { tray, remove, clear } = useCompareTray();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
@@ -31,9 +32,15 @@ export function CompareTrayBar() {
 
   function goCompare() {
     if (!tray || tray.items.length < MIN_COMPARE) return;
-    const target = `/explore/${tray.sectorSlug}/compare?category=${tray.categoryId}&ids=${tray.items
-      .map((i) => i.id)
-      .join(",")}`;
+    // Carry the need-intake context (budget flexibility + stated constraints)
+    // from the explore page through to the compare page so the AI
+    // recommendation can be tailored to it.
+    const budget = searchParams.get("budget");
+    const constraint = searchParams.get("constraint");
+    const params = new URLSearchParams({ category: tray.categoryId, ids: tray.items.map((i) => i.id).join(",") });
+    if (budget) params.set("budget", budget);
+    if (constraint) params.set("constraint", constraint);
+    const target = `/explore/${tray.sectorSlug}/compare?${params.toString()}`;
     if (isAuthed === false) {
       router.push(`/signup?next=${encodeURIComponent(target)}`);
       return;

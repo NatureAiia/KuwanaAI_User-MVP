@@ -12,12 +12,21 @@ export default async function ComparePage({
   searchParams,
 }: {
   params: Promise<{ sector: string }>;
-  searchParams: Promise<{ category?: string; ids?: string }>;
+  searchParams: Promise<{ category?: string; ids?: string; budget?: string; constraint?: string }>;
 }) {
   const { sector } = await params;
-  const { category: categoryId, ids } = await searchParams;
+  const { category: categoryId, ids, budget, constraint } = await searchParams;
 
   if (!categoryId || !ids) notFound();
+
+  const budgetFlexibility = budget === "low" || budget === "medium" || budget === "high" ? budget : null;
+  const constraints = constraint
+    ? constraint
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
 
   const listingIds = ids.split(",").filter(Boolean);
   if (listingIds.length < 2) notFound();
@@ -66,6 +75,8 @@ export default async function ComparePage({
         attributeSchema={attributeSchema}
         trends={trends}
         initialSavedIds={initialSavedIds}
+        budgetFlexibility={budgetFlexibility}
+        constraints={constraints}
       />
       <BottomTabBar />
     </div>
