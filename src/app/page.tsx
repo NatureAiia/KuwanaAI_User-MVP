@@ -11,6 +11,7 @@ import { HeroDeviceMockup } from "@/components/landing/HeroDeviceMockup";
 import { ScrollButtons } from "@/components/landing/ScrollButtons";
 import { WaitlistInline } from "@/components/landing/WaitlistInline";
 import { GetStartedButton } from "@/components/landing/GetStartedButton";
+import { HeaderGetStarted } from "@/components/landing/HeaderGetStarted";
 
 const WEEKLY_PICKS = [
   { title: "Best value data bundles this week", sub: "Econet · NetOne · Telecel", score: 92 },
@@ -52,9 +53,7 @@ export default function LandingPage() {
           <LinkButton href="/login" variant="ghost" size="md">
             Log in
           </LinkButton>
-          <LinkButton href="/signup" variant="primary" size="md">
-            Get started
-          </LinkButton>
+          <HeaderGetStarted />
         </nav>
       </header>
 
@@ -76,7 +75,7 @@ export default function LandingPage() {
               </span>
 
               <h1 className="mt-4 font-display text-[32px] leading-[1.05] font-bold tracking-tight md:text-[46px]">
-                Compare smarter. <span className="text-accent-sky">Gain</span> more.
+                Compare smarter. <span className="text-accent-teal">Gain</span> more.
               </h1>
               <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-text-secondary">
                 Explainable, total-cost, eligibility-aware comparisons across telecom, banking,
@@ -106,28 +105,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1120px] px-5 py-10 md:px-10">
-          <h2 className="font-display text-[20px] font-semibold">This week&apos;s picks</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
-            {WEEKLY_PICKS.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 transition-shadow hover:shadow-[0_0_28px_-10px_var(--accent-teal)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display font-semibold text-[16px] leading-[1.2]">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-[12px] text-text-muted">{item.sub}</p>
-                  </div>
-                  <SignalBloom value={item.score} size={52} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <section id="features" className="mx-auto max-w-[1120px] px-5 py-10 md:px-10">
           <span className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
             What you get
@@ -150,6 +127,28 @@ export default function LandingPage() {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-[1120px] px-5 py-10 md:px-10">
+          <h2 className="font-display text-[20px] font-semibold">This week&apos;s picks</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {WEEKLY_PICKS.map((item) => (
+              <div
+                key={item.title}
+                className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 transition-shadow hover:shadow-[0_0_28px_-10px_var(--accent-teal)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-display font-semibold text-[16px] leading-[1.2]">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-[12px] text-text-muted">{item.sub}</p>
+                  </div>
+                  <SignalBloom value={item.score} size={52} />
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
@@ -204,11 +203,11 @@ export default function LandingPage() {
             <ul className="flex flex-row items-center justify-start gap-8 md:justify-center md:gap-16 min-w-max md:min-w-0">
               <li className="shrink-0">
                 <Image
-                  src="/aiia-logo.jpg"
+                  src="/aiia-logo.png"
                   alt="Ai Institute Africa"
-                  width={366}
-                  height={307}
-                  className="h-24 w-auto md:h-36"
+                  width={488}
+                  height={409}
+                  className="h-48 w-auto md:h-72"
                   priority={false}
                 />
               </li>
@@ -218,7 +217,7 @@ export default function LandingPage() {
                   alt="Kuwana"
                   width={240}
                   height={240}
-                  className="h-24 w-24 md:h-36 md:w-36"
+                  className="h-48 w-48 md:h-72 md:w-72"
                   priority={false}
                 />
               </li>
@@ -244,60 +243,62 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-border px-5 py-10 md:px-10">
+      <footer className="border-t border-[#16212B] bg-[#0C161C] px-5 py-10 md:px-10">
         <div className="mx-auto flex max-w-[1120px] flex-col gap-8 md:flex-row md:justify-between">
           <div className="max-w-[36ch]">
             <div className="flex items-center gap-2">
               <Image src="/kuwana-mark.png" alt="" width={22} height={22} />
-              <span className="font-display text-[15px] font-bold tracking-tight">kuwana.ai</span>
+              <span className="font-display text-[15px] font-bold tracking-tight text-white">
+                kuwana.ai
+              </span>
             </div>
-            <p className="mt-2 text-[12px] leading-[1.6] text-text-muted">
+            <p className="mt-2 text-[12px] leading-[1.6] text-[#7E8B97]">
               Explainable comparisons for the decisions that actually matter.
             </p>
           </div>
 
           <div className="flex gap-10">
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-[#2DD4BF]">
                 Product
               </h4>
-              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
+              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-[#9FB0BD]">
                 <li>
-                  <a href="#features" className="hover:text-text-primary">
+                  <a href="#features" className="hover:text-white">
                     Features
                   </a>
                 </li>
                 <li>
-                  <Link href="/explore" className="hover:text-text-primary">
+                  <Link href="/explore" className="hover:text-white">
                     Explore
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-[#2DD4BF]">
                 Account
               </h4>
-              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
+              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-[#9FB0BD]">
                 <li>
-                  <Link href="/login" className="hover:text-text-primary">
+                  <Link href="/login" className="hover:text-white">
                     Log in
                   </Link>
                 </li>
                 <li>
-                  <Link href="/signup" className="hover:text-text-primary">
+                  <Link href="/signup" className="hover:text-white">
                     Get started
                   </Link>
                 </li>
               </ul>
             </div>
             <div>
-              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
+              <h4 className="text-[11px] font-semibold uppercase tracking-wide text-[#2DD4BF]">
                 Trust
               </h4>
-              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-text-secondary">
+              <ul className="mt-2 flex flex-col gap-1.5 text-[13px] text-[#9FB0BD]">
                 <li>
-                  <Link href="/trust" className="hover:text-text-primary">
+                  <Link href="/trust" className="hover:text-white">
                     Our promises
                   </Link>
                 </li>
@@ -307,8 +308,8 @@ export default function LandingPage() {
         </div>
 
         <div className="mx-auto mt-8 flex max-w-[1120px] flex-col items-center gap-4 text-center">
-          <p className="text-[12px] text-text-muted">
-            <a href="https://kuwana.ai" className="hover:text-text-primary">kuwana.ai</a>{" "}
+          <p className="text-[12px] text-[#7E8B97]">
+            <a href="https://kuwana.ai" className="hover:text-white">kuwana.ai</a>{" "}
             Proudly brought to you by Ai Institute Africa. Copyright 2026
           </p>
           <BackToTopButton />

@@ -86,6 +86,40 @@ body {
   background: color-mix(in srgb, var(--accent-sky) 35%, transparent);
 }
 
+/* ---------------------------------------------------------------------- */
+/* Slim, theme-matched scrollbars — replaces the default chunky browser     */
+/* scrollbar with a 6px rail that follows the app's surface/border colors   */
+/* in both themes. FireFox uses the native `scrollbar-color` pair; Chrome/   */
+/* Edge/Safari get the explicit -webkit rules below.                       */
+/* ---------------------------------------------------------------------- */
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 55%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* 44x44 CSS-pixel minimum touch target (Section 9, WCAG 2.1 AA) */
 .tap-target {
   min-height: 44px;
