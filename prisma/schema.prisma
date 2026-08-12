@@ -398,6 +398,7 @@ enum EventType {
   action_taken
   daily_visit
   chat_started
+  advert_opened
 }
 
 model UserEvent {
@@ -544,6 +545,9 @@ enum AdminAuditAction {
   provider_unlinked
   user_role_changed
   llm_model_changed
+  advert_created
+  advert_updated
+  advert_deleted
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
@@ -608,28 +612,28 @@ model RecommendationCache {
 // billed at. Decimal, not Float: at $0.00000008/token a float's rounding
 // error is a meaningful share of the value.
 model LlmUsage {
-  id           String   @id @default(uuid())
+  id           String  @id @default(uuid())
   provider     String // "anthropic" | "openrouter"
   model        String
   feature      String // "chat" | "recommendations" | "intake"
-  userId       String?  @map("user_id")
-  inputTokens  Int      @default(0) @map("input_tokens")
-  outputTokens Int      @default(0) @map("output_tokens")
-  costUsd      Decimal  @default(0) @map("cost_usd") @db.Decimal(14, 10)
-  latencyMs    Int      @map("latency_ms")
-  ok           Boolean  @default(true)
-  errorMessage String?  @map("error_message")
+  userId       String? @map("user_id")
+  inputTokens  Int     @default(0) @map("input_tokens")
+  outputTokens Int     @default(0) @map("output_tokens")
+  costUsd      Decimal @default(0) @map("cost_usd") @db.Decimal(14, 10)
+  latencyMs    Int     @map("latency_ms")
+  ok           Boolean @default(true)
+  errorMessage String? @map("error_message")
 
   // Tier routing. `attempt` is 1 for the rung the complexity heuristic chose
   // and increments each time a failure pushed the call further up the ladder,
   // so "escalation rate" is just the share of rows with attempt > 1.
   // `complexity` is stored so the heuristics in lib/ai/tiers.ts can be re-tuned
   // later against what actually happened rather than from intuition.
-  attempt       Int      @default(1)
-  escalatedFrom String?  @map("escalated_from")
+  attempt       Int     @default(1)
+  escalatedFrom String? @map("escalated_from")
   complexity    Float?
 
-  createdAt    DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // No FK to User: usage is an operational record that must outlive the
   // account that generated it, the same reasoning as admin_audit_log.
@@ -649,4 +653,18 @@ model AppSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")
+}
+
+// Admin-managed promo slots rotated through the explore page's ad card.
+model Advert {
+  id          String   @id @default(uuid())
+  sponsorName String   @map("sponsor_name")
+  tagline     String
+  imageUrl    String   @map("image_url")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@map("adverts")
 }

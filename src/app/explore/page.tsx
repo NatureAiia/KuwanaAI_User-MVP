@@ -4,7 +4,8 @@ import { clsx } from "clsx";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { NeedIntake } from "@/components/explore/NeedIntake";
-import { SpecialAdCard } from "@/components/explore/SpecialAdCard";
+import { AdvertRotator } from "@/components/explore/AdvertRotator";
+import { prisma } from "@/lib/prisma";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
 export const metadata: Metadata = {
@@ -13,7 +14,13 @@ export const metadata: Metadata = {
     "Compare telecom, banking, insurance, and education providers in Zimbabwe with transparent, explainable decision scores.",
 };
 
-export default function ExploreHubPage() {
+export default async function ExploreHubPage() {
+  const adverts = await prisma.advert.findMany({
+    where: { active: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, sponsorName: true, tagline: true, imageUrl: true },
+  });
+
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
@@ -22,7 +29,7 @@ export default function ExploreHubPage() {
 
       <NeedIntake />
 
-      <SpecialAdCard />
+      <AdvertRotator adverts={adverts} />
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {Object.values(SECTORS).map((sector) => {

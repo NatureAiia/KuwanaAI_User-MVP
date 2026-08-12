@@ -13,6 +13,7 @@ const bodySchema = z.object({
     "item_saved",
     "action_taken",
     "daily_visit",
+    "advert_opened",
   ]),
   sector: z
     .enum([

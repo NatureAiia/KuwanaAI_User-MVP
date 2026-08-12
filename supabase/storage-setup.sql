@@ -20,3 +20,15 @@ create policy "Public read access to listing images"
 on storage.objects for select
 to public
 using (bucket_id = 'listing-images');
+
+-- Admin-uploaded advert images (POST /api/admin/adverts/images), same
+-- pattern: public read, no client-write policy — every write goes through
+-- that one server route, which already checks requireAdmin() first.
+insert into storage.buckets (id, name, public)
+values ('advert-images', 'advert-images', true)
+on conflict (id) do nothing;
+
+create policy "Public read access to advert images"
+on storage.objects for select
+to public
+using (bucket_id = 'advert-images');

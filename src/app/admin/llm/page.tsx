@@ -341,6 +341,41 @@ export default async function AdminLlmPage({
         </Card>
       </section>
 
+      <section className="mt-8">
+        <h2 className="font-display text-text-secondary text-[14px] font-semibold">By user</h2>
+        <p className="text-text-muted mt-1 text-[12px]">Top 50 by spend. Calls with no signed-in user aren&apos;t shown.</p>
+        <Card className="mt-2 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-[12px]">
+            <thead className="text-text-muted border-border border-b text-[11px]">
+              <tr>
+                <th className="py-2 text-left font-medium">User</th>
+                <th className="py-2 text-right font-medium">Calls</th>
+                <th className="py-2 text-right font-medium">Failed</th>
+                <th className="py-2 text-right font-medium">In</th>
+                <th className="py-2 text-right font-medium">Out</th>
+                <th className="py-2 text-right font-medium">Avg</th>
+                <th className="py-2 text-right font-medium">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.byUser.map((row) => (
+                <tr key={row.userId} className="border-border/60 border-b last:border-0">
+                  <td className="py-2 font-medium">{row.email ?? row.userId}</td>
+                  <TotalsRow totals={row} />
+                </tr>
+              ))}
+              {report.byUser.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-text-muted py-3">
+                    Nothing recorded yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Card>
+      </section>
+
       {report.recentFailures.length > 0 && (
         <section className="mt-8">
           <h2 className="font-display text-text-secondary text-[14px] font-semibold">Recent failures</h2>

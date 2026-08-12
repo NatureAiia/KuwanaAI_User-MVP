@@ -13,6 +13,7 @@ export const XP_RULES: Record<EventType, number> = {
   action_taken: 25,
   daily_visit: 5,
   chat_started: 5,
+  advert_opened: 2,
 };
 
 export const XP_PER_LEVEL = 100;
@@ -70,7 +71,7 @@ export const BADGE_TRIGGERS: Partial<Record<EventType, BadgeTrigger[]>> = {
 };
 
 /** Event types whose GamificationRule carries `questTrigger: true` at seed time. */
-export const QUEST_TRIGGER_EVENTS: EventType[] = ["comparison_completed", "daily_visit"];
+export const QUEST_TRIGGER_EVENTS: EventType[] = ["comparison_completed", "daily_visit", "advert_opened"];
 
 /**
  * Quest.criteria shapes the progress engine understands. "target" is the
@@ -81,4 +82,5 @@ export type QuestCriteria =
   | { type: "category_count"; target: number }
   | { type: "comparison_count"; target: number }
   | { type: "sector_diversity"; target: number }
-  | { type: "streak_count"; target: number };
+  | { type: "streak_count"; target: number }
+  | { type: "advert_open_count"; target: number };

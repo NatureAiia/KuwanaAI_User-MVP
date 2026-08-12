@@ -128,6 +128,11 @@ async function computeQuestProgress(
 
     case "streak_count":
       return streak.currentStreak;
+
+    case "advert_open_count":
+      return tx.userEvent.count({
+        where: { userId, eventType: "advert_opened", createdAt: { gte: quest.activeFrom, lte: quest.activeTo } },
+      });
   }
 }
 

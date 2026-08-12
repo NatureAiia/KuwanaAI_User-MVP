@@ -61,6 +61,7 @@ export type UsageTotals = {
 
 export type ModelBreakdownRow = UsageTotals & { model: string; provider: string; label: string };
 export type FeatureBreakdownRow = UsageTotals & { feature: string };
+export type UserBreakdownRow = UsageTotals & { userId: string | null; email: string | null };
 export type DailyPoint = { day: string; calls: number; costUsd: number };
 
 const EMPTY_TOTALS: UsageTotals = {
@@ -137,6 +138,7 @@ export type UsageReport = {
   overall: UsageTotals;
   byModel: ModelBreakdownRow[];
   byFeature: FeatureBreakdownRow[];
+  byUser: UserBreakdownRow[];
   daily: DailyPoint[];
   tiers: TierReport;
   recentFailures: {
@@ -285,6 +287,26 @@ export async function getUsageReport(days: number): Promise<UsageReport> {
     ORDER BY SUM(cost_usd) DESC, COUNT(*) DESC
   `;
 
+  const userRows = await prisma.$queryRaw<RawRow[]>`
+    SELECT user_id AS key,
+           COUNT(*) AS calls,
+           COUNT(*) FILTER (WHERE NOT ok) AS failed_calls,
+           SUM(input_tokens) AS input_tokens,
+           SUM(output_tokens) AS output_tokens,
+           SUM(cost_usd) AS cost_usd,
+           AVG(latency_ms) AS avg_latency
+    FROM llm_usage
+    WHERE created_at >= ${since} AND user_id IS NOT NULL
+    GROUP BY user_id
+    ORDER BY SUM(cost_usd) DESC, COUNT(*) DESC
+    LIMIT 50
+  `;
+  const users = await prisma.user.findMany({
+    where: { id: { in: userRows.map((row) => row.key).filter((id): id is string => id !== null) } },
+    select: { id: true, email: true },
+  });
+  const emailById = new Map(users.map((u) => [u.id, u.email]));
+
   const dailyRows = await prisma.$queryRaw<{ day: Date; calls: bigint; cost_usd: Prisma.Decimal | null }[]>`
     SELECT date_trunc('day', created_at) AS day,
            COUNT(*) AS calls,
@@ -354,6 +376,11 @@ export async function getUsageReport(days: number): Promise<UsageReport> {
       label: findModel(row.key ?? "")?.label ?? row.key ?? "unknown",
     })),
     byFeature: featureRows.map((row) => ({ ...toTotals(row), feature: row.key ?? "unknown" })),
+    byUser: userRows.map((row) => ({
+      ...toTotals(row),
+      userId: row.key,
+      email: row.key ? emailById.get(row.key) ?? null : null,
+    })),
     tiers: buildTierReport(attemptRows, servedRows, ladders),
     daily: dailyRows.map((row) => ({
       day: row.day.toISOString().slice(0, 10),
