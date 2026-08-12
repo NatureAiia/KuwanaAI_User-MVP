@@ -3,10 +3,11 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ExternalLink, ShieldCheck } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { getListingPriceTrends, getAlsoCompared, getClosestMatches } from "@/lib/catalog";
+import { getListingPriceTrends, getAlsoCompared, getClosestMatches, getCategoryAttributeMedians } from "@/lib/catalog";
 import { requireUser } from "@/lib/auth";
 import { computePriceForecast } from "@/lib/priceTrend";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
+import { describeMarketPosition } from "@/lib/attributeDirection";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { ListingCoverArt } from "@/components/ListingCoverArt";
@@ -69,6 +70,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
   const trends = await getListingPriceTrends([listing.id]);
   const trend = trends[listing.id];
   const forecast = trend ? computePriceForecast(trend) : null;
+  const attributeMedians = await getCategoryAttributeMedians(listing.category.id);
   const alsoCompared = await getAlsoCompared(listing.id);
   const closestMatches = await getClosestMatches(listing.id);
   const hasSavings = trend && trend.direction === "down" && trend.earliestPrice > Number(listing.price);
@@ -142,18 +144,25 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             <dl className="mt-3 space-y-2.5">
               {listing.category.attributeSchema
                 .filter((attr) => !isRequirementAttribute(attr.key))
-                .map((attr) => (
-                  <div key={attr.key} className="flex justify-between text-[13px]">
-                    <dt className="text-text-secondary">{attr.label}</dt>
-                    <dd className="font-medium">
-                      {typeof attributes[attr.key] === "boolean"
-                        ? attributes[attr.key]
-                          ? "Yes"
-                          : "No"
-                        : `${attributes[attr.key] ?? "—"}${attr.unit ? ` ${attr.unit}` : ""}`}
-                    </dd>
-                  </div>
-                ))}
+                .map((attr) => {
+                  const median = attributeMedians[attr.key];
+                  const value = attributes[attr.key];
+                  const position =
+                    attr.dataType === "number" && attr.isComparable && median !== undefined && typeof value === "number"
+                      ? describeMarketPosition(value, median, attr.key)
+                      : null;
+                  return (
+                    <div key={attr.key} className="flex items-center justify-between text-[13px]">
+                      <dt className="text-text-secondary">{attr.label}</dt>
+                      <dd className="flex items-center gap-1.5 font-medium">
+                        {position && position.tone !== "neutral" && (
+                          <Badge tone={position.tone}>{position.label}</Badge>
+                        )}
+                        {typeof value === "boolean" ? (value ? "Yes" : "No") : `${value ?? "—"}${attr.unit ? ` ${attr.unit}` : ""}`}
+                      </dd>
+                    </div>
+                  );
+                })}
             </dl>
           </div>
 

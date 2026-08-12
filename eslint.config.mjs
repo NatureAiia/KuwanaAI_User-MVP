@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local virtualenv bundles vendored JupyterLab/npm minified JS that
+    // eslint would otherwise traverse on every `eslint .`.
+    ".venv/**",
+    "test-results/**",
+    "node_modules/.cache/**",
   ]),
   {
     // Root-level .js files are CommonJS by contract, not by preference:

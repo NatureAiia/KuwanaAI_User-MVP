@@ -300,3 +300,44 @@ gateway pointed at a Vision model) works too — just point `LLAMA_VISION_BASE_U
   traceable, and the system prompt still forbids inventing numbers.
 - No fallback. If the local Llama endpoint is down, the AI endpoints 503 with a clear message.
   Acceptable for an open-source MVP; would want a managed fallback before any user-facing SLA.
+
+## 2026-08-12: lint script fix + PR #4 (`app-line`) merge
+
+**`npm run lint` was silently not running lint.** Next.js 16 removed the `next lint` command
+(bundled `next build` no longer lints either) — the script was still calling it, so every run
+errored out on an "invalid project directory" before eslint executed. Every "eslint clean" claim
+in commit messages since the 16.3.0 bump was checking a command that never actually ran. Fixed to
+`"lint": "eslint src"`; running it for real surfaces 3 small pre-existing issues (unrelated to this
+fix, left as-is): a component created during render and an unused import in `CategoryBadge.tsx`,
+and an `any` in `scoring.ts`.
+
+**PR #4 merged a large parallel branch (`app-line`) into `main`** — 201 files, ~9,200 insertions.
+Ships several things this file previously described as planned, proposed, or living on a different
+provider:
+
+- The Anthropic → Llama 3.2 Vision swap described in the 2026-08-09 entry above is now actually on
+  `main`. `ANTHROPIC_API_KEY` in `.env` is vestigial — nothing in `src/` reads it. Note for anyone
+  deploying beyond local dev: `LLAMA_VISION_BASE_URL` defaults to `http://localhost:11434`, which
+  will not resolve from a Vercel serverless function — a real reachable endpoint is needed before
+  this works in production.
+- `notebooks/` — a Python/Jupyter modeling workstream (`value_score_baseline`,
+  `recommendation_engine`) that exports a DB snapshot and fits per-category attribute weights.
+  `src/lib/fittedWeights.ts` + `scoreWithFit()` in `src/lib/catalog.ts` use a fit from
+  `notebooks/data/fitted_weights.json` when one exists, falling back to the hand-tuned heuristic
+  otherwise. Not yet a trained model — see `notebooks/README.md`.
+- `scripts/social-scan/` — scans public Reddit/Telegram content for price mentions, tags them with
+  a matched provider name, and stores them in `SocialPriceMention` for manual admin review only;
+  never writes to `Listing`/`Provider` directly.
+- PDF export off the compare view (`src/lib/comparePdf.ts`), a `/history` page, real provider logo
+  assets (`public/provider-logos/`), new loading screens (`GalleryTunnel`, `LoadingFacts`), and a
+  `docker-compose.3tier.yml` + `prisma/schema.3tier.prisma` sketch (not adopted — the app still
+  runs on the existing Supabase/Prisma setup).
+
+**The merge initially broke `main`'s build.** A conflict between this branch and concurrent
+perf/pin-unpin work on `main` got resolved by keeping both sides of several conflicts (duplicate
+`const`/object-property declarations across `proxy.ts`, `scoring.ts`, the `chat`/`events`/
+`need-intake`/`recommendations` routes, and `ProviderLogo.tsx`) instead of picking one, plus a spot
+in `catalog.ts` where one function's declaration landed in the middle of another's unclosed body.
+Fixed and reverified (`tsc --noEmit` clean, 234/234 tests) same day — see `HANDOFF.md`'s
+2026-08-12 entry for the full account. If you're reading this soon after: confirm via `git status`
+that the fix is actually committed before trusting this paragraph.

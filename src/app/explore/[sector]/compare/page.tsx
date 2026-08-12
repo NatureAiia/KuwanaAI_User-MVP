@@ -68,10 +68,6 @@ export default async function ComparePage({
       <Header />
       <h1 className="mt-4 font-display text-[22px] font-bold">Compare {category.name}</h1>
       <CompareClientLazy
-      {/* The "Compare <category>" header row (title + share-as-PDF button)
-          lives inside CompareClient so the share button can reach the AI /
-          traditional comparison results that are generated client-side. */}
-      <CompareClient
         sectorSlug={sector}
         categoryId={categoryId}
         categoryName={category.name}

@@ -4,12 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 import { llamaChat, LlamaUnavailableError } from "@/lib/ai/llama";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
-import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
+import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { buildTotalCostSummary } from "@/lib/totalCost";
 import { recordEvent } from "@/lib/gamification/process-event";
-import { getCachedRecommendation, recommendationCacheKey, setCachedRecommendation } from "@/lib/recommendationCache";
-import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import {
   getCachedRecommendation,
   isValidRecommendation,
@@ -118,12 +116,6 @@ export async function POST(req: Request) {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
-  // Every miss here is a billed Claude call. Keyed on the user id rather
-  // than the IP: the caller is authenticated, so it cannot be sidestepped by
-  // rotating a forwarded-for header.
-  const limited = await enforceRateLimit(`recommendations:${user.id}`, RATE_LIMITS.authedAi);
-  if (limited) return limited;
-
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -139,10 +131,6 @@ export async function POST(req: Request) {
   }
 
   const category = listings[0].category;
-  // Uses the shared mapper rather than rebuilding the field list here — the
-  // hand-rolled copy that used to live at this spot went stale the moment
-  // ListingDTO gained description/rating/reviewCount.
-  const listingDTOs: ListingDTO[] = listings.map(toListingDTO);
   const listingDTOs: ListingDTO[] = listings.map((l) => ({
     id: l.id,
     name: l.name,

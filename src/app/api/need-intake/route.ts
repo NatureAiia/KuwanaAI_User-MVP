@@ -18,10 +18,6 @@ const bodySchema = z.object({ query: z.string().trim().min(1).max(300) });
 // laptop. See lib/rateLimit.ts for why a per-instance counter is a real but
 // partial mitigation on a serverless deploy.
 const RATE_LIMIT = { limit: 20, windowSeconds: 10 * 60 };
-// Every call here hits the self-hosted Llama endpoint unauthenticated — the
-// tighter, cost-relevant limit of the two public endpoints. Still generous
-// for a real visitor trying a few different needs while browsing.
-const RATE_LIMIT = { windowMs: 10 * 60 * 1000, max: 20 };
 
 export async function POST(req: Request) {
   const limited = await enforceRateLimit(`need-intake:${clientKey(req)}`, RATE_LIMIT);
