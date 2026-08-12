@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { createPrismaAdapter } from './prismaAdapter'
 
 declare global {
   var prisma: PrismaClient | undefined
@@ -9,6 +10,7 @@ declare global {
 export const prisma =
   global.prisma ||
   new PrismaClient({
+    adapter: createPrismaAdapter(),
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 

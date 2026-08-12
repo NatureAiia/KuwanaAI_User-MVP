@@ -1,7 +1,8 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 import { BADGE_DEFS, XP_RULES, BADGE_TRIGGERS, QUEST_TRIGGER_EVENTS } from "../src/lib/gamification/rules";
+import { createPrismaAdapter } from "../src/lib/prismaAdapter";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ adapter: createPrismaAdapter() });
 
 // Deterministic PRNG so re-seeding produces the same synthetic history every time.
 function seededRandom(seed: string) {
