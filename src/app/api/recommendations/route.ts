@@ -119,6 +119,12 @@ export async function POST(req: Request) {
         confidence: number;
       }>({
         feature: "recommendations",
+        signals: {
+          feature: "recommendations",
+          listingCount: listingDTOs.length,
+          comparableAttributes: attributeSchema.filter((a) => a.isComparable).length,
+          hasPriceTrends: Object.keys(trends).length > 0,
+        },
         userId: user.id,
         maxTokens: 1024,
         effort: "low",

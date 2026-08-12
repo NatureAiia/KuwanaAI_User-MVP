@@ -174,6 +174,16 @@ export async function POST(req: Request) {
       try {
         for await (const delta of streamAiText({
           feature: "chat",
+          signals: {
+            feature: "chat",
+            hasImage: Boolean(image),
+            turnCount: priorMessages.length,
+            messageLength: content.length,
+            // `listingIds` is what the user asked about; grounding data for
+            // several listings is the case that needs real reasoning rather
+            // than a definition.
+            groundedListings: listingIds?.length ?? 0,
+          },
           userId: user.id,
           system,
           messages: modelMessages,

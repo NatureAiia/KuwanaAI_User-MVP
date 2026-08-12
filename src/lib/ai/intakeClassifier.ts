@@ -52,6 +52,7 @@ export async function classifyIntake(query: string): Promise<IntakeResult> {
   try {
     result = await generateAiJson({
       feature: "intake",
+      signals: { feature: "intake", query },
       system: SYSTEM_PROMPT,
       prompt: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
       schema: INTAKE_SCHEMA,

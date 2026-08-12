@@ -3,7 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { Card, Badge } from "@/components/ui/Card";
 import { getUsageReport, type UsageTotals } from "@/lib/ai/usage";
-import { getSelectedModels } from "@/lib/ai/modelConfig";
+import { getLadders } from "@/lib/ai/modelConfig";
 import {
   AI_FEATURES,
   AI_FEATURE_BLURBS,
@@ -11,7 +11,7 @@ import {
   MODEL_CATALOG,
   type AiFeature,
 } from "@/lib/ai/models";
-import { ModelPicker } from "./ModelPicker";
+import { LadderEditor } from "./LadderEditor";
 
 // Usage rows are written on every model call, so a cached render would show an
 // admin stale spend the moment anyone uses the app.
@@ -78,7 +78,7 @@ export default async function AdminLlmPage({
   const { range } = await searchParams;
   const days = RANGES.find((r) => String(r.days) === range)?.days ?? 7;
 
-  const [report, selected] = await Promise.all([getUsageReport(days), getSelectedModels()]);
+  const [report, ladders] = await Promise.all([getUsageReport(days), getLadders()]);
 
   const peakDay = report.daily.reduce<{ day: string; costUsd: number } | null>(
     (best, point) => (best === null || point.costUsd > best.costUsd ? point : best),
@@ -139,18 +139,97 @@ export default async function AdminLlmPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="font-display text-text-secondary text-[14px] font-semibold">Active model per feature</h2>
+        <h2 className="font-display text-text-secondary text-[14px] font-semibold">Tier routing</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="Saved vs top rung"
+            value={money(report.tiers.savedUsd)}
+            sub={`${money(report.tiers.actualUsd)} spent vs ${money(report.tiers.counterfactualUsd)}`}
+            tone="text-accent-teal"
+          />
+          <StatCard
+            label="Served free"
+            value={`${Math.round(report.tiers.freeShare * 100)}%`}
+            sub="of successful calls"
+          />
+          <StatCard
+            label="Escalated"
+            value={`${Math.round(report.tiers.escalationRate * 100)}%`}
+            sub={`${compact(report.tiers.escalatedCalls)} of ${compact(
+              report.tiers.firstTryCalls + report.tiers.escalatedCalls,
+            )} attempts`}
+            tone={report.tiers.escalationRate > 0.25 ? "text-accent-coral" : undefined}
+          />
+          <StatCard
+            label="Avg complexity"
+            value={
+              report.tiers.avgComplexity === null ? "—" : report.tiers.avgComplexity.toFixed(2)
+            }
+            sub="0 = trivial, 1 = hardest"
+          />
+        </div>
+
+        {report.tiers.byLadderPosition.length > 0 && (
+          <Card className="mt-3">
+            <p className="text-text-muted text-[11px]">Attempts by ladder position</p>
+            <div className="mt-2 flex flex-col gap-1.5">
+              {report.tiers.byLadderPosition.map((row) => (
+                <div key={row.attempt} className="flex items-center gap-2 text-[11.5px]">
+                  <span className="text-text-muted w-[72px] shrink-0">
+                    {row.attempt === 1 ? "First try" : `Escalation ${row.attempt - 1}`}
+                  </span>
+                  <div className="bg-bg-surface-raised h-3 flex-1 overflow-hidden rounded-full">
+                    <div
+                      className={`h-full rounded-full ${row.attempt === 1 ? "bg-accent-teal" : "bg-accent-sky"}`}
+                      style={{
+                        width: `${Math.max(
+                          2,
+                          (row.calls /
+                            Math.max(
+                              1,
+                              report.tiers.firstTryCalls + report.tiers.escalatedCalls,
+                            )) *
+                            100,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <span className="w-[56px] shrink-0 text-right font-mono">{compact(row.calls)}</span>
+                  <span className="w-[64px] shrink-0 text-right font-mono">
+                    {row.failedCalls > 0 ? (
+                      <span className="text-accent-coral">{compact(row.failedCalls)} failed</span>
+                    ) : (
+                      ""
+                    )}
+                  </span>
+                  <span className="w-[84px] shrink-0 text-right font-mono">{money(row.costUsd)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-text-muted mt-3 text-[11.5px]">
+              &ldquo;Saved&rdquo; prices the tokens that were actually served against the top rung of
+              each feature&rsquo;s ladder. It is an estimate — the bigger model would have produced a
+              different number of output tokens — but &ldquo;send everything to the big model&rdquo; is
+              the real alternative to tiering, so it is the right comparison.
+            </p>
+          </Card>
+        )}
+      </section>
+
+      <section className="mt-8">
+        <h2 className="font-display text-text-secondary text-[14px] font-semibold">Tier ladder per feature</h2>
         <p className="text-text-muted mt-1 text-[12px]">
-          Changes apply to new requests within 30 seconds and are recorded in the audit log.
+          Ordered cheapest-first. Changes apply to new requests within 30 seconds and are recorded in
+          the audit log.
         </p>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {AI_FEATURES.map((feature: AiFeature) => (
-            <ModelPicker
+            <LadderEditor
               key={feature}
               feature={feature}
               label={AI_FEATURE_LABELS[feature]}
               blurb={AI_FEATURE_BLURBS[feature]}
-              current={selected[feature]}
+              ladder={ladders[feature]}
               models={MODEL_CATALOG}
             />
           ))}

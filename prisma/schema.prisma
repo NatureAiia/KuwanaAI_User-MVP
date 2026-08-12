@@ -602,6 +602,16 @@ model LlmUsage {
   latencyMs    Int      @map("latency_ms")
   ok           Boolean  @default(true)
   errorMessage String?  @map("error_message")
+
+  // Tier routing. `attempt` is 1 for the rung the complexity heuristic chose
+  // and increments each time a failure pushed the call further up the ladder,
+  // so "escalation rate" is just the share of rows with attempt > 1.
+  // `complexity` is stored so the heuristics in lib/ai/tiers.ts can be re-tuned
+  // later against what actually happened rather than from intuition.
+  attempt       Int      @default(1)
+  escalatedFrom String?  @map("escalated_from")
+  complexity    Float?
+
   createdAt    DateTime @default(now()) @map("created_at")
 
   // No FK to User: usage is an operational record that must outlive the
