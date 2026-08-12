@@ -137,7 +137,7 @@ const TelecomFootprint = z.object({
   network_preference: z.enum(["Econet", "NetOne", "Telecel", "Any"]).optional(),
 });
 
-export function scoreListing(footprint: unknown, listingAttributes: Record<string, any>) {
+export function scoreListing(footprint: unknown, listingAttributes: Record<string, number | undefined>) {
   const parsed = TelecomFootprint.safeParse(footprint);
   if (!parsed.success) return { score: 0, reason: "footprint invalid" };
 

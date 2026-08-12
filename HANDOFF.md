@@ -72,6 +72,48 @@ By the time this note was written the tree was verified clean again, but
 **check `git status` before assuming these fixes are committed** — they
 were still uncommitted, working-tree-only changes as of this writing.
 
+## 2026-08-12 continued — crash-recovery confirmed intact, deploy target decided
+
+You asked whether Friday 2026-08-07's laptop crash had left anything unfinished. Short answer: no.
+The full timeline, from `git log`/`git reflog` (no stash entries — nothing was ever dangling):
+
+- **23:07** `a23b777` and **23:10** `5d35b88` — PR #3 had merged a database-architecture spike
+  (`database-schema` branch) into the app with **live, committed conflict markers** in
+  `package.json`, `prisma/seed.ts`, `catalog.ts`, `scoring.ts` (`main` was uninstallable). Fixed, and
+  the v2 schema redesign it carried was moved to `docs/schema-v2-proposal/` — a proposal, never
+  wired in, with a README pricing out what adopting it would actually cost (~55 files, ~430 call
+  sites) if that's ever revisited.
+- **23:24** `29c5317` — merged a parallel **"hardening" branch** (security/perf/production-infra)
+  into the recovered app line, resolving 36 conflicts. Verified at the time: 0 typecheck/lint
+  errors, 220/220 tests, `next build` green.
+
+That session (Claude Opus 5, 1M context) left a fully working tree; everything since builds on top
+of it. **The hardening branch is also where a previously-undocumented production track came
+from** — worth flagging here because neither this file nor `README.md` mentioned it before now:
+a multi-stage `Dockerfile` (`runner`/`migrator` targets), a full Helm chart at `deploy/helm/kuwana/`
+(HPA, KEDA, PDB, NetworkPolicy, ExternalSecret, Postgres backup + migrate Jobs), `.github/workflows/
+ci.yml` (lint/typecheck/test → Docker build + smoke test → Trivy scan → Helm validation) +
+`release.yml` + Dependabot, health probes (`/api/health`, `/api/health/ready`), and a shared
+Redis/Valkey Next.js cache handler (`cache-handler.js`, engaged only if `REDIS_URL` is set).
+
+**Decided 2026-08-12: Kubernetes (the Helm chart) is the real deploy target**, not a parallel
+exploration — supersedes this file's and `README.md`'s Vercel-only framing wherever they conflict.
+Concrete follow-ons this creates, none done yet:
+
+- `LLAMA_VISION_BASE_URL` defaults to `localhost:11434` — needs a real endpoint the cluster can
+  reach (a dedicated Ollama/vLLM deployment, most likely) before `/api/chat`, `/api/recommendations`,
+  and `/api/need-intake` work outside local dev.
+- `REDIS_URL` isn't set anywhere yet, so the shared cache handler and the distributed rate limiter
+  in `src/lib/rateLimit.ts` both still run in single-process/in-memory mode despite the Redis-backed
+  code already existing — needs a real Redis/Valkey instance wired in via the Helm chart.
+- Secrets (`DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, etc.) should move to the chart's
+  `ExternalSecret` template rather than living in a plaintext `.env` — not done yet.
+- `main`'s branch protection should require the CI `verify` job (lint/typecheck/test) before merge —
+  **this is the actual root cause of both the 08-07 and today's 08-12 breakages**: `ci.yml` already
+  runs those checks on every push/PR, so either it isn't set as a required check, or it was bypassed.
+  Couldn't verify or fix this from here (no `gh` CLI / GitHub admin access in this environment) — do
+  this directly in the repo settings; it's the single highest-leverage fix available.
+
 ## The one-sentence version
 
 Kuwana is a decision-intelligence platform (Need → Context → Eligible
