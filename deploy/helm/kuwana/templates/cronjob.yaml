@@ -1,0 +1,70 @@
+{{- if .Values.cronJobs.enabled }}
+{{- $root := . -}}
+{{- range .Values.cronJobs.jobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "kuwana.fullname" $root }}-{{ .name }}
+  labels:
+    {{- include "kuwana.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: cron
+spec:
+  schedule: {{ .schedule | quote }}
+  {{- with $root.Values.cronJobs.timeZone }}
+  # Named zone rather than UTC: these jobs exist to refresh data ahead of the
+  # local business day, and Zimbabwe does not observe DST, so the wall-clock
+  # time is what actually matters. Requires Kubernetes >= 1.27.
+  timeZone: {{ . | quote }}
+  {{- end }}
+  concurrencyPolicy: {{ $root.Values.cronJobs.concurrencyPolicy }}
+  startingDeadlineSeconds: {{ $root.Values.cronJobs.startingDeadlineSeconds }}
+  successfulJobsHistoryLimit: {{ $root.Values.cronJobs.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ $root.Values.cronJobs.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: {{ $root.Values.cronJobs.backoffLimit }}
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            {{- include "kuwana.labels" $root | nindent 12 }}
+            app.kubernetes.io/component: cron
+        spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "kuwana.serviceAccountName" $root }}
+          automountServiceAccountToken: false
+          securityContext:
+            {{- toYaml $root.Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: trigger
+              image: {{ $root.Values.cronJobs.image }}
+              securityContext:
+                {{- toYaml $root.Values.containerSecurityContext | nindent 16 }}
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "kuwana.secretName" $root }}
+                      key: CRON_SECRET
+              # The endpoint does the work; this only triggers it. `--fail`
+              # matters — without it curl exits 0 on a 401/500 and the job is
+              # recorded as successful while nothing ran.
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  curl --fail --show-error --silent \
+                    --max-time 600 \
+                    --retry 2 --retry-delay 10 --retry-connrefused \
+                    -H "Authorization: Bearer ${CRON_SECRET}" \
+                    "http://{{ include "kuwana.fullname" $root }}.{{ $root.Release.Namespace }}.svc.cluster.local:{{ $root.Values.service.port }}{{ .path }}"
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  memory: 64Mi
+{{- end }}
+{{- end }}

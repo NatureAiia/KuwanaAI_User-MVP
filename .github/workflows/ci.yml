@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push to the same branch makes the previous run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "24"
+
+jobs:
+  verify:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      # The generated Prisma client is a type dependency of half the codebase,
+      # so this has to happen before tsc, not before the build.
+      - run: npx prisma generate
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  build:
+    name: Build image
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # amd64 only here — this job answers "does it build", and emulating
+      # arm64 on a PR would triple the wall-clock time for no extra signal.
+      # The release workflow builds both.
+      - name: Build runner image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: false
+          load: true
+          tags: kuwana:ci
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://ci.invalid.supabase.co
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build migrator image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrator
+          push: false
+          tags: kuwana-migrate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Proves the container actually serves, not merely that it compiles. A
+      # broken standalone copy (a missing static dir, a wrong workdir) passes
+      # `docker build` and fails here.
+      - name: Smoke test the container
+        run: |
+          docker run -d --name kuwana-ci -p 3000:3000 \
+            -e DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/ci \
+            -e SUPABASE_SERVICE_ROLE_KEY=ci \
+            -e ANTHROPIC_API_KEY=ci \
+            kuwana:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health; then
+              echo "liveness ok"; exit 0
+            fi
+            sleep 2
+          done
+          echo "container never became live"; docker logs kuwana-ci; exit 1
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs kuwana-ci || true
+
+  scan:
+    name: Vulnerability scan
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: false
+          load: true
+          tags: kuwana:scan
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=https://ci.invalid.supabase.co
+            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci
+          cache-from: type=gha
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: kuwana:scan
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          # Report everything; the gate below decides what blocks. Splitting
+          # these apart is what keeps an unfixable base-image CVE from
+          # blocking every unrelated PR.
+          exit-code: "0"
+
+      - name: Upload scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Fail on fixable critical findings
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: kuwana:scan
+          format: table
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  manifests:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Lint chart (both overlays)
+        run: |
+          helm lint deploy/helm/kuwana -f deploy/helm/kuwana/values-production.yaml
+          helm lint deploy/helm/kuwana -f deploy/helm/kuwana/values-staging.yaml
+
+      # Rendered into the workspace, not /tmp: container-based steps below see
+      # the workspace mounted at /github/workspace and nothing else.
+      - name: Render manifests
+        run: |
+          mkdir -p rendered
+          helm template kuwana deploy/helm/kuwana \
+            -f deploy/helm/kuwana/values-production.yaml \
+            --set image.tag=ci --set migrations.image.tag=ci > rendered/production.yaml
+          helm template kuwana deploy/helm/kuwana \
+            -f deploy/helm/kuwana/values-staging.yaml \
+            --set image.tag=ci --set migrations.image.tag=ci > rendered/staging.yaml
+
+      - name: Validate against Kubernetes schemas
+        uses: docker://ghcr.io/yannh/kubeconform:v0.6.7
+        with:
+          # ignore-missing-schemas covers the ExternalSecret CRD, which is not
+          # part of the upstream Kubernetes schema set.
+          args: -strict -summary -kubernetes-version 1.30.0 -ignore-missing-schemas rendered
+
+      - name: Policy check (Trivy misconfiguration)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: rendered
+          severity: CRITICAL,HIGH
+          exit-code: "1"

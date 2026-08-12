@@ -45,8 +45,21 @@ export function convertCurrency(
   return usd * toRate;
 }
 
+/**
+ * The locale prices are formatted in, pinned rather than inherited.
+ *
+ * `toLocaleString(undefined, …)` uses whatever locale the *runtime* has,
+ * which differs between the server and the visitor's browser. That produced
+ * two distinct bugs: every price was a hydration mismatch waiting to happen
+ * (server renders "1 234,50", client renders "1,234.50" for the same
+ * number), and two users comparing the same listing could see different
+ * separators. For a price-comparison product the presentation of a price has
+ * to be stable, so it is fixed here.
+ */
+const PRICE_LOCALE = "en-US";
+
 export function formatCurrency(amount: number, code: CurrencyCode): string {
   const def = BY_CODE.get(code);
   const symbol = def?.symbol ?? code;
-  return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${symbol} ${amount.toLocaleString(PRICE_LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

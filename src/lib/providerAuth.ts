@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { privateJson } from "@/lib/apiResponse";
 
 /**
  * A "provider" role account only ever acts on the one Provider record an
@@ -15,13 +16,13 @@ export async function requireOwnProvider(): Promise<
 > {
   const user = await requireUser();
   if (!user) {
-    return { response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
+    return { response: privateJson({ error: "Not authenticated" }, { status: 401 }) };
   }
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
   if (dbUser?.role !== "provider") {
     return {
-      response: NextResponse.json({ error: "This feature is for provider accounts" }, { status: 403 }),
+      response: privateJson({ error: "This feature is for provider accounts" }, { status: 403 }),
     };
   }
 
@@ -31,7 +32,7 @@ export async function requireOwnProvider(): Promise<
   });
   if (!provider) {
     return {
-      response: NextResponse.json(
+      response: privateJson(
         { error: "Your account isn't linked to a provider yet — ask an admin to link it." },
         { status: 404 },
       ),

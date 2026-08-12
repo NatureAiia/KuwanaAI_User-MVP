@@ -6,8 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { BackToTopButton } from "@/components/landing/BackToTopButton";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 import { SignalBloom } from "@/components/SignalBloom";
-import { LandingFX } from "@/components/landing/LandingFX";
-import { HeroDeviceMockup } from "@/components/landing/HeroDeviceMockup";
+import { LandingFXLazy, HeroDeviceMockupLazy } from "@/components/landing/LandingHeroLazy";
 import { ScrollButtons } from "@/components/landing/ScrollButtons";
 import { GetStartedButton } from "@/components/landing/GetStartedButton";
 import { HeaderGetStarted } from "@/components/landing/HeaderGetStarted";
@@ -61,7 +60,7 @@ export default function LandingPage() {
           id="landing-hero-fx"
           className="relative isolate px-5 pt-6 md:px-10 md:pt-10"
         >
-          <LandingFX containerId="landing-hero-fx" />
+          <LandingFXLazy containerId="landing-hero-fx" />
 
           <div className="relative mx-auto flex max-w-[1120px] flex-col items-center gap-10 md:flex-row md:items-center md:gap-8">
             <div className="w-full md:max-w-[520px]">
@@ -99,7 +98,7 @@ export default function LandingPage() {
             </div>
 
             <div className="w-full md:flex-1">
-              <HeroDeviceMockup />
+              <HeroDeviceMockupLazy />
             </div>
           </div>
         </section>

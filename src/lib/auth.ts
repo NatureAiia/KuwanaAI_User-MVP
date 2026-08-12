@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { privateJson } from "@/lib/apiResponse";
 
 export async function requireUser() {
   const supabase = await createClient();
@@ -27,14 +28,18 @@ export async function getUserRole(userId: string) {
 export async function requireConsumer(): Promise<
   { user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }
 > {
+  // privateJson, not NextResponse.json: an auth denial is per-caller and
+  // must never be stored by a shared cache. Without it, a CDN could serve
+  // one user's 401 to another request — or, worse, cache the 401 and keep
+  // serving it after the user signs in.
   const user = await requireUser();
   if (!user) {
-    return { response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
+    return { response: privateJson({ error: "Not authenticated" }, { status: 401 }) };
   }
   const role = await getUserRole(user.id);
   if (role !== "consumer") {
     return {
-      response: NextResponse.json({ error: "This feature is for consumer accounts" }, { status: 403 }),
+      response: privateJson({ error: "This feature is for consumer accounts" }, { status: 403 }),
     };
   }
   return { user };

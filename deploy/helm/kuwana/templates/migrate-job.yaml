@@ -1,0 +1,89 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "kuwana.fullname" . }}-migrate
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    {{- if .Values.postgresql.enabled }}
+    # With the in-cluster database, a pre-install hook would run before the
+    # StatefulSet it needs has been created. On first install the migration
+    # therefore runs after the release is applied — new pods simply stay
+    # unready until the schema exists, which is exactly what the readiness
+    # probe is for. Upgrades keep the pre-upgrade ordering, since by then the
+    # database is already running.
+    "helm.sh/hook": post-install,pre-upgrade
+    {{- else }}
+    # External database: migrate before the new ReplicaSet is created, so code
+    # never runs against a schema it does not expect. A failed migration
+    # aborts the release.
+    "helm.sh/hook": pre-install,pre-upgrade
+    {{- end }}
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": {{ .Values.migrations.hookDeletePolicy }}
+spec:
+  backoffLimit: {{ .Values.migrations.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrations.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        {{- include "kuwana.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kuwana.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.postgresql.enabled }}
+      initContainers:
+        - name: wait-for-db
+          image: {{ .Values.postgresql.image }}
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h {{ include "kuwana.postgresFullname" . }} -p 5432 -U {{ .Values.postgresql.auth.username }} -d {{ .Values.postgresql.auth.database }}; do
+                echo "waiting for postgres..."
+                sleep 2
+              done
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: migrate
+          image: {{ include "kuwana.migrationsImage" . }}
+          imagePullPolicy: {{ .Values.migrations.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          # `migrate deploy` only applies committed migration files — it never
+          # generates one and never prompts, which is what makes it safe to run
+          # unattended. `migrate dev` must never appear here.
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env:
+            {{- include "kuwana.databaseEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

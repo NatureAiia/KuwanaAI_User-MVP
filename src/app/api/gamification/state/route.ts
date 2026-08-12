@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 import { XP_PER_LEVEL, xpIntoLevel } from "@/lib/gamification/rules";
@@ -20,7 +20,7 @@ export async function GET() {
 
   const totalXp = xp?.totalXp ?? 0;
 
-  return NextResponse.json({
+  return privateJson({
     totalXp,
     level: xp?.level ?? 1,
     xpIntoLevel: xpIntoLevel(totalXp),

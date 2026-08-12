@@ -1,0 +1,81 @@
+# Staging overlay.
+#
+# Runs the in-cluster Postgres so staging can be torn down and rebuilt without
+# touching a managed database, and so the StatefulSet path stays exercised
+# rather than rotting untested. Supabase Auth is still the hosted service —
+# it is the identity provider, not something this chart can stand up.
+#
+#   helm upgrade --install kuwana deploy/helm/kuwana \
+#     -n kuwana-staging --create-namespace \
+#     -f deploy/helm/kuwana/values-staging.yaml \
+#     --set image.tag=<sha> --set migrations.image.tag=<sha>
+
+replicaCount: 2
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 75
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 768Mi
+
+podDisruptionBudget:
+  # A PDB of 50% on 2 replicas blocks node drains during cluster maintenance
+  # for no benefit in a non-production environment.
+  enabled: false
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # Staging is not for the public or for search engines.
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Robots-Tag: noindex, nofollow";
+  hosts:
+    - host: staging.kuwana.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: kuwana-staging-tls
+      hosts:
+        - staging.kuwana.example.com
+
+config:
+  adminEmails: "arthur@rubiem.com"
+  supabaseUrl: "https://your-staging-project.supabase.co"
+  supabasePublishableKey: "sb_publishable_replace_me"
+
+# Secrets still come from a Secret created out of band — staging holds real
+# Supabase and Anthropic credentials, which cost real money if leaked.
+#   kubectl -n kuwana-staging create secret generic kuwana-app \
+#     --from-literal=SUPABASE_SERVICE_ROLE_KEY=... \
+#     --from-literal=ANTHROPIC_API_KEY=... \
+#     --from-literal=CRON_SECRET="$(openssl rand -hex 32)"
+existingSecret: "kuwana-app"
+
+postgresql:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  backup:
+    enabled: false
+
+cronJobs:
+  enabled: true

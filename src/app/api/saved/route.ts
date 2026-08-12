@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { privateJson } from "@/lib/apiResponse";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
@@ -13,13 +13,13 @@ export async function POST(req: Request) {
   const { user } = auth;
 
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const listing = await prisma.listing.findFirst({
     where: { id: parsed.data.listingId, status: "published" },
     include: { category: { include: { sector: true } } },
   });
-  if (!listing) return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+  if (!listing) return privateJson({ error: "Listing not found" }, { status: 404 });
 
   const result = await prisma.$transaction(
     async (tx) => {
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     { timeout: 15_000 },
   );
 
-  return NextResponse.json({ gamification: result });
+  return privateJson({ gamification: result });
 }
 
 export async function DELETE(req: Request) {
@@ -48,13 +48,13 @@ export async function DELETE(req: Request) {
   const { user } = auth;
 
   const parsed = bodySchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   await prisma.savedListing.deleteMany({
     where: { userId: user.id, listingId: parsed.data.listingId },
   });
 
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }
 
 export async function GET() {
@@ -62,13 +62,17 @@ export async function GET() {
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
+  // Capped: nothing limits how many listings a user may save, so this
+  // response grew without bound and was fetching three joined tables per
+  // row. The saved list is a browsing surface, not an export.
   const saved = await prisma.savedListing.findMany({
     where: { userId: user.id },
     include: { listing: { include: { provider: true, category: { include: { sector: true } } } } },
     orderBy: { savedAt: "desc" },
+    take: 200,
   });
 
-  return NextResponse.json({
+  return privateJson({
     saved: saved.map((s) => ({
       savedAt: s.savedAt,
       listing: {

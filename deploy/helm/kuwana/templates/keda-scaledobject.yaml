@@ -1,0 +1,79 @@
+{{- if .Values.keda.enabled }}
+# Request-rate autoscaling via KEDA.
+#
+# Why not CPU: this app spends most of a request waiting — on Supabase, on
+# Postgres, on the Claude API for streaming chat. A pod with 40 in-flight
+# requests blocked on a slow upstream looks nearly idle to the CPU metric, so
+# a CPU-driven HPA adds capacity only once the queue is already deep and
+# users are already waiting.
+#
+# The metrics come from the ingress controller rather than from the app.
+# That is deliberate: it counts requests that are queued or rejected before
+# they ever reach a pod, which is precisely the traffic that proves more pods
+# are needed, and it requires no instrumentation inside the application.
+#
+# Requires: KEDA installed, and Prometheus scraping ingress-nginx.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "kuwana.fullname" . }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "kuwana.fullname" . }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  {{- with .Values.keda.fallback }}
+  # When Prometheus itself is unreachable KEDA would otherwise stop scaling
+  # entirely and hold whatever replica count it last set. This pins a safe
+  # floor instead of trusting a metric it cannot read.
+  fallback:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      # Same asymmetry as the plain HPA: add capacity fast, remove it slowly,
+      # because the traffic that just spiked usually spikes again.
+      behavior:
+        {{- toYaml .Values.autoscaling.behavior | nindent 8 }}
+  triggers:
+    # 1. Requests per second, summed across the ingress and divided by the
+    #    per-pod threshold. This is the primary signal.
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheusAddress | quote }}
+        metricName: kuwana_ingress_rps
+        threshold: {{ .Values.keda.requestsPerSecondPerPod | quote }}
+        query: |
+          sum(rate(nginx_ingress_controller_requests{namespace="{{ .Release.Namespace }}",ingress="{{ include "kuwana.fullname" . }}"}[1m]))
+    # 2. Tail latency, as a backstop for the case the rate signal misses:
+    #    upstreams got slower without traffic rising, so each pod holds more
+    #    concurrent requests than it can serve well.
+    #
+    #    Note this trigger does not scale linearly — latency is not additive
+    #    over replicas, so desiredReplicas = ceil(p95 / threshold) is a blunt
+    #    "things are bad, add some" instruction, not a calculation. It is
+    #    bounded by maxReplicaCount and exists to react, not to be precise.
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheusAddress | quote }}
+        metricName: kuwana_ingress_p95_seconds
+        threshold: {{ .Values.keda.p95LatencySeconds | quote }}
+        query: |
+          histogram_quantile(0.95, sum(rate(nginx_ingress_controller_request_duration_seconds_bucket{namespace="{{ .Release.Namespace }}",ingress="{{ include "kuwana.fullname" . }}"}[5m])) by (le))
+    {{- if .Values.keda.cpuFloor.enabled }}
+    # 3. CPU as a floor only. It is a poor primary signal here but a real one
+    #    for the case both Prometheus queries return nothing (no traffic
+    #    recorded yet, metrics pipeline broken) while pods are genuinely busy.
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ .Values.keda.cpuFloor.utilizationPercentage | quote }}
+    {{- end }}
+{{- end }}

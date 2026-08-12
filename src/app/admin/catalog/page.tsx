@@ -3,8 +3,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/Card";
-import { NewListingForm } from "@/components/admin/NewListingForm";
-import { NewProviderForm } from "@/components/admin/NewProviderForm";
+import { NewListingFormLazy, NewProviderFormLazy } from "@/components/LazyClients";
 import { ListingRowActions } from "@/components/admin/ListingRowActions";
 import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
@@ -76,8 +75,8 @@ export default async function AdminCatalogPage({
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2">
-        <NewListingForm categories={categories} providers={providers} />
-        <NewProviderForm />
+        <NewListingFormLazy categories={categories} providers={providers} />
+        <NewProviderFormLazy />
       </div>
 
       <div className="mt-8 overflow-x-auto rounded-[var(--radius-card)] border border-border">

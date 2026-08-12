@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Header } from "@/components/Header";
-import { ProviderListingForm } from "@/components/provider/ProviderListingForm";
+import { ProviderListingFormLazy } from "@/components/LazyClients";
 
 export default async function NewProviderListingPage() {
   const user = await requireUser();
@@ -24,7 +24,7 @@ export default async function NewProviderListingPage() {
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
       <Header />
       <div className="mt-6">
-        <ProviderListingForm mode="create" categories={categories} />
+        <ProviderListingFormLazy mode="create" categories={categories} />
       </div>
     </div>
   );

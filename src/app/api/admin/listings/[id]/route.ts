@@ -6,14 +6,16 @@ import { requireAdmin } from "@/lib/auth";
 import { notifyListingDecision } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/adminAudit";
 import { recordPriceChange } from "@/lib/catalog";
+import { revalidateCatalog } from "@/lib/cacheTags";
+import { boundedJsonRecord } from "@/lib/zodShared";
 
 const updateSchema = z.object({
-  name: z.string().min(1).optional(),
+  name: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
-  attributes: z.record(z.string(), z.unknown()).optional(),
-  price: z.number().positive().optional(),
-  currency: z.string().optional(),
-  sourceUrl: z.string().url().nullable().optional(),
+  attributes: boundedJsonRecord(50, 16_000).optional(),
+  price: z.number().positive().max(100_000_000).optional(),
+  currency: z.string().trim().length(3).optional(),
+  sourceUrl: z.string().url().max(2000).nullable().optional(),
   freshnessStatus: z.enum(["fresh", "stale", "unverified"]).optional(),
   // The provider review queue: approve (-> published) or reject (with a
   // reason the provider sees on /provider) a pending_review submission.
@@ -81,6 +83,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
   }
 
+  // The catalog read cache is tag-keyed, not TTL-only — without this an
+  // edited or deleted listing keeps serving stale until the backstop expires.
+  revalidateCatalog();
   return NextResponse.json({ listing });
 }
 
@@ -99,5 +104,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     detail: `Deleted "${listing.name}"`,
   });
 
+  // The catalog read cache is tag-keyed, not TTL-only — without this an
+  // edited or deleted listing keeps serving stale until the backstop expires.
+  revalidateCatalog();
   return NextResponse.json({ ok: true });
 }
