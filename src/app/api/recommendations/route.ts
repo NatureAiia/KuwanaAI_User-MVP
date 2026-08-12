@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { generateAiJson } from "@/lib/ai/provider";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
 import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
@@ -112,15 +112,18 @@ export async function POST(req: Request) {
   let result = await getCachedRecommendation(cacheKey);
 
   if (!result) {
-    let message;
     try {
-      message = await anthropic.messages.create({
-        model: RECOMMENDATION_MODEL,
-        max_tokens: 1024,
-        output_config: {
-          effort: "low",
-          format: { type: "json_schema", schema: RECOMMENDATION_SCHEMA },
-        },
+      result = await generateAiJson<{
+        recommended_listing_name: string;
+        explanation: string;
+        confidence: number;
+      }>({
+        feature: "recommendations",
+        userId: user.id,
+        maxTokens: 1024,
+        effort: "low",
+        schema: RECOMMENDATION_SCHEMA,
+        schemaName: "listing_recommendation",
         system:
           "You are Kuwana's comparison assistant. You recommend the best-fit option from a small set " +
           "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best " +
@@ -132,13 +135,13 @@ export async function POST(req: Request) {
           "out for someone who can't meet it) rather than restating the raw price. If one option has a " +
           "materially higher requirement than the others, say so explicitly — this is an eligibility " +
           "signal, not just a spec difference. Only reference data present in the listings provided; " +
-          "never invent statistics. Always make clear this is an AI-assisted recommendation.",
-        messages: [
-          {
-            role: "user",
-            content: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
-          },
-        ],
+          "never invent statistics. Always make clear this is an AI-assisted recommendation.\n\n" +
+          // Restated in prose because this feature is routable to models that
+          // treat a JSON schema as advisory rather than enforced.
+          'Reply with JSON only, no prose and no markdown fence: {"recommended_listing_name": string ' +
+          'copied verbatim from the listings, "explanation": string of 2-4 sentences, "confidence": ' +
+          "number between 0 and 1}.",
+        prompt: `Category: ${category.name}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing for a typical consumer and explain why.`,
       });
     } catch (err) {
       // Previously unhandled — the client would get a bare 500 with no JSON
@@ -146,29 +149,26 @@ export async function POST(req: Request) {
       // the button reverting as if nothing happened). 503 signals "the AI
       // service itself is unavailable," distinct from a 400/404 caused by bad
       // input.
-      console.error("[recommendations] Anthropic request failed:", err);
+      console.error("[recommendations] model request failed:", err);
       return NextResponse.json(
         { error: "AI recommendation is unavailable right now — please try again shortly." },
         { status: 503 },
       );
     }
 
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
+    if (!result?.explanation) {
       return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
     }
-    result = JSON.parse(textBlock.text) as {
-      recommended_listing_name: string;
-      explanation: string;
-      confidence: number;
-    };
     await setCachedRecommendation(cacheKey, result);
   }
 
   const recommendedListing =
     listings.find((l) => l.name === result.recommended_listing_name) ?? listings[0];
 
-  const confidence = Math.max(0, Math.min(1, result.confidence));
+  // Number(): a model that answers "0.8" as a string would otherwise clamp to
+  // NaN, which Prisma rejects when writing the Recommendation row.
+  const rawConfidence = Number(result.confidence);
+  const confidence = Number.isFinite(rawConfidence) ? Math.max(0, Math.min(1, rawConfidence)) : 0;
 
   const gamification = await prisma.$transaction(
     async (tx) => {

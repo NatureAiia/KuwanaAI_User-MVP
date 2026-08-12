@@ -526,6 +526,7 @@ enum AdminAuditAction {
   provider_linked
   provider_unlinked
   user_role_changed
+  llm_model_changed
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
@@ -574,4 +575,51 @@ model RecommendationCache {
 
   @@index([expiresAt])
   @@map("recommendation_cache")
+}
+
+// ---------------------------------------------------------------------------
+// LLM routing & cost tracking
+// ---------------------------------------------------------------------------
+
+// One row per model call, written by lib/ai/provider.ts on both success and
+// failure. Failures are recorded too: a route that starts erroring is the
+// thing an admin most needs to see on the cost page, and a table that only
+// holds successes makes an outage look like a traffic drop.
+//
+// Cost is stored per row rather than derived at read time from a price table
+// — prices change, and a historical row must keep the cost it was actually
+// billed at. Decimal, not Float: at $0.00000008/token a float's rounding
+// error is a meaningful share of the value.
+model LlmUsage {
+  id           String   @id @default(uuid())
+  provider     String // "anthropic" | "openrouter"
+  model        String
+  feature      String // "chat" | "recommendations" | "intake"
+  userId       String?  @map("user_id")
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
+  costUsd      Decimal  @default(0) @map("cost_usd") @db.Decimal(14, 10)
+  latencyMs    Int      @map("latency_ms")
+  ok           Boolean  @default(true)
+  errorMessage String?  @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // No FK to User: usage is an operational record that must outlive the
+  // account that generated it, the same reasoning as admin_audit_log.
+  @@index([createdAt(sort: Desc)])
+  @@index([feature, createdAt])
+  @@index([model, createdAt])
+  @@map("llm_usage")
+}
+
+// Small key/value store for operator-tunable runtime settings. Currently only
+// the per-feature model selection (`llm.model.<feature>`), which admins change
+// from /admin/llm without a redeploy.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
 }

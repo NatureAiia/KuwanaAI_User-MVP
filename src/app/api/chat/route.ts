@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends, toListingDTO } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { privateJson } from "@/lib/apiResponse";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
+import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
 
@@ -150,14 +151,16 @@ export async function POST(req: Request) {
     }
   }
 
-  const lastUserContent: Parameters<typeof anthropic.messages.stream>[0]["messages"][number]["content"] = image
-    ? [
-        { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
-        { type: "text", text: content || "What can you tell me about this?" },
-      ]
+  // Provider-neutral shape; lib/ai/provider.ts translates it for whichever
+  // model is currently selected, and drops the image for a text-only model.
+  const lastUserContent: NormalizedMessage["content"] = image
+    ? {
+        text: content || "What can you tell me about this?",
+        image: { mediaType: image.mediaType, data: image.data },
+      }
     : content;
 
-  const claudeMessages = [
+  const modelMessages: NormalizedMessage[] = [
     ...priorMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     { role: "user" as const, content: lastUserContent },
   ];
@@ -169,17 +172,15 @@ export async function POST(req: Request) {
     async start(controller) {
       let fullText = "";
       try {
-        const stream = anthropic.messages.stream({
-          model: RECOMMENDATION_MODEL,
-          max_tokens: 700,
+        for await (const delta of streamAiText({
+          feature: "chat",
+          userId: user.id,
           system,
-          messages: claudeMessages,
-        });
-        for await (const event of stream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            fullText += event.delta.text;
-            controller.enqueue(encoder.encode(event.delta.text));
-          }
+          messages: modelMessages,
+          maxTokens: 700,
+        })) {
+          fullText += delta;
+          controller.enqueue(encoder.encode(delta));
         }
       } catch {
         controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));

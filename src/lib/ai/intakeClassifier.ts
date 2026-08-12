@@ -1,4 +1,4 @@
-import { anthropic, RECOMMENDATION_MODEL } from "@/lib/ai/anthropic";
+import { generateAiJson } from "@/lib/ai/provider";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
@@ -25,7 +25,11 @@ const SYSTEM_PROMPT =
   "matches, return null for both. A vague need like \"I need internet\" should still map to the " +
   "closest live sector/category (telecom data bundles) even if imperfect, as long as it's a " +
   "reasonable interpretation — only return null when the need is genuinely unrelated to anything " +
-  "in the list (e.g. a general question, or a sector Kuwana doesn't cover).";
+  "in the list (e.g. a general question, or a sector Kuwana doesn't cover).\n\n" +
+  // Restated in prose because this feature is routable to models that treat a
+  // JSON schema as advisory rather than enforced.
+  'Reply with JSON only, no prose and no markdown fence: {"sector_slug": string|null, ' +
+  '"category_slug": string|null, "confidence": number between 0 and 1}.';
 
 export type IntakeResult = { sectorSlug: string | null; categorySlug: string | null; confidence: number };
 
@@ -44,37 +48,35 @@ export async function classifyIntake(query: string): Promise<IntakeResult> {
     categories: s.categories.map((c) => ({ category_slug: c.slug, category_name: c.name })),
   }));
 
-  const message = await anthropic.messages.create({
-    model: RECOMMENDATION_MODEL,
-    max_tokens: 300,
-    output_config: { effort: "low", format: { type: "json_schema", schema: INTAKE_SCHEMA } },
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
-      },
-    ],
-  });
-
-  const textBlock = message.content.find((b) => b.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
+  let result: { sector_slug: string | null; category_slug: string | null; confidence: number };
+  try {
+    result = await generateAiJson({
+      feature: "intake",
+      system: SYSTEM_PROMPT,
+      prompt: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
+      schema: INTAKE_SCHEMA,
+      schemaName: "intake_route",
+      maxTokens: 300,
+      effort: "low",
+    });
+  } catch (err) {
+    // Routing is a nice-to-have on top of the search the caller does anyway —
+    // "no confident match" is a usable answer, an exception is not.
+    console.error("[intake] classification failed:", err);
     return { sectorSlug: null, categorySlug: null, confidence: 0 };
   }
-
-  const result = JSON.parse(textBlock.text) as {
-    sector_slug: string | null;
-    category_slug: string | null;
-    confidence: number;
-  };
 
   // Never trust the model's slugs blindly — validate against the same closed list it was given.
   const matchedSector = sectorsWithCategories.find((s) => s.slug === result.sector_slug);
   const matchedCategory = matchedSector?.categories.find((c) => c.slug === result.category_slug);
 
+  // Number(): a model that answers "0.8" as a string would otherwise clamp to
+  // NaN and render as an empty confidence badge.
+  const confidence = Number(result.confidence);
+
   return {
     sectorSlug: matchedSector?.slug ?? null,
     categorySlug: matchedCategory?.slug ?? null,
-    confidence: Math.max(0, Math.min(1, result.confidence)),
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
   };
 }

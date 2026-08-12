@@ -6,7 +6,8 @@ type AdminAuditAction =
   | "listing_deleted"
   | "provider_linked"
   | "provider_unlinked"
-  | "user_role_changed";
+  | "user_role_changed"
+  | "llm_model_changed";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -17,7 +18,7 @@ type AdminAuditAction =
 export async function logAdminAction(params: {
   adminEmail: string;
   action: AdminAuditAction;
-  targetType: "listing" | "provider" | "user";
+  targetType: "listing" | "provider" | "user" | "setting";
   targetId: string;
   detail: string;
 }): Promise<void> {
