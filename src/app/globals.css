@@ -76,6 +76,17 @@ html {
   color-scheme: light dark;
 }
 
+/* Most text in this app is set via fixed-pixel Tailwind classes
+   (text-[15px], text-[22px], ...) rather than the rem-based named scale, so
+   this only reaches text sized with text-xs/sm/base/lg/etc. and anything
+   else using rem — it's a partial, low-risk pass, not a guarantee every
+   string on the page shrinks. */
+@media (max-width: 767px) {
+  html {
+    font-size: 87.5%;
+  }
+}
+
 body {
   background: var(--bg-base);
   color: var(--text-primary);

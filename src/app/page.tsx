@@ -47,11 +47,15 @@ export default function LandingPage() {
           <span className="font-display text-xl font-bold tracking-tight">kuwana.ai</span>
         </div>
         <nav className="flex items-center gap-3">
+          <div className="hidden md:block">
+            <LinkButton href="/login" variant="ghost" size="md">
+              Log in
+            </LinkButton>
+          </div>
+          <div className="hidden md:block">
+            <HeaderGetStarted />
+          </div>
           <ThemeToggle />
-          <LinkButton href="/login" variant="ghost" size="md">
-            Log in
-          </LinkButton>
-          <HeaderGetStarted />
         </nav>
       </header>
 
@@ -220,7 +224,7 @@ export default function LandingPage() {
                   alt="Ai Institute Africa"
                   width={488}
                   height={409}
-                  className="h-10 w-auto md:h-12"
+                  className="h-[50px] w-auto md:h-[60px]"
                   priority={false}
                 />
               </li>
@@ -230,7 +234,7 @@ export default function LandingPage() {
                   alt="Kuwana"
                   width={240}
                   height={240}
-                  className="h-10 w-10 md:h-12 md:w-12"
+                  className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]"
                   priority={false}
                 />
               </li>

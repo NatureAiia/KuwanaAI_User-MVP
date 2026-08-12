@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { NeedIntake } from "@/components/explore/NeedIntake";
+import { SpecialAdCard } from "@/components/explore/SpecialAdCard";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
 export const metadata: Metadata = {
@@ -20,6 +21,8 @@ export default function ExploreHubPage() {
       <p className="mt-1 text-[13px] text-text-secondary">Tell us what you need, or pick a sector below.</p>
 
       <NeedIntake />
+
+      <SpecialAdCard />
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {Object.values(SECTORS).map((sector) => {
