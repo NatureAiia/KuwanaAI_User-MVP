@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { llamaChatStream, base64FromDataUrl } from "@/lib/ai/llama";
+import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
+import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
 
@@ -155,19 +156,17 @@ export async function POST(req: Request) {
     }
   }
 
-  const lastUserContent = image
-    ? [
-        { type: "image" as const, image: base64FromDataUrl(image.data) },
-        { type: "text" as const, text: content || "What can you tell me about this?" },
-      ]
-    : (content as string | { type: "text"; text: string }[]);
+  // Provider-neutral shape; lib/ai/provider.ts translates it for whichever
+  // model is currently selected, and drops the image for a text-only model.
+  const lastUserContent: NormalizedMessage["content"] = image
+    ? {
+        text: content || "What can you tell me about this?",
+        image: { mediaType: image.mediaType, data: image.data },
+      }
+    : content;
 
-  const llamaMessages = [
-    { role: "system" as const, content: system },
-    ...priorMessages.map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.content as string,
-    })),
+  const modelMessages: NormalizedMessage[] = [
+    ...priorMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
     { role: "user" as const, content: lastUserContent },
   ];
 
@@ -178,19 +177,29 @@ export async function POST(req: Request) {
     async start(controller) {
       let fullText = "";
       try {
-        const stream = llamaChatStream({
-          messages: llamaMessages,
-          options: { temperature: 0.2, num_predict: 700 },
-        });
-        for await (const delta of stream) {
-          if (delta) {
-            fullText += delta;
-            controller.enqueue(encoder.encode(delta));
-          }
+        for await (const delta of streamAiText({
+          feature: "chat",
+          signals: {
+            feature: "chat",
+            hasImage: Boolean(image),
+            turnCount: priorMessages.length,
+            messageLength: content.length,
+            // `listingIds` is what the user asked about; grounding data for
+            // several listings is the case that needs real reasoning rather
+            // than a definition.
+            groundedListings: listingIds?.length ?? 0,
+          },
+          userId: user.id,
+          system,
+          messages: modelMessages,
+          maxTokens: 700,
+        })) {
+          fullText += delta;
+          controller.enqueue(encoder.encode(delta));
         }
       } catch (err) {
         // Previously swallowed silently — log so production failures are diagnosable.
-        console.error("[chat] Llama stream failed:", err);
+        console.error("[chat] AI stream failed:", err);
         controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
         controller.close();
         return;

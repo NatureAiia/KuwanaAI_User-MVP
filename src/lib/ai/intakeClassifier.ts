@@ -1,4 +1,4 @@
-import { llamaChat } from "@/lib/ai/llama";
+import { generateAiJson } from "@/lib/ai/provider";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
@@ -39,7 +39,12 @@ const SYSTEM_PROMPT =
   "in the list (e.g. a general question, or a sector Kuwana doesn't cover).\n" +
   "Also capture the user's budget flexibility and any concrete constraints from their words — but " +
   "only what they actually said; don't infer a budget stance or constraints that aren't expressed. " +
-  "Distill constraints to short, standalone noun phrases (never full sentences).";
+  "Distill constraints to short, standalone noun phrases (never full sentences).\n\n" +
+  // Restated in prose because this feature is routable to models that treat a
+  // JSON schema as advisory rather than enforced.
+  'Reply with JSON only, no prose and no markdown fence: {"sector_slug": string|null, ' +
+  '"category_slug": string|null, "confidence": number between 0 and 1, "budget_flexibility": ' +
+  '"low"|"medium"|"high"|null, "constraints": string[]|null}.';
 
 export type IntakeResult = {
   sectorSlug: string | null;
@@ -66,35 +71,43 @@ export async function classifyIntake(query: string): Promise<IntakeResult> {
     categories: s.categories.map((c) => ({ category_slug: c.slug, category_name: c.name })),
   }));
 
-  const content = await llamaChat({
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
-      },
-    ],
-    // Ollama guarantees the response is a JSON object matching this schema.
-    format: INTAKE_SCHEMA,
-    options: { temperature: 0, num_predict: 400 },
-  });
-
-  const result = JSON.parse(content) as {
+  let result: {
     sector_slug: string | null;
     category_slug: string | null;
     confidence: number;
     budget_flexibility: string | null;
     constraints: string[] | null;
   };
+  try {
+    result = await generateAiJson({
+      feature: "intake",
+      signals: { feature: "intake", query },
+      system: SYSTEM_PROMPT,
+      prompt: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's need: "${query}"`,
+      schema: INTAKE_SCHEMA,
+      schemaName: "intake_route",
+      maxTokens: 300,
+      effort: "low",
+    });
+  } catch (err) {
+    // Routing is a nice-to-have on top of the search the caller does anyway —
+    // "no confident match" is a usable answer, an exception is not.
+    console.error("[intake] classification failed:", err);
+    return { sectorSlug: null, categorySlug: null, confidence: 0, budgetFlexibility: null, constraints: [] };
+  }
 
   // Never trust the model's slugs blindly — validate against the same closed list it was given.
   const matchedSector = sectorsWithCategories.find((s) => s.slug === result.sector_slug);
   const matchedCategory = matchedSector?.categories.find((c) => c.slug === result.category_slug);
 
+  // Number(): a model that answers "0.8" as a string would otherwise clamp to
+  // NaN and render as an empty confidence badge.
+  const confidence = Number(result.confidence);
+
   return {
     sectorSlug: matchedSector?.slug ?? null,
     categorySlug: matchedCategory?.slug ?? null,
-    confidence: Math.max(0, Math.min(1, result.confidence)),
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
     budgetFlexibility:
       typeof result.budget_flexibility === "string" && BUDGET_FLEXIBILITY.has(result.budget_flexibility)
         ? (result.budget_flexibility as "low" | "medium" | "high")

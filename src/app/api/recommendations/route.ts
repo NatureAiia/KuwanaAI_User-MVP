@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
-import { llamaChat, LlamaUnavailableError } from "@/lib/ai/llama";
+import { generateAiJson } from "@/lib/ai/provider";
 import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
@@ -203,63 +203,63 @@ export async function POST(req: Request) {
   }
 
   if (!result) {
-    let content: string;
-    try {
-      const userContext: string[] = [];
-      if (budgetFlexibility) {
-        userContext.push(
-          `Budget flexibility: ${budgetFlexibility}${budgetFlexibility === "low" ? " (price is the deciding factor — cheapest acceptable option)" : budgetFlexibility === "medium" ? " (value-conscious, some room)" : " (price is not the deciding factor)"}`,
-        );
-      }
-      if (constraints?.length) userContext.push(`Stated constraints: ${constraints.join("; ")}`);
-      const userContextBlock =
-        userContext.length > 0 ? `\nUser context (use to tailor your reasoning — never claim a constraint is met unless the listing data supports it):\n${userContext.join("\n")}` : "";
+    const userContext: string[] = [];
+    if (budgetFlexibility) {
+      userContext.push(
+        `Budget flexibility: ${budgetFlexibility}${budgetFlexibility === "low" ? " (price is the deciding factor — cheapest acceptable option)" : budgetFlexibility === "medium" ? " (value-conscious, some room)" : " (price is not the deciding factor)"}`,
+      );
+    }
+    if (constraints?.length) userContext.push(`Stated constraints: ${constraints.join("; ")}`);
+    const userContextBlock =
+      userContext.length > 0 ? `\nUser context (use to tailor your reasoning — never claim a constraint is met unless the listing data supports it):\n${userContext.join("\n")}` : "";
 
-      content = await llamaChat({
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are Kuwana's decision-intelligence assistant. You recommend the best-fit option from a small set " +
-              "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best overall fit " +
-              "for value and needs. Each listing includes a decision_score breakdown (price_score, benefit_score, " +
-              "freshness_adjustment, trend_adjustment, trust_adjustment, total), a price_trend, requirements_to_qualify " +
-              "(any upfront balance/deposit or condition needed to access it), and total_cost (recurring or per-use fees). " +
-              "Use these as your primary evidence, and reference them concretely in your reasoning rather than restating " +
-              "the raw price. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
-              "(or a materially higher one than its peers), say so explicitly and weigh it honestly in the tradeoffs — " +
-              "this is an eligibility signal, not just a spec difference. Only reference data present in the listings " +
-              "provided; never invent statistics. Always make clear this is an AI-assisted recommendation.",
-          },
-          {
-            role: "user",
-            content: `Category: ${category.name}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
-          },
-        ],
-        // Ollama guarantees the response is JSON matching the schema.
-        format: RECOMMENDATION_SCHEMA,
-        options: { temperature: 0, num_predict: 1400 },
+    try {
+      result = await generateAiJson<CachedRecommendation>({
+        feature: "recommendations",
+        signals: {
+          feature: "recommendations",
+          listingCount: listingDTOs.length,
+          comparableAttributes: attributeSchema.filter((a) => a.isComparable).length,
+          hasPriceTrends: Object.keys(trends).length > 0,
+        },
+        userId: user.id,
+        maxTokens: 1400,
+        effort: "low",
+        schema: RECOMMENDATION_SCHEMA,
+        schemaName: "listing_recommendation",
+        system:
+          "You are Kuwana's decision-intelligence assistant. You recommend the best-fit option from a small set " +
+          "of real listing records for a consumer in Zimbabwe — never the cheapest by default, the best overall fit " +
+          "for value and needs. Each listing includes a decision_score breakdown (price_score, benefit_score, " +
+          "freshness_adjustment, trend_adjustment, trust_adjustment, total), a price_trend, requirements_to_qualify " +
+          "(any upfront balance/deposit or condition needed to access it), and total_cost (recurring or per-use fees). " +
+          "Use these as your primary evidence, and reference them concretely in your reasoning rather than restating " +
+          "the raw price. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
+          "(or a materially higher one than its peers), say so explicitly and weigh it honestly in the tradeoffs — " +
+          "this is an eligibility signal, not just a spec difference. Only reference data present in the listings " +
+          "provided; never invent statistics. Always make clear this is an AI-assisted recommendation.\n\n" +
+          // Restated in prose because this feature is routable to models that
+          // treat a JSON schema as advisory rather than enforced.
+          'Reply with JSON only, no prose and no markdown fence: {"primary_option": {"listing_name": string, ' +
+          '"key_differentiator": string}, "alternative_options": [{"listing_name": string, "key_differentiator": ' +
+          'string}], "explanation": {"summary": string, "key_tradeoffs": string[], "data_traceability_notes": ' +
+          'string}, "suggested_action": string, "confidence": number between 0 and 1}.',
+        prompt: `Category: ${category.name}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
       });
     } catch (err) {
-      // 503 signals "the AI service itself is unavailable," distinct from a
-      // 400/404 caused by bad input. LlamaUnavailableError covers network +
-      // non-2xx; a JSON parse failure on the (guaranteed-valid) schema
-      // response is a 502.
-      if (err instanceof LlamaUnavailableError) {
-        console.error("[recommendations] Llama request failed:", err);
-        return NextResponse.json(
-          { error: "AI recommendation is unavailable right now — please try again shortly." },
-          { status: 503 },
-        );
-      }
-      console.error("[recommendations] Unexpected error:", err);
-      return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
+      // Previously unhandled — the client would get a bare 500 with no JSON
+      // body and silently do nothing (no error shown, no state change, just
+      // the button reverting as if nothing happened). 503 signals "the AI
+      // service itself is unavailable," distinct from a 400/404 caused by bad
+      // input.
+      console.error("[recommendations] model request failed:", err);
+      return NextResponse.json(
+        { error: "AI recommendation is unavailable right now — please try again shortly." },
+        { status: 503 },
+      );
     }
 
-    try {
-      result = JSON.parse(content) as CachedRecommendation;
-    } catch (err) {
-      console.error("[recommendations] Llama returned non-JSON despite schema format:", err, content);
+    if (!result?.explanation) {
       return NextResponse.json({ error: "No recommendation generated" }, { status: 502 });
     }
     await setCachedRecommendation(cacheKey, result);
@@ -290,7 +290,10 @@ export async function POST(req: Request) {
     requirements_to_qualify: getListingRequirements(dto, attributeSchema).map(formatRequirement),
   }));
 
-  const confidence = Math.max(0, Math.min(1, result.confidence));
+  // Number(): a model that answers "0.8" as a string would otherwise clamp to
+  // NaN, which Prisma rejects when writing the Recommendation row.
+  const rawConfidence = Number(result.confidence);
+  const confidence = Number.isFinite(rawConfidence) ? Math.max(0, Math.min(1, rawConfidence)) : 0;
 
   const gamification = await prisma.$transaction(
     async (tx) => {

@@ -23,7 +23,16 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border bg-bg-surface/90 px-4 backdrop-blur-md md:px-6">
+      {/* Mobile: plain flex row, justify-between — only two items ever render
+          (logo, icon cluster), so this pins them to the two edges exactly.
+          md+: switches to the 3-column grid so the centered nav gets its own
+          track between them. A single grid-cols-[1fr_auto_1fr] at every
+          breakpoint left the mobile icon cluster short of the right edge —
+          the "auto" track still collapsed to 0 width, but the two 1fr tracks
+          split what remained around it rather than starting from the edges,
+          and the logo's non-shrinking min-content ate more than its fair
+          half. */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between gap-3 border-b border-border bg-bg-surface/90 px-4 backdrop-blur-md md:grid md:grid-cols-[1fr_auto_1fr] md:justify-normal md:px-6">
         <Link
           href="/dashboard"
           className="flex items-center gap-2 justify-self-start"
