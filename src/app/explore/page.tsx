@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { clsx } from "clsx";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { NeedIntake } from "@/components/explore/NeedIntake";
+import { SpecialAdCard } from "@/components/explore/SpecialAdCard";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
 export const metadata: Metadata = {
@@ -20,20 +22,43 @@ export default function ExploreHubPage() {
 
       <NeedIntake />
 
+      <SpecialAdCard />
+
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {Object.values(SECTORS).map((sector) => {
           const Icon = sector.icon;
           const live = LIVE_SECTORS.includes(sector.slug);
-          return (
+          const card = (
+            <>
+              <Icon size={30} className={live ? "text-accent-teal" : "text-text-muted"} />
+              <span className={clsx("font-medium text-[14px]", !live && "text-text-muted")}>
+                {sector.name}
+              </span>
+              {live ? (
+                <span className="text-[11px] text-text-muted">{sector.blurb}</span>
+              ) : (
+                <span className="rounded-full border border-border bg-bg-base px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                  Coming soon
+                </span>
+              )}
+            </>
+          );
+          return live ? (
             <Link
               key={sector.slug}
-              href={live ? `/explore/${sector.slug}` : "/explore/healthcare"}
+              href={`/explore/${sector.slug}`}
               className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 text-center hover:border-accent-sky/50"
             >
-              <Icon size={30} className="text-accent-teal" />
-              <span className="font-medium text-[14px]">{sector.name}</span>
-              <span className="text-[11px] text-text-muted">{live ? sector.blurb : "Coming soon"}</span>
+              {card}
             </Link>
+          ) : (
+            <div
+              key={sector.slug}
+              aria-disabled="true"
+              className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5 text-center opacity-55"
+            >
+              {card}
+            </div>
           );
         })}
       </div>

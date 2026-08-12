@@ -27,22 +27,30 @@ export async function GET(req: Request) {
   }
 
   if (category) {
-    const result = await getCategoryWithListings(sector, category);
+    // Overlap the Supabase auth call (slow, network) with the category read
+    // so they don't serialize. Trends + saved-list lookup then run in
+    // parallel once both are available.
+    const [user, result] = await Promise.all([
+      requireUser(),
+      getCategoryWithListings(sector, category),
+    ]);
     if (!result) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const trends = await getListingPriceTrends(result.listings.map((l) => l.id));
+
+    const listingIds = result.listings.map((l) => l.id);
 
     // Browsing without an account is supported (see the homepage's "Browse
-    // now, sign up when you're ready" CTA), so this can't require auth —
+    // now, sign up when you're ready" CTA), so this can't require auth -
     // just skip the saved lookup for anonymous visitors.
-    const user = await requireUser();
-    const savedIds = user
-      ? (
-          await prisma.savedListing.findMany({
-            where: { userId: user.id, listingId: { in: result.listings.map((l) => l.id) } },
+    const [trends, savedRows] = await Promise.all([
+      getListingPriceTrends(listingIds),
+      user
+        ? prisma.savedListing.findMany({
+            where: { userId: user.id, listingId: { in: listingIds } },
             select: { listingId: true },
           })
-        ).map((s) => s.listingId)
-      : [];
+        : Promise.resolve([]),
+    ]);
+    const savedIds = savedRows.map((s) => s.listingId);
 
     // no-store, NOT the shared cache used below. `savedIds` is scoped to the
     // caller, so an s-maxage here would let a CDN serve one user's saved

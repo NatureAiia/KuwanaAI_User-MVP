@@ -9,6 +9,8 @@ import {
   Pill,
   Laptop2,
   Shirt,
+  Hotel,
+  ShoppingCart,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -22,7 +24,9 @@ export type SectorSlug =
   | "utilities"
   | "pharmacy"
   | "electronics"
-  | "fashion";
+  | "fashion"
+  | "hotels"
+  | "retail";
 
 export const SECTORS: Record<
   SectorSlug,
@@ -61,7 +65,7 @@ export const SECTORS: Record<
     slug: "healthcare",
     icon: HeartPulse,
     status: "coming_soon",
-    blurb: "Coming soon",
+    blurb: "Medical aid schemes",
   },
   transport: {
     name: "Transport",
@@ -88,15 +92,29 @@ export const SECTORS: Record<
     name: "Tech & Electronics",
     slug: "electronics",
     icon: Laptop2,
-    status: "live",
+    status: "coming_soon",
     blurb: "Gadgets & AI tools",
   },
   fashion: {
     name: "Clothes",
     slug: "fashion",
     icon: Shirt,
-    status: "live",
+    status: "coming_soon",
     blurb: "Menswear, womenswear & footwear",
+  },
+  hotels: {
+    name: "Hotels",
+    slug: "hotels",
+    icon: Hotel,
+    status: "coming_soon",
+    blurb: "Hotels & stays",
+  },
+  retail: {
+    name: "Retail & Groceries",
+    slug: "retail",
+    icon: ShoppingCart,
+    status: "coming_soon",
+    blurb: "Groceries & staples",
   },
 };
 
@@ -108,6 +126,4 @@ export const LIVE_SECTORS: SectorSlug[] = [
   "transport",
   "utilities",
   "pharmacy",
-  "electronics",
-  "fashion",
 ];

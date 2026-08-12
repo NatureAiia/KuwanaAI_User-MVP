@@ -16,6 +16,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
+  // One email, one account: the `users.email` unique constraint enforces
+  // this at the data layer, and this guard turns the collision into a clear
+  // error instead of a raw 500. `findUnique` never matches this auth user's
+  // own row (the upsert below targets that same id), so a hit here always
+  // means the email already belongs to a different account.
+  const existingAccount = await prisma.user.findUnique({
+    where: { email: authUser.email },
+    select: { id: true },
+  });
+  if (existingAccount && existingAccount.id !== authUser.id) {
+    return NextResponse.json(
+      { error: "This email can only be used once." },
+      { status: 409 },
+    );
+  }
+
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

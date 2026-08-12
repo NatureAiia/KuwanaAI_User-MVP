@@ -9,7 +9,7 @@
  * OpenRouter response that omits cost.
  */
 
-export type AiProvider = "anthropic" | "openrouter";
+export type AiProvider = "anthropic" | "openrouter" | "ollama";
 
 /** Every distinct place the app calls a model. One selectable model each. */
 export const AI_FEATURES = ["chat", "recommendations", "intake"] as const;
@@ -46,6 +46,16 @@ export type ModelSpec = {
  * cost ladder rather than an arbitrary list.
  */
 export const MODEL_CATALOG: ModelSpec[] = [
+  {
+    id: "llama-3.2-vision",
+    provider: "ollama",
+    label: "Llama 3.2 Vision (self-hosted)",
+    inputPrice: 0,
+    outputPrice: 0,
+    contextWindow: 128_000,
+    vision: true,
+    note: "Self-hosted via Ollama (see LLAMA_VISION_BASE_URL) — no external API cost, no shared-queue latency or daily cap unlike OpenRouter's free tier, but only reachable if the Ollama server is actually running.",
+  },
   {
     id: "nvidia/nemotron-3-super-120b-a12b:free",
     provider: "openrouter",
@@ -112,14 +122,16 @@ export function findModel(id: string): ModelSpec | undefined {
 }
 
 /**
- * What each feature uses when no admin override is stored. Chat defaults to a
- * vision-capable model because it is the one feature that can receive an
- * image; the other two are text-only and default to the free model.
+ * What each feature uses when no admin override is stored. All three default
+ * to the self-hosted model: it costs nothing per call and, unlike the
+ * OpenRouter free tier, has no shared-queue latency or daily cap — and it
+ * also happens to be vision-capable, which chat needs since it's the one
+ * feature that can receive an image.
  */
 export const DEFAULT_MODELS: Record<AiFeature, string> = {
-  chat: "claude-opus-5",
-  recommendations: "nvidia/nemotron-3-super-120b-a12b:free",
-  intake: "nvidia/nemotron-3-super-120b-a12b:free",
+  chat: "llama-3.2-vision",
+  recommendations: "llama-3.2-vision",
+  intake: "llama-3.2-vision",
 };
 
 /** Cost of one call in USD, from token counts. Used when the provider doesn't report a cost. */

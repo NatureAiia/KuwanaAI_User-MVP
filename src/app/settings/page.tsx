@@ -9,6 +9,7 @@ import { CurrencySwitcher } from "@/components/CurrencySwitcher";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { SwitchAccountButton } from "@/components/LogoutButton";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -139,9 +140,16 @@ export default function SettingsPage() {
           <p className="text-[13px] text-text-secondary">Email</p>
           <p className="text-[14px] font-medium">{email ?? "…"}</p>
         </div>
-        <Button variant="secondary" onClick={logout} className="w-full">
-          Log out
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="danger"
+            onClick={logout}
+            className="!px-3.5 !py-2 text-[13px]"
+          >
+            Log out
+          </Button>
+          <SwitchAccountButton />
+        </div>
       </div>
 
       <BottomTabBar />

@@ -1,21 +1,49 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { clsx } from "clsx";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/Button";
 
-export function LogoutButton() {
+async function signOutTo(to: string, router: ReturnType<typeof useRouter>) {
+  await createClient().auth.signOut();
+  router.push(to);
+  router.refresh();
+}
+
+export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
 
-  async function logout() {
-    await createClient().auth.signOut();
-    router.push("/login");
-    router.refresh();
-  }
+  return (
+    <div className={clsx("flex items-center gap-2", className)}>
+      <Button
+        variant="danger"
+        size="md"
+        onClick={() => signOutTo("/login", router)}
+        className="!px-3.5 !py-2 text-[13px]"
+      >
+        Log out
+      </Button>
+      <SwitchAccountButton />
+    </div>
+  );
+}
+
+/** Kuwana-green action — signs the current account out and lands on /login. */
+export function SwitchAccountButton({ className }: { className?: string }) {
+  const router = useRouter();
 
   return (
-    <Button variant="secondary" onClick={logout}>
-      Log out
+    <Button
+      variant="secondary"
+      size="md"
+      onClick={() => signOutTo("/login", router)}
+      className={clsx(
+        "!border-transparent !bg-[#0d7568] !px-3.5 !py-2 !text-[13px] !text-white hover:!brightness-110",
+        className,
+      )}
+    >
+      Switch account
     </Button>
   );
 }

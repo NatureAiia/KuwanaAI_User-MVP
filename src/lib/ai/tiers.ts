@@ -26,15 +26,21 @@ import { findModel, type AiFeature, type ModelSpec } from "./models";
  * wrong-but-fast answer is worse than a slow one.
  */
 export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
-  // Chat streams to a waiting user and can carry an image, so it starts on a
-  // vision-capable model. The free rung is still reachable for plain short
-  // questions, which are most of them.
-  chat: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
-  recommendations: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-sonnet-5"],
+  // Chat streams to a waiting user and can carry an image, so the starting
+  // rung must be vision-capable — the self-hosted model is both that and
+  // free, so it leads. The OpenRouter free tier is next in case Ollama is
+  // unreachable, then paid Claude for anything that needs real capability.
+  chat: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
+  recommendations: [
+    "llama-3.2-vision",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "claude-haiku-4-5",
+    "claude-sonnet-5",
+  ],
   // Intake is a closed-list classifier — the cheapest rung handles nearly all
   // of it, and a wrong answer degrades to "no confident match" rather than
   // showing a user something false.
-  intake: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  intake: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */

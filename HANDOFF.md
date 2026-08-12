@@ -6,6 +6,114 @@ read `README.md` first (it has its own, more granular "what changed"
 log with commit-level detail) — this file is the higher-altitude map:
 what's done, why, and what's genuinely left.
 
+## 2026-08-12 update — read this before trusting anything below
+
+Everything from here down (including the rest of this file and most of
+`README.md`'s changelog) describes state as of 2026-08-06/09. A lot has
+shipped since then — this section is the current picture; treat the
+sections below it as history, not ground truth.
+
+**Repo health, verified live just now:** `tsc --noEmit` clean, `vitest run`
+234/234 passing, `main` up to date with `origin/main`, working tree
+otherwise clean.
+
+**`npm run lint` was broken and is now fixed.** Next.js 16 removed the
+`next lint` command outright (see `node_modules/next/dist/docs/.../
+upgrading/version-16.md`), but `package.json`'s `lint` script still called
+it — so every "eslint clean" claim in commit messages since the 16.3.0
+bump was **not actually running lint**, it was erroring out before eslint
+ever ran. Fixed to `"lint": "eslint src"`. Running it for real surfaces 3
+small pre-existing issues, none touched here: a component created during
+render in `CategoryBadge.tsx` (`react-hooks/static-components`), an
+unused import in the same file, and an `any` in `scoring.ts`.
+
+**A large branch (`app-line`) merged into `main` via PR #4** — 201 files,
+~9,200 insertions. It ships things earlier docs only described as planned
+or as living on a different provider:
+
+- The Anthropic → self-hosted Llama 3.2 Vision swap (`src/lib/ai/llama.ts`)
+  that README's 2026-08-09 entry describes is now actually on `main` —
+  `ANTHROPIC_API_KEY` in `.env` is vestigial (nothing in `src/` reads it
+  anymore, safe to delete). `LLAMA_VISION_BASE_URL` defaults to
+  `http://localhost:11434` if unset — **this will not work from a Vercel
+  serverless deploy** without a real reachable endpoint; still fine for
+  local dev against Ollama.
+- `notebooks/` — a Python/Jupyter modeling workstream (`value_score_
+  baseline`, `recommendation_engine`) that exports a DB snapshot and fits
+  per-category weights; `src/lib/fittedWeights.ts` + `scoreWithFit()` in
+  `src/lib/catalog.ts` load a fit from `notebooks/data/fitted_weights.json`
+  when one exists and fall back to the hand-tuned heuristic otherwise. See
+  `notebooks/README.md` — explicitly **not yet a trained model**, no
+  labeled "best listing" signal exists in the data yet.
+- `scripts/social-scan/` — a Reddit/Telegram scanner that tags public
+  price-mention text with a matched provider name and stores it in
+  `SocialPriceMention` for manual admin review. Deliberately never writes
+  to `Listing`/`Provider` directly — intelligence-gathering only, a human
+  decides what to act on. Worth knowing this exists before assuming all
+  "social" signals in the product are user-generated.
+- `src/lib/comparePdf.ts` (PDF export off the compare view), `src/app/
+  history/page.tsx`, `src/components/CategoryBadge.tsx`, `GalleryTunnel`/
+  `LoadingFacts` loading screens, `MagneticWrapper`, real provider logo
+  assets under `public/provider-logos/`, and a `docker-compose.3tier.yml`
+  + `prisma/schema.3tier.prisma` (a separate, not-yet-adopted 3-tier
+  deployment sketch — doesn't affect the current Supabase/Prisma setup).
+
+**The PR #4 merge initially broke `main`'s build** — a conflict between
+this branch and the concurrent perf/pin-unpin work on `main` got resolved
+by keeping both sides of several conflicts (duplicate `const`/object-
+property declarations) instead of picking one, plus one spot in
+`catalog.ts` where a function body got sliced in half by another
+function's declaration landing in the middle of it. Affected: `catalog.ts`,
+`proxy.ts`, `scoring.ts`/`scoring.test.ts`, `ProviderLogo.tsx`, and the
+`chat`/`events`/`need-intake`/`recommendations` API routes. This was found
+and fixed live in this session (not by the AI — a human/other session was
+editing these exact files in real time while this scan was in progress).
+By the time this note was written the tree was verified clean again, but
+**check `git status` before assuming these fixes are committed** — they
+were still uncommitted, working-tree-only changes as of this writing.
+
+## 2026-08-12 continued — crash-recovery confirmed intact, deploy target decided
+
+You asked whether Friday 2026-08-07's laptop crash had left anything unfinished. Short answer: no.
+The full timeline, from `git log`/`git reflog` (no stash entries — nothing was ever dangling):
+
+- **23:07** `a23b777` and **23:10** `5d35b88` — PR #3 had merged a database-architecture spike
+  (`database-schema` branch) into the app with **live, committed conflict markers** in
+  `package.json`, `prisma/seed.ts`, `catalog.ts`, `scoring.ts` (`main` was uninstallable). Fixed, and
+  the v2 schema redesign it carried was moved to `docs/schema-v2-proposal/` — a proposal, never
+  wired in, with a README pricing out what adopting it would actually cost (~55 files, ~430 call
+  sites) if that's ever revisited.
+- **23:24** `29c5317` — merged a parallel **"hardening" branch** (security/perf/production-infra)
+  into the recovered app line, resolving 36 conflicts. Verified at the time: 0 typecheck/lint
+  errors, 220/220 tests, `next build` green.
+
+That session (Claude Opus 5, 1M context) left a fully working tree; everything since builds on top
+of it. **The hardening branch is also where a previously-undocumented production track came
+from** — worth flagging here because neither this file nor `README.md` mentioned it before now:
+a multi-stage `Dockerfile` (`runner`/`migrator` targets), a full Helm chart at `deploy/helm/kuwana/`
+(HPA, KEDA, PDB, NetworkPolicy, ExternalSecret, Postgres backup + migrate Jobs), `.github/workflows/
+ci.yml` (lint/typecheck/test → Docker build + smoke test → Trivy scan → Helm validation) +
+`release.yml` + Dependabot, health probes (`/api/health`, `/api/health/ready`), and a shared
+Redis/Valkey Next.js cache handler (`cache-handler.js`, engaged only if `REDIS_URL` is set).
+
+**Decided 2026-08-12: Kubernetes (the Helm chart) is the real deploy target**, not a parallel
+exploration — supersedes this file's and `README.md`'s Vercel-only framing wherever they conflict.
+Concrete follow-ons this creates, none done yet:
+
+- `LLAMA_VISION_BASE_URL` defaults to `localhost:11434` — needs a real endpoint the cluster can
+  reach (a dedicated Ollama/vLLM deployment, most likely) before `/api/chat`, `/api/recommendations`,
+  and `/api/need-intake` work outside local dev.
+- `REDIS_URL` isn't set anywhere yet, so the shared cache handler and the distributed rate limiter
+  in `src/lib/rateLimit.ts` both still run in single-process/in-memory mode despite the Redis-backed
+  code already existing — needs a real Redis/Valkey instance wired in via the Helm chart.
+- Secrets (`DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, etc.) should move to the chart's
+  `ExternalSecret` template rather than living in a plaintext `.env` — not done yet.
+- `main`'s branch protection should require the CI `verify` job (lint/typecheck/test) before merge —
+  **this is the actual root cause of both the 08-07 and today's 08-12 breakages**: `ci.yml` already
+  runs those checks on every push/PR, so either it isn't set as a required check, or it was bypassed.
+  Couldn't verify or fix this from here (no `gh` CLI / GitHub admin access in this environment) — do
+  this directly in the repo settings; it's the single highest-leverage fix available.
+
 ## The one-sentence version
 
 Kuwana is a decision-intelligence platform (Need → Context → Eligible

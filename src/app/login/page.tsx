@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { markHardNav } from "@/components/SoftNavTracker";
 
 function LoginForm() {
   const router = useRouter();
@@ -36,6 +37,8 @@ function LoginForm() {
     // value. Passing it to the router unchecked is an open redirect off the
     // back of a successful login. See lib/safeRedirect.ts.
     router.push(safeRedirectPath(params.get("next")));
+    markHardNav();
+    router.push(params.get("next") ?? "/dashboard");
     router.refresh();
   }
 

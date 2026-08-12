@@ -1,5 +1,7 @@
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
+import { isLowerBetterAttribute } from "@/lib/attributeDirection";
+import { z } from "zod";
 
 export function normalize(value: number, min: number, max: number, invert: boolean) {
   if (max === min) return 100;
@@ -7,14 +9,6 @@ export function normalize(value: number, min: number, max: number, invert: boole
   return Math.round((invert ? 1 - t : t) * 100);
 }
 
-/**
- * Decision Score config registry — every tunable constant the scoring
- * formula uses, named and versioned in one place. Bumping the formula (new
- * adjustment, changed weight) means adding a new version key here, not
- * hunting for magic numbers across routes/components. Recommendations store
- * the version that produced them (see Recommendation.scoreVersion) so past
- * results stay attributable even after the formula changes.
- */
 export const DECISION_SCORE_VERSIONS = {
   v1: {
     defaultPriceWeight: 0.5,
@@ -42,12 +36,33 @@ export type DecisionScoreBreakdown = {
 };
 
 /**
+ * Picks which comparable numeric attribute stands in as "the benefit" for a
+ * category, and which direction counts as better. Prefers the first
+ * genuinely higher-is-better field (interest rate, coverage amount, branch
+ * count, ...) over a lower-is-better one (monthly fee, excess, ...) — a
+ * schema's first comparable field is often a cost figure that already
+ * duplicates what `price` captures, so blindly taking "first" and assuming
+ * higher-is-better would score the priciest listing as the best one. Only
+ * falls back to a lower-is-better field when the category has no
+ * higher-is-better candidate at all.
+ */
+function pickBenefitField(
+  attributeSchema: AttributeSchemaFieldDTO[],
+): { field: AttributeSchemaFieldDTO; lowerIsBetter: boolean } | null {
+  const comparableNumeric = attributeSchema.filter((a) => a.dataType === "number" && a.isComparable && a.key !== "price");
+  const higherIsBetter = comparableNumeric.find((a) => !isLowerBetterAttribute(a.key));
+  const field = higherIsBetter ?? comparableNumeric[0];
+  return field ? { field, lowerIsBetter: isLowerBetterAttribute(field.key) } : null;
+}
+
+/**
  * Decision Score: a transparent price/benefit blend — price (lower is
- * better) blended with the first comparable numeric "benefit" attribute
- * (higher is better), when the category has one — broken into named
- * components plus three extra signals: listing freshness, recent price
- * trend, and provider trust. Only ever combines fields already on the
- * listing record; not an invented statistic.
+ * better) blended with a comparable numeric "benefit" attribute, when the
+ * category has one, oriented in whichever direction is actually better for
+ * that attribute (see pickBenefitField) — broken into named components plus
+ * three extra signals: listing freshness, recent price trend, and provider
+ * trust. Only ever combines fields already on the listing record; not an
+ * invented statistic.
  */
 export function computeDecisionScores(
   listings: ListingDTO[],
@@ -65,11 +80,9 @@ export function computeDecisionScores(
   const priceMin = Math.min(...prices);
   const priceMax = Math.max(...prices);
 
-  const benefitField = attributeSchema.find(
-    (a) => a.dataType === "number" && a.isComparable && a.key !== "price",
-  );
-  const benefitValues = benefitField
-    ? listings.map((l) => Number(l.attributes[benefitField.key])).filter((v) => !Number.isNaN(v))
+  const benefit = pickBenefitField(attributeSchema);
+  const benefitValues = benefit
+    ? listings.map((l) => Number(l.attributes[benefit.field.key])).filter((v) => !Number.isNaN(v))
     : [];
   const benefitMin = benefitValues.length ? Math.min(...benefitValues) : 0;
   const benefitMax = benefitValues.length ? Math.max(...benefitValues) : 0;
@@ -79,9 +92,11 @@ export function computeDecisionScores(
     const priceScore = normalize(listing.price, priceMin, priceMax, true);
 
     let benefitScore: number | null = null;
-    if (benefitField) {
-      const benefitValue = Number(listing.attributes[benefitField.key]);
-      benefitScore = Number.isNaN(benefitValue) ? null : normalize(benefitValue, benefitMin, benefitMax, false);
+    if (benefit) {
+      const benefitValue = Number(listing.attributes[benefit.field.key]);
+      benefitScore = Number.isNaN(benefitValue)
+        ? null
+        : normalize(benefitValue, benefitMin, benefitMax, benefit.lowerIsBetter);
     }
 
     const baseScore =
@@ -114,3 +129,27 @@ export function computeDecisionScores(
   }
   return breakdowns;
 }
+
+// Example: telecom scoring based on footprint
+const TelecomFootprint = z.object({
+  monthly_budget_usd: z.number().min(0),
+  data_need_gb: z.number().min(0),
+  network_preference: z.enum(["Econet", "NetOne", "Telecel", "Any"]).optional(),
+});
+
+export function scoreListing(footprint: unknown, listingAttributes: Record<string, number | undefined>) {
+  const parsed = TelecomFootprint.safeParse(footprint);
+  if (!parsed.success) return { score: 0, reason: "footprint invalid" };
+
+  const { monthly_budget_usd, data_need_gb } = parsed.data;
+  const price = listingAttributes.price_usd ?? listingAttributes.monthly_usd ?? 999;
+  const gb = listingAttributes.data_gb ?? 0;
+
+  let score = 100;
+  if (price > monthly_budget_usd) score -= 30;
+  if (gb < data_need_gb) score -= 40;
+  if (price <= monthly_budget_usd && gb >= data_need_gb) score += 10;
+
+  return { score: Math.max(0, Math.min(100, score)), breakdown: { price, gb, budget: monthly_budget_usd, need: data_need_gb } };
+}
+

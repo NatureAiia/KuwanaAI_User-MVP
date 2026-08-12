@@ -1,0 +1,195 @@
+⨯ Error [PrismaClientInitializationError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].fxRate.findMany()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\[root-of-the-server]__10_e74t._.js:74:161
+
+  71 ;
+  72 ;
+  73 async function GET() {
+→ 74     const rates = await {imported module ./src/lib/prisma.ts}["prisma"].fxRate.findMany(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\app\api\fx-rates\route.ts:6:37)
+    at async GET (src\app\api\fx-rates\route.ts:6:17)
+  4 | /** Public, cheap, no auth — reference exchange rates, not user data. */
+  5 | export async function GET() {
+> 6 |   const rates = await prisma.fxRate.findMany();
+    |                                     ^
+  7 |   return NextResponse.json({
+  8 |     rates: Object.fromEntries(rates.map((r) => [r.code, r.perUsd])),
+  9 |     fetchedAt: rates.length > 0 ? rates.reduce((max, r) => (r.fetchedAt > max ? r.fetchedAt : max), rates[0].fetchedAt) : null, {
+  clientVersion: '6.19.3',
+  errorCode: undefined,
+  retryable: undefined
+}
+⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findUnique()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:64:158
+
+  61 async function DashboardPage() {
+  62     const user = await (0, {imported module ./src/lib/auth.ts}["requireUser"])();
+  63     if (!user) return null;
+→ 64     const dbUser = await {imported module ./src/lib/prisma.ts}["prisma"].user.findUnique(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\app\dashboard\page.tsx:25:36)
+    at async DashboardPage (src\app\dashboard\page.tsx:25:18)
+  23 |   if (!user) return null;
+  24 |
+> 25 |   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+     |                                    ^
+  26 |   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
+  27 |   if (roleRedirect) redirect(roleRedirect);
+  28 | {
+  code: 'P1001',
+  meta: {
+    modelName: 'User',
+    database_location: 'db.iguhrpbnnrdeplnbzyxc.supabase.co:5432'
+  },
+  clientVersion: '6.19.3',
+  digest: '2321954468'
+}
+⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].user.findUnique()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:64:158
+
+  61 async function DashboardPage() {
+  62     const user = await (0, {imported module ./src/lib/auth.ts}["requireUser"])();
+  63     if (!user) return null;
+→ 64     const dbUser = await {imported module ./src/lib/prisma.ts}["prisma"].user.findUnique(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\app\dashboard\page.tsx:25:36)
+    at async DashboardPage (src\app\dashboard\page.tsx:25:18)
+  23 |   if (!user) return null;
+  24 |
+> 25 |   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+     |                                    ^
+  26 |   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
+  27 |   if (roleRedirect) redirect(roleRedirect);
+  28 | {
+  code: 'P1001',
+  meta: {
+    modelName: 'User',
+    database_location: 'db.iguhrpbnnrdeplnbzyxc.supabase.co:5432'
+  },
+  clientVersion: '6.19.3',
+  digest: '2321954468'
+}
+[browser] [error boundary] PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].user.findUnique()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:64:158
+
+  61 async function DashboardPage() {
+  62     const user = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$auth$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["requireUser"])();
+  63     if (!user) return null;
+→ 64     const dbUser = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].user.findUnique(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\app\dashboard\page.tsx:25:36)
+    at  DashboardPage (src\app\dashboard\page.tsx:25:18)
+  23 |   if (!user) return null;
+  24 |
+> 25 |   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+     |                                    ^
+  26 |   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
+  27 |   if (roleRedirect) redirect(roleRedirect);
+  28 | (src/app/error.tsx:11:13)
+[browser] [error boundary] PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].user.findUnique()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:64:158
+
+  61 async function DashboardPage() {
+  62     const user = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$auth$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["requireUser"])();
+  63     if (!user) return null;
+→ 64     const dbUser = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].user.findUnique(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\app\dashboard\page.tsx:25:36)
+    at  DashboardPage (src\app\dashboard\page.tsx:25:18)
+  23 |   if (!user) return null;
+  24 |
+> 25 |   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+     |                                    ^
+  26 |   const roleRedirect = dbUser && ROLE_DASHBOARD[dbUser.role];
+  27 |   if (roleRedirect) redirect(roleRedirect);
+  28 | (src/app/error.tsx:11:13)
+⨯ Error [PrismaClientKnownRequestError]: 
+Invalid `{imported module ./src/lib/prisma.ts}["prisma"].savedListing.findMany()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:1548:149
+
+  1545         userId
+  1546     }
+  1547 }),
+→ 1548 {imported module ./src/lib/prisma.ts}["prisma"].savedListing.findMany(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\lib\catalog.ts:353:25)
+    at async getFavoriteProductSpecials (src\lib\catalog.ts:351:31)
+    at async DashboardPage (src\app\dashboard\page.tsx:29:99)
+  351 |   const [footprints, saved] = await Promise.all([
+  352 |     prisma.sectorFootprint.findMany({ where: { userId } }),
+> 353 |     prisma.savedListing.findMany({ where: { userId }, select: { listing: { select: { providerId: true } } } }),
+      |                         ^
+  354 |   ]);
+  355 |
+  356 |   // 1. Extract provider names from footprints. {
+  code: 'P1001',
+  meta: {
+    modelName: 'SavedListing',
+    database_location: 'db.iguhrpbnnrdeplnbzyxc.supabase.co:5432'
+  },
+  clientVersion: '6.19.3',
+  digest: '750865957'
+}
+[browser] [error boundary] PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].savedListing.findMany()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:1548:149
+
+  1545         userId
+  1546     }
+  1547 }),
+→ 1548 __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].savedListing.findMany(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\lib\catalog.ts:353:25)
+    at Promise.all (<anonymous>:1:20)
+    at getFavoriteProductSpecials (src\lib\catalog.ts:351:31)
+    at Promise.all (<anonymous>:1:20)
+    at DashboardPage (src\app\dashboard\page.tsx:29:99)
+  351 |   const [footprints, saved] = await Promise.all([
+  352 |     prisma.sectorFootprint.findMany({ where: { userId } }),
+> 353 |     prisma.savedListing.findMany({ where: { userId }, select: { listing: { select: { providerId: true } } } }),
+      |                         ^
+  354 |   ]);
+  355 |
+  356 |   // 1. Extract provider names from footprints. (src/app/error.tsx:11:13)
+[browser] [error boundary] PrismaClientKnownRequestError: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].savedListing.findMany()` invocation in
+C:\Users\Admin\Aiia\Systems\KuwanaAI_User-MVP\.next\dev\server\chunks\ssr\[root-of-the-server]__00iqgig._.js:1548:149
+
+  1545         userId
+  1546     }
+  1547 }),
+→ 1548 __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["prisma"].savedListing.findMany(
+Can't reach database server at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`
+
+Please make sure your database server is running at `db.iguhrpbnnrdeplnbzyxc.supabase.co:5432`.
+    at <unknown> (src\lib\catalog.ts:353:25)
+    at Promise.all (<anonymous>:1:20)
+    at getFavoriteProductSpecials (src\lib\catalog.ts:351:31)
+    at Promise.all (<anonymous>:1:20)
+    at DashboardPage (src\app\dashboard\page.tsx:29:99)
+  351 |   const [footprints, saved] = await Promise.all([
+  352 |     prisma.sectorFootprint.findMany({ where: { userId } }),
+> 353 |     prisma.savedListing.findMany({ where: { userId }, select: { listing: { select: { providerId: true } } } }),
+      |                         ^
+  354 |   ]);
+  355 |
+  356 |   // 1. Extract provider names from footprints. (src/app/error.tsx:11:13)

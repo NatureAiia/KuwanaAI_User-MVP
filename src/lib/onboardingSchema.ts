@@ -39,20 +39,40 @@ const consumerSchema = z.object({
     .optional(),
   bankingFootprint: z
     .object({
-      bank_name: z.string(),
+      // Multi-select: a user can hold accounts at any combination of the
+      // banks listed in src/lib/onboarding-options.ts (CBZ + Steward +
+      // Stanbic etc.). "I don't bank" stays out of this array — the
+      // presence of the footprint itself is the signal the user banks.
+      banks: z.array(z.string()).min(1),
       account_types: z.array(z.string()).default([]),
+      // Mobile wallets (EcoCash/OneMoney/InnBucks/etc.) are tracked
+      // separately from bank account types because they're issued by
+      // telecoms/fintechs, not banks. Optional and free-text — same
+      // string-array shape as `account_types` for the same reason.
+      wallets: z.array(z.string()).default([]),
     })
     .optional(),
   insuranceFootprint: z
     .object({
-      provider: z.string(),
+      // Multi-select: a user can be covered by more than one insurer
+      // (e.g. a life policy with Old Mutual + a funeral policy with
+      // ZIMNAT). "I don't have insurance" is an exclusive sentinel kept
+      // out of this array — its presence as the *only* entry is the
+      // signal the user is uninsured. Same pattern as
+      // `bankingFootprint.banks`.
+      providers: z.array(z.string()).min(1),
       policy_types: z.array(z.string()).default([]),
       has_insurance: z.boolean(),
     })
     .optional(),
   healthcareFootprint: z
     .object({
-      medical_aid_provider: z.string(),
+      // Multi-select: a person can belong to more than one medical aid
+      // scheme (e.g. workplace PSMAS + private family cover at Cimas).
+      // "None" and "Public hospital only" are exclusive sentinels kept out
+      // of this array — whichever is present as the *only* entry signals
+      // no private scheme. Same pattern as `insuranceFootprint.providers`.
+      medical_aid_providers: z.array(z.string()).min(1),
       chronic_condition_disclosure_opt_in: z.boolean(),
     })
     .optional(),

@@ -16,6 +16,7 @@
 
 import { anthropic } from "./anthropic";
 import { openRouterComplete, openRouterStream } from "./openrouter";
+import { ollamaComplete, ollamaStream } from "./ollama";
 import { resolveLadder } from "./modelConfig";
 import { estimateCostUsd, type AiFeature, type ModelSpec } from "./models";
 import { planTiers, scoreComplexity, type ComplexitySignals } from "./tiers";
@@ -126,6 +127,17 @@ export async function generateAiJson<T>(params: {
         text = block && block.type === "text" ? block.text : "";
         inputTokens = message.usage.input_tokens;
         outputTokens = message.usage.output_tokens;
+      } else if (model.provider === "ollama") {
+        const result = await ollamaComplete({
+          system: params.system,
+          messages,
+          maxTokens: params.maxTokens,
+          jsonSchema: { name: params.schemaName, schema: params.schema },
+        });
+        text = result.text;
+        inputTokens = result.usage.inputTokens;
+        outputTokens = result.usage.outputTokens;
+        costUsd = result.usage.costUsd;
       } else {
         // The schema is also restated in the system prompt by the callers, so a
         // model that ignores response_format still has a chance of complying.
@@ -244,6 +256,21 @@ export async function* streamAiText(params: {
             emitted = true;
             yield event.delta.text;
           }
+        }
+      } else if (model.provider === "ollama") {
+        const stream = ollamaStream({
+          system: params.system,
+          messages,
+          maxTokens: params.maxTokens,
+          onUsage: (usage) => {
+            inputTokens = usage.inputTokens;
+            outputTokens = usage.outputTokens;
+            reportedCost = usage.costUsd;
+          },
+        });
+        for await (const delta of stream) {
+          emitted = true;
+          yield delta;
         }
       } else {
         const stream = openRouterStream({

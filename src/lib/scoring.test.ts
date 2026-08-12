@@ -5,18 +5,15 @@ import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 function listing(overrides: Partial<ListingDTO> & { id: string; price: number }): ListingDTO {
   return {
     name: overrides.id,
-    // rating/reviewCount are null/0 rather than invented values: the product
-    // rule is that no review figure is ever fabricated, and no review
-    // collection exists yet.
-    description: null,
-    rating: null,
-    reviewCount: 0,
     currency: "USD",
     attributes: {},
     freshnessStatus: "fresh",
     lastVerifiedAt: new Date().toISOString(),
     sourceUrl: null,
     images: [],
+    description: null,
+    rating: null,
+    reviewCount: 0,
     provider: { id: "p1", name: "Provider", logoUrl: null, verified: true },
     ...overrides,
   };
@@ -48,6 +45,36 @@ describe("computeDecisionScores", () => {
     // Same price -> priceScore ties; more data should push b's total higher via benefitScore.
     expect(scores.b.benefitScore).toBeGreaterThan(scores.a.benefitScore ?? 0);
     expect(scores.b.total).toBeGreaterThan(scores.a.total);
+  });
+
+  it("skips a lower-is-better fee field in favor of a genuine higher-is-better benefit", () => {
+    const schema: AttributeSchemaFieldDTO[] = [
+      { key: "monthly_fee", label: "Monthly fee", dataType: "number", unit: "USD", isComparable: true, sortOrder: 0 },
+      { key: "interest_rate", label: "Interest rate", dataType: "number", unit: "% p.a.", isComparable: true, sortOrder: 1 },
+    ];
+    const listings = [
+      // Same price, but "high fee, high interest" vs "low fee, low interest" —
+      // the interest rate (a genuine benefit) should win as the benefit field,
+      // not the monthly fee (whose lower value is actually the better one).
+      listing({ id: "high_fee_high_rate", price: 10, attributes: { monthly_fee: 5, interest_rate: 3 } }),
+      listing({ id: "low_fee_low_rate", price: 10, attributes: { monthly_fee: 0, interest_rate: 0.5 } }),
+    ];
+    const scores = computeDecisionScores(listings, schema);
+    expect(scores.high_fee_high_rate.benefitScore).toBeGreaterThan(scores.low_fee_low_rate.benefitScore ?? 0);
+    expect(scores.high_fee_high_rate.total).toBeGreaterThan(scores.low_fee_low_rate.total);
+  });
+
+  it("falls back to a lower-is-better field, correctly inverted, when it's the only comparable one", () => {
+    const schema: AttributeSchemaFieldDTO[] = [
+      { key: "monthly_fee", label: "Monthly fee", dataType: "number", unit: "USD", isComparable: true, sortOrder: 0 },
+    ];
+    const listings = [
+      listing({ id: "low_fee", price: 10, attributes: { monthly_fee: 0 } }),
+      listing({ id: "high_fee", price: 10, attributes: { monthly_fee: 5 } }),
+    ];
+    const scores = computeDecisionScores(listings, schema);
+    expect(scores.low_fee.benefitScore).toBeGreaterThan(scores.high_fee.benefitScore ?? 0);
+    expect(scores.low_fee.total).toBeGreaterThan(scores.high_fee.total);
   });
 
   it("applies a freshness penalty to stale/unverified listings relative to a fresh one", () => {

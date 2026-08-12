@@ -9,6 +9,8 @@ function pricePerMillion(price: number) {
   return price === 0 ? "free" : `$${(price * 1_000_000).toFixed(2)}`;
 }
 
+const PROVIDER_TONE = { anthropic: "sky", openrouter: "teal", ollama: "coral" } as const;
+
 /**
  * Edits one feature's tier ladder: an ordered, cheapest-first list of models.
  * Rung 1 is where an easy request starts; a request the complexity heuristic
@@ -99,7 +101,7 @@ export function LadderEditor({
           >
             <span className="text-text-muted w-4 shrink-0 font-mono text-[11px]">{index + 1}</span>
             <span className="min-w-0 flex-1 text-[12.5px] font-medium">{spec.label}</span>
-            <Badge tone={spec.provider === "anthropic" ? "sky" : "teal"}>{spec.provider}</Badge>
+            <Badge tone={PROVIDER_TONE[spec.provider]}>{spec.provider}</Badge>
             <span className="text-text-muted font-mono text-[10.5px]">
               {pricePerMillion(spec.inputPrice)} / {pricePerMillion(spec.outputPrice)}
             </span>

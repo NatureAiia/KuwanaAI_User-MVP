@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, ShieldCheck } from "lucide-react";
 import { ListingCard } from "@/components/ListingCard";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { computeDecisionScores } from "@/lib/scoring";
@@ -36,6 +36,10 @@ export function ExploreClient({
   const [data, setData] = useState<CategoryWithTrendsDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<SortMode>("value");
+  // Hides listings with a stated qualification requirement (e.g. a minimum
+  // balance) — purely data-driven, so it never guesses whether a specific
+  // user qualifies; it only drops options that *do* carry a requirement.
+  const [eligibleOnly, setEligibleOnly] = useState(false);
   const { toggle, isSelected } = useCompareTray();
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
@@ -82,12 +86,15 @@ export function ExploreClient({
 
   const sortedListings = useMemo(() => {
     if (!data) return [];
-    const listings = [...data.listings];
+    let listings = [...data.listings];
+    if (eligibleOnly) {
+      listings = listings.filter((l) => (requirementsById.get(l.id)?.length ?? 0) === 0);
+    }
     if (sort === "price_asc") listings.sort((a, b) => a.price - b.price);
     else if (sort === "price_desc") listings.sort((a, b) => b.price - a.price);
     else listings.sort((a, b) => (scores[b.id]?.total ?? 0) - (scores[a.id]?.total ?? 0));
     return listings;
-  }, [data, sort, scores]);
+  }, [data, sort, scores, eligibleOnly, requirementsById]);
 
   // Stable across renders (via useCallback) for the same reason as
   // requirementsById above — ListingCard is memoized, and an inline function
@@ -125,19 +132,40 @@ export function ExploreClient({
         ))}
       </div>
 
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] text-text-muted">
-          {loading ? "Loading…" : `${sortedListings.length} listings`}
+          {loading
+            ? "Loading…"
+            : eligibleOnly
+              ? `${sortedListings.length} of ${data?.listings.length ?? 0} eligible`
+              : `${sortedListings.length} listings`}
         </p>
-        <button
-          onClick={() =>
-            setSort((s) => (s === "value" ? "price_asc" : s === "price_asc" ? "price_desc" : "value"))
-          }
-          className="tap-target flex items-center gap-1.5 text-[13px] font-medium text-text-secondary"
-        >
-          <ArrowUpDown size={14} />
-          {sort === "value" ? "Best value" : sort === "price_asc" ? "Price: low to high" : "Price: high to low"}
-        </button>
+        <div className="flex items-center gap-1.5">
+          {data?.listings.some((l) => (requirementsById.get(l.id)?.length ?? 0) > 0) && (
+            <button
+              onClick={() => setEligibleOnly((v) => !v)}
+              aria-pressed={eligibleOnly}
+              className={clsx(
+                "tap-target flex items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium",
+                eligibleOnly
+                  ? "border-accent-teal bg-accent-teal/15 text-accent-teal"
+                  : "border-border text-text-secondary",
+              )}
+            >
+              <ShieldCheck size={14} />
+              No qualification required
+            </button>
+          )}
+          <button
+            onClick={() =>
+              setSort((s) => (s === "value" ? "price_asc" : s === "price_asc" ? "price_desc" : "value"))
+            }
+            className="tap-target flex items-center gap-1.5 text-[13px] font-medium text-text-secondary"
+          >
+            <ArrowUpDown size={14} />
+            {sort === "value" ? "Best value" : sort === "price_asc" ? "Price: low to high" : "Price: high to low"}
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
@@ -148,6 +176,7 @@ export function ExploreClient({
             score={scores[listing.id]?.total ?? 0}
             trend={data?.trends[listing.id] ?? null}
             sectorSlug={sectorSlug}
+            categorySlug={activeCategorySlug}
             selected={data ? isSelected(data.id, listing.id) : false}
             onToggleSelect={toggleSelect}
             initialSaved={savedIds.has(listing.id)}

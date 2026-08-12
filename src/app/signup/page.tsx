@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
-import { buildFactQueue } from "@/lib/onboarding-facts";
+import { LoadingFacts } from "@/components/loading/LoadingFacts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
+import { markHardNav } from "@/components/SoftNavTracker";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
 import {
   AGE_RANGES,
@@ -21,6 +23,7 @@ import {
   SPEND_RANGES,
   BANKS,
   ACCOUNT_TYPES,
+  WALLETS,
   INSURERS,
   POLICY_TYPES,
   MEDICAL_AIDS,
@@ -84,6 +87,7 @@ const CONSUMER_STEPS = [
   "personal",
   "telecom",
   "banking",
+  "wallets",
   "insurance",
   "health",
   "consent",
@@ -107,10 +111,12 @@ function ChipGroup({
   options,
   value,
   onChange,
+  renderOption,
 }: {
   options: string[];
   value: string;
   onChange: (v: string) => void;
+  renderOption?: (opt: string) => React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap gap-2.5">
@@ -121,12 +127,13 @@ function ChipGroup({
           onClick={() => onChange(opt)}
           aria-pressed={value === opt}
           className={clsx(
-            "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
+            "tap-target flex items-center gap-2 rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             value === opt
               ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
               : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
+          {renderOption ? renderOption(opt) : null}
           {opt}
         </button>
       ))}
@@ -138,10 +145,12 @@ function MultiChipGroup({
   options,
   values,
   onToggle,
+  renderOption,
 }: {
   options: string[];
   values: string[];
   onToggle: (v: string) => void;
+  renderOption?: (opt: string) => React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap gap-2.5">
@@ -152,17 +161,27 @@ function MultiChipGroup({
           onClick={() => onToggle(opt)}
           aria-pressed={values.includes(opt)}
           className={clsx(
-            "tap-target rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
+            "tap-target flex items-center gap-2 rounded-xl border px-4 py-3 text-[14px] font-medium transition-all",
             values.includes(opt)
               ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
               : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
+          {renderOption ? renderOption(opt) : null}
           {opt}
         </button>
       ))}
     </div>
   );
+}
+
+/** Renders the provider logo (or a colored-initials fallback) to the left of
+ *  the option label. Sized for chip-row use — bigger than the listing card
+ *  so a user picking their network/bank/insurer can actually see the mark. */
+function ProviderChipMark({ name }: { name: string }) {
+  // Catch-all sentinel / negative options — never display a logo for these.
+  if (/^(i don't|public hospital only|none|other\b)/i.test(name)) return null;
+  return <ProviderLogo name={name} size={20} className="max-h-[20px] max-w-[40px]" />;
 }
 
 export default function SignupPage() {
@@ -172,7 +191,6 @@ export default function SignupPage() {
   const [step, setStep] = useState<Step>("role");
   const historyRef = useRef<Step[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [factIndex, setFactIndex] = useState(0);
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -192,24 +210,98 @@ export default function SignupPage() {
   const [planType, setPlanType] = useState("");
   const [spend, setSpend] = useState("");
 
-  const [bank, setBank] = useState("");
+  // Banking relationships are now multi-select — many Zimbabweans hold
+  // accounts at more than one bank (salary at CBZ, EcoCash at Steward, USD
+  // nostro at Stanbic, etc.). The "I don't bank" sentinel is exclusive so
+  // the account-types follow-up step stays hidden for those users.
+  const [banks, setBanks] = useState<string[]>([]);
+  // Free-text name captured when "Other" is picked in the banks list — shown
+  // as a short inline input above the account-types follow-up. Sent to the
+  // API in place of the literal "Other" marker whenever it's filled in.
+  const [otherBank, setOtherBank] = useState("");
   const [accountTypes, setAccountTypes] = useState<string[]>([]);
+  // Mobile wallets (EcoCash, OneMoney, InnBucks, etc.) are tracked
+  // separately from bank account types because they're issued by telecoms /
+  // fintechs, not banks, and a user almost always has a wallet *in addition
+  // to* a bank account. Optional — pick none is a valid answer.
+  const [wallets, setWallets] = useState<string[]>([]);
 
-  const [insurer, setInsurer] = useState("");
+  // Insurance coverage — multi-select since a user can hold policies
+  // with more than one insurer (life at Old Mutual + funeral at ZIMNAT,
+  // etc.). "I don't have insurance" is an exclusive sentinel like
+  // "I don't bank" — see toggleInsurer() below.
+  const [insurers, setInsurers] = useState<string[]>([]);
   const [policyTypes, setPolicyTypes] = useState<string[]>([]);
 
-  const [medicalAid, setMedicalAid] = useState("");
+  // Medical aid coverage — multi-select since a person can belong to more
+  // than one scheme (a workplace PSMAS policy plus private family cover at
+  // Cimas, etc.). "Public hospital only" and "None" are exclusive sentinels
+  // like "I don't bank"/"I don't have insurance" — see toggleMedicalAid().
+  const [medicalAids, setMedicalAids] = useState<string[]>([]);
   const [chronicOptIn, setChronicOptIn] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
 
   const startedProcessing = useRef(false);
-  const [factQueue, setFactQueue] = useState<string[]>([]);
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
+  }
+
+  // "I don't bank" is an exclusive sentinel — picking it clears every other
+  // bank the user may have already chosen, and picking a real bank while the
+  // sentinel is set clears the sentinel first. Keeps the multi-select UX
+  // sensible without forcing the user into a separate "are you sure?" step.
+  function toggleBank(value: string) {
+    if (value === "I don't bank") {
+      setBanks((prev) => (prev.includes(value) ? [] : [value]));
+      return;
+    }
+    setBanks((prev) => {
+      const withoutSentinel = prev.filter((b) => b !== "I don't bank");
+      return withoutSentinel.includes(value)
+        ? withoutSentinel.filter((b) => b !== value)
+        : [...withoutSentinel, value];
+    });
+  }
+
+  // Same exclusive-sentinel pattern for insurers. "I don't have insurance"
+  // is the uninsured marker; picking it clears any selected insurers, and
+  // picking a real insurer clears the sentinel. Mirrors toggleBank() above
+  // so the multi-select UX behaves consistently across the two financial
+  // steps.
+  function toggleInsurer(value: string) {
+    if (value === "I don't have insurance") {
+      setInsurers((prev) => (prev.includes(value) ? [] : [value]));
+      return;
+    }
+    setInsurers((prev) => {
+      const withoutSentinel = prev.filter((i) => i !== "I don't have insurance");
+      return withoutSentinel.includes(value)
+        ? withoutSentinel.filter((i) => i !== value)
+        : [...withoutSentinel, value];
+    });
+  }
+
+  // Same exclusive-sentinel pattern for medical aids. "None" (no coverage)
+  // and "Public hospital only" (no private scheme) are the markers that clear
+  // every scheme already chosen; picking a real scheme clears the sentinels
+  // first. Mirrors toggleBank()/toggleInsurer() so the multi-select UX behaves
+  // consistently across the financial and health steps.
+  function toggleMedicalAid(value: string) {
+    if (value === "Public hospital only" || value === "None") {
+      setMedicalAids((prev) => (prev.includes(value) ? [] : [value]));
+      return;
+    }
+    setMedicalAids((prev) => {
+      const withoutSentinel = prev.filter((m) => m !== "Public hospital only" && m !== "None");
+      return withoutSentinel.includes(value)
+        ? withoutSentinel.filter((m) => m !== value)
+        : [...withoutSentinel, value];
+    });
   }
 
   function go(next: Step) {
@@ -224,15 +316,6 @@ export default function SignupPage() {
   }
 
   useEffect(() => {
-    if (step !== "processing" || factQueue.length === 0) return;
-    const interval = setInterval(
-      () => setFactIndex((i) => (i + 1) % factQueue.length),
-      2200,
-    );
-    return () => clearInterval(interval);
-  }, [step, factQueue]);
-
-  useEffect(() => {
     if (step !== "processing" || startedProcessing.current) return;
     startedProcessing.current = true;
 
@@ -240,13 +323,31 @@ export default function SignupPage() {
       const supabase = createClient();
       const { error: signUpError } = await supabase.auth.signUp({ email, password });
       if (signUpError) {
-        setError(signUpError.message);
+        const alreadyRegistered = /already registered|already exists|already been used|taken/i.test(
+          signUpError.message,
+        );
+        setError(
+          alreadyRegistered
+            ? "This email can only be used once. If you already have an account, please log in instead."
+            : signUpError.message,
+        );
         setStep("account");
         return;
       }
 
-      const bankSelected = bank && bank !== "I don't bank";
-      const insuranceSelected = insurer && insurer !== "I don't have insurance";
+      const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
+      // Replace the "Other" marker with whatever the user typed, if anything
+      // — otherwise keep "Other" so the selection still round-trips.
+      const finalBanks = banksSelected
+        ? banks
+            .filter((b) => b !== "Other")
+            .concat(otherBank.trim() ? [otherBank.trim()] : banks.includes("Other") ? ["Other"] : [])
+        : banks;
+      // `insuranceSelected` is true when the user picked at least one real
+      // insurer. "I don't have insurance" as the sole selection flips this
+      // to false — same shape as the banks step's "I don't bank" sentinel.
+      const insuranceSelected =
+        insurers.length > 0 && !insurers.includes("I don't have insurance");
 
       const consents = {
         research_use: researchConsent,
@@ -268,14 +369,16 @@ export default function SignupPage() {
                   occupation,
                   socialPlatforms,
                   telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
-                  bankingFootprint: bankSelected ? { bank_name: bank, account_types: accountTypes } : undefined,
+                  bankingFootprint: banksSelected
+                    ? { banks: finalBanks, account_types: accountTypes, wallets }
+                    : undefined,
                   insuranceFootprint: {
-                    provider: insurer,
+                    providers: insurers,
                     policy_types: insuranceSelected ? policyTypes : [],
-                    has_insurance: !!insuranceSelected,
+                    has_insurance: insuranceSelected,
                   },
                   healthcareFootprint: {
-                    medical_aid_provider: medicalAid,
+                    medical_aid_providers: medicalAids,
                     chronic_condition_disclosure_opt_in: chronicOptIn,
                   },
                   consents,
@@ -299,6 +402,7 @@ export default function SignupPage() {
         return;
       }
 
+      markHardNav();
       router.push(role === "consumer" ? "/dashboard" : `/${role}`);
       router.refresh();
     })();
@@ -316,11 +420,13 @@ export default function SignupPage() {
     network,
     planType,
     spend,
-    bank,
+    banks,
+    otherBank,
     accountTypes,
-    insurer,
+    wallets,
+    insurers,
     policyTypes,
-    medicalAid,
+    medicalAids,
     chronicOptIn,
     healthDataConsent,
     researchConsent,
@@ -337,11 +443,16 @@ export default function SignupPage() {
       case "telecom":
         return !!(network && planType && spend);
       case "banking":
-        return !!bank;
+        return banks.length > 0;
+      case "wallets":
+        // Optional step — picking zero wallets is valid (a user may not
+        // use mobile money at all, or only use it via the bank-linked
+        // services we already capture in the banking step).
+        return true;
       case "insurance":
-        return !!insurer;
+        return insurers.length > 0;
       case "health":
-        return !!medicalAid;
+        return medicalAids.length > 0 && termsAccepted;
       case "orgDetails":
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "consent":
@@ -350,15 +461,6 @@ export default function SignupPage() {
   }
 
   function startProcessing() {
-    setFactQueue(
-      buildFactQueue([
-        network,
-        bank !== "I don't bank" ? bank : undefined,
-        insurer !== "I don't have insurance" ? insurer : undefined,
-        medicalAid !== "None" ? medicalAid : undefined,
-      ]),
-    );
-    setFactIndex(0);
     go("processing");
   }
 
@@ -615,7 +717,12 @@ export default function SignupPage() {
             <p className="text-[13px] text-text-secondary">
               This personalizes your telecom comparisons from day one.
             </p>
-            <ChipGroup options={NETWORKS} value={network} onChange={setNetwork} />
+            <ChipGroup
+              options={NETWORKS}
+              value={network}
+              onChange={setNetwork}
+              renderOption={(opt) => <ProviderChipMark name={opt} />}
+            />
             <div>
               <span className="text-[13px] font-medium text-text-secondary">Plan type</span>
               <div className="mt-2">
@@ -648,8 +755,29 @@ export default function SignupPage() {
         {step === "banking" && (
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Banking relationships</h1>
-            <ChipGroup options={BANKS} value={bank} onChange={setBank} />
-            {bank && bank !== "I don't bank" && (
+            <p className="text-[13px] text-text-secondary">
+              Pick every bank you hold an account with. We&apos;ll personalize your
+              banking comparisons across all of them.
+            </p>
+            <MultiChipGroup
+              options={BANKS}
+              values={banks}
+              onToggle={toggleBank}
+              renderOption={(opt) => <ProviderChipMark name={opt} />}
+            />
+            {banks.includes("Other") && (
+              <div>
+                <span className="text-[13px] font-medium text-text-secondary">Other bank name</span>
+                <input
+                  value={otherBank}
+                  onChange={(e) => setOtherBank(e.target.value)}
+                  placeholder="Other"
+                  autoComplete="off"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                />
+              </div>
+            )}
+            {banks.length > 0 && !banks.includes("I don't bank") && (
               <div>
                 <span className="text-[13px] font-medium text-text-secondary">Account types</span>
                 <div className="mt-2">
@@ -666,8 +794,35 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go("insurance")}
+                onClick={() => go("wallets")}
                 disabled={!canContinue("banking")}
+                className="flex-1"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "wallets" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Mobile wallets</h1>
+            <p className="text-[13px] text-text-secondary">
+              Pick every mobile money or digital wallet you use. We&apos;ll factor
+              these into your banking comparisons and fee alerts. Skip if you
+              don&apos;t use any.
+            </p>
+            <MultiChipGroup
+              options={WALLETS}
+              values={wallets}
+              onToggle={(v) => toggle(wallets, setWallets, v)}
+            />
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("insurance")}
                 className="flex-1"
               >
                 Continue
@@ -679,8 +834,18 @@ export default function SignupPage() {
         {step === "insurance" && (
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Insurance coverage</h1>
-            <ChipGroup options={INSURERS} value={insurer} onChange={setInsurer} />
-            {insurer && insurer !== "I don't have insurance" && (
+            <p className="text-[13px] text-text-secondary">
+              Pick every insurer you hold a policy with. We&apos;ll surface their
+              products in your comparisons and notify you on price or benefit
+              changes. Pick &quot;I don&apos;t have insurance&quot; to skip.
+            </p>
+            <MultiChipGroup
+              options={INSURERS}
+              values={insurers}
+              onToggle={toggleInsurer}
+              renderOption={(opt) => <ProviderChipMark name={opt} />}
+            />
+            {insurers.length > 0 && !insurers.includes("I don't have insurance") && (
               <div>
                 <span className="text-[13px] font-medium text-text-secondary">Policy types</span>
                 <div className="mt-2">
@@ -709,33 +874,56 @@ export default function SignupPage() {
 
         {step === "health" && (
           <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Health data</h1>
-            <ChipGroup options={MEDICAL_AIDS} value={medicalAid} onChange={setMedicalAid} />
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={chronicOptIn}
-                onChange={(e) => setChronicOptIn(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Opt in to disclose chronic conditions — helps calculate a more accurate sensitivity
-                score. Stored securely and never shown publicly.
-              </span>
-            </label>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={healthDataConsent}
-                onChange={(e) => setHealthDataConsent(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                Separately, allow anonymized use of my health data to improve Kuwana&apos;s
-                healthcare comparisons — distinct from the general research consent on the next
-                screen, since health data deserves its own opt-in.
-              </span>
-            </label>
+            <h1 className="font-display text-[24px] font-bold">Medical Aid</h1>
+            <p className="text-[13px] leading-relaxed text-text-secondary">
+              Select every medical aid scheme you belong to — many Zimbabweans hold more than one
+              (a workplace scheme plus family cover, for example). Pick &quot;None&quot; if you have
+              no coverage.
+            </p>
+            <MultiChipGroup
+              options={MEDICAL_AIDS}
+              values={medicalAids}
+              onToggle={toggleMedicalAid}
+              renderOption={(opt) => <ProviderChipMark name={opt} />}
+            />
+            <div>
+              <p className="text-[14px] font-semibold">Allow kuwana Team to:</p>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={chronicOptIn}
+                  onChange={(e) => setChronicOptIn(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  Selection optional: I have a chronic condition / I&apos;m a Person with a
+                  disability / Prefer not to say.
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={healthDataConsent}
+                  onChange={(e) => setHealthDataConsent(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  Separately, allow anonymized use of my data to improve Kuwana&apos;s comparisons
+                  — distinct from the general research consent on the next screen
+                </span>
+              </label>
+            </div>
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
@@ -745,9 +933,15 @@ export default function SignupPage() {
                 disabled={!canContinue("health")}
                 className="flex-1"
               >
-                Continue
+                I Agree &amp; Continue
               </Button>
             </div>
+            <p className="text-[11px] italic leading-relaxed text-text-muted">
+              By continuing, you agree to let Kuwana process your usage data, product comparisons,
+              and account information to refine our algorithms, personalize recommendations, and
+              improve app performance. You may withdraw your consent at any time in your account
+              settings under the Cyber and Data Protection Act [Chapter 12:07]
+            </p>
           </div>
         )}
 
@@ -830,12 +1024,7 @@ export default function SignupPage() {
         )}
 
         {step === "processing" && (
-          <div className="mt-16 flex flex-col items-center text-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-accent-sky border-t-transparent" />
-            <h1 className="mt-6 font-display text-[20px] font-bold">Saving your profile…</h1>
-            <p className="mt-3 max-w-[36ch] text-[13px] text-text-secondary">
-              {factQueue[factIndex]}
-            </p>
+          <LoadingFacts title="Saving your profile" subtitle="Getting your comparison scores ready">
             {error && (
               <div className="mt-6 space-y-3">
                 <p className="text-[13px] text-accent-coral">{error}</p>
@@ -844,7 +1033,7 @@ export default function SignupPage() {
                 </Button>
               </div>
             )}
-          </div>
+          </LoadingFacts>
         )}
       </div>
     </div>

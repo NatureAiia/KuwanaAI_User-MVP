@@ -7,19 +7,19 @@ describe("convertCurrency", () => {
   });
 
   it("pivots through USD correctly for two non-USD currencies", () => {
-    // perUsd: ZiG 13.5, ZAR 18.2 — 135 ZiG is 10 USD, which is 182 ZAR.
-    const result = convertCurrency(135, "ZiG", "ZAR");
-    expect(result).toBeCloseTo(182, 0);
+    // perUsd: ZiG 26.6039, ZAR 16.3473 — 266.039 ZiG is 10 USD, which is 163.473 ZAR.
+    const result = convertCurrency(266.039, "ZiG", "ZAR");
+    expect(result).toBeCloseTo(163.473, 1);
   });
 
   it("converts USD to a non-USD currency by multiplying by its rate", () => {
     const result = convertCurrency(10, "USD", "ZAR");
-    expect(result).toBeCloseTo(182, 0);
+    expect(result).toBeCloseTo(163.473, 1);
   });
 
   it("converts a non-USD currency to USD by dividing by its rate", () => {
-    const result = convertCurrency(182, "ZAR", "USD");
-    expect(result).toBeCloseTo(10, 0);
+    const result = convertCurrency(163.473, "ZAR", "USD");
+    expect(result).toBeCloseTo(10, 1);
   });
 
   it("returns the amount unchanged when the source currency has no known rate", () => {
@@ -31,7 +31,7 @@ describe("convertCurrency", () => {
   });
 
   it("uses live overrides in preference to the static defaults", () => {
-    // Static ZAR rate is 18.2; override it to exactly 20 and confirm the
+    // Static ZAR rate is 16.3473; override it to exactly 20 and confirm the
     // override — not the static table — drove the conversion.
     const overridden = convertCurrency(1, "USD", "ZAR", getPerUsdMap({ ZAR: 20 }));
     expect(overridden).toBeCloseTo(20);

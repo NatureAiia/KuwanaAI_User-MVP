@@ -1,4 +1,4 @@
-export type CurrencyCode = "USD" | "ZiG" | "ZAR" | "GBP";
+export type CurrencyCode = "USD" | "ZiG" | "ZAR";
 
 export type CurrencyDef = {
   code: CurrencyCode;
@@ -9,14 +9,14 @@ export type CurrencyDef = {
   perUsd: number;
 };
 
-// Static, approximate reference rates — not live market data. Shown with an
-// "approximate" disclaimer anywhere they're surfaced; never passed to the AI
-// assistant as fact.
+// Static reference rates from the Reserve Bank of Zimbabwe's published daily
+// interbank mid rates (spot the daily rate at the link shown in the settings
+// currency switcher). For reference/display only — not live market data; never
+// passed to the AI assistant as fact.
 export const CURRENCIES: CurrencyDef[] = [
   { code: "USD", label: "US Dollar", symbol: "$", flag: "🇺🇸", perUsd: 1 },
-  { code: "ZiG", label: "Zimbabwe Gold", symbol: "ZiG", flag: "🇿🇼", perUsd: 13.5 },
-  { code: "ZAR", label: "Rand", symbol: "R", flag: "🇿🇦", perUsd: 18.2 },
-  { code: "GBP", label: "Pound", symbol: "£", flag: "🇬🇧", perUsd: 0.79 },
+  { code: "ZiG", label: "Zimbabwe Gold", symbol: "ZiG", flag: "🇿🇼", perUsd: 26.6039 },
+  { code: "ZAR", label: "Rand", symbol: "R", flag: "🇿🇦", perUsd: 16.3473 },
 ];
 
 const BY_CODE = new Map(CURRENCIES.map((c) => [c.code, c]));
