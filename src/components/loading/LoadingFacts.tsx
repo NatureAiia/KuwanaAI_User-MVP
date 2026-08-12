@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import { GalleryTunnel } from "./GalleryTunnel";
+import Text3DFlip from "@/components/ui/Text3DFlip";
 
 const ROTATE_MS = 2600;
 
@@ -108,7 +109,25 @@ export function LoadingFacts({
       )}
 
       <div className="relative z-10 flex h-full flex-col items-center justify-center px-5 text-center">
-        <h1 className="font-display text-[32px] font-bold leading-tight text-accent-teal drop-shadow-[0_2px_10px_rgba(0,0,0,0.15)]">
+        <div className="drop-shadow-[0_2px_10px_rgba(0,0,0,0.15)]">
+          <Text3DFlip
+            text="kuwana.ai"
+            tag="span"
+            animation="enter"
+            intervalMs={8000}
+            color="var(--accent-teal)"
+            font={{
+              fontFamily: "var(--font-display)",
+              fontSize: 28,
+              fontWeight: 700,
+              lineHeight: "1em",
+              letterSpacing: "-0.025em",
+              textAlign: "center",
+            }}
+            style={{ width: "auto", height: "auto", display: "inline-flex" }}
+          />
+        </div>
+        <h1 className="mt-3 font-display text-[32px] font-bold leading-tight text-accent-teal drop-shadow-[0_2px_10px_rgba(0,0,0,0.15)]">
           {title}
         </h1>
         <p

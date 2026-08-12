@@ -9,6 +9,7 @@ import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StreakBadge } from "@/components/StreakBadge";
+import Text3DFlip from "@/components/ui/Text3DFlip";
 
 export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
   const pathname = usePathname();
@@ -39,7 +40,21 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
           aria-label="Kuwana home"
         >
           <Image src="/kuwana-mark.png" alt="" width={32} height={32} className="rounded-full" />
-          <span className="font-display text-[16px] font-bold text-accent-teal">kuwana.ai</span>
+          <Text3DFlip
+            text="kuwana.ai"
+            tag="span"
+            animation="enter"
+            intervalMs={45000}
+            color="var(--accent-teal)"
+            font={{
+              fontFamily: "var(--font-display)",
+              fontSize: 16,
+              fontWeight: 700,
+              lineHeight: "1em",
+              textAlign: "left",
+            }}
+            style={{ width: "auto", height: "auto", display: "inline-flex" }}
+          />
         </Link>
 
         {/* Desktop nav — segmented pill dock, dead-centred. Icons everywhere;

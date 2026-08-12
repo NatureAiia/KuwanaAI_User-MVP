@@ -36,9 +36,8 @@ function LoginForm() {
     // `next` is attacker-controllable — anyone can send a link with their own
     // value. Passing it to the router unchecked is an open redirect off the
     // back of a successful login. See lib/safeRedirect.ts.
-    router.push(safeRedirectPath(params.get("next")));
     markHardNav();
-    router.push(params.get("next") ?? "/dashboard");
+    router.push(safeRedirectPath(params.get("next")));
     router.refresh();
   }
 

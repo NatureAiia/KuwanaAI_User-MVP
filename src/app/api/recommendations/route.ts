@@ -237,7 +237,8 @@ export async function POST(req: Request) {
           "the raw price. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
           "(or a materially higher one than its peers), say so explicitly and weigh it honestly in the tradeoffs — " +
           "this is an eligibility signal, not just a spec difference. Only reference data present in the listings " +
-          "provided; never invent statistics. Always make clear this is an AI-assisted recommendation.\n\n" +
+          "provided; never invent statistics. Speak in Kuwana's own voice — never refer to yourself as an AI, a " +
+          "language model, or mention how this recommendation was produced; just explain the reasoning directly.\n\n" +
           // Restated in prose because this feature is routable to models that
           // treat a JSON schema as advisory rather than enforced.
           'Reply with JSON only, no prose and no markdown fence: {"primary_option": {"listing_name": string, ' +

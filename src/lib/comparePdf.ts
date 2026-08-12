@@ -35,13 +35,20 @@ export type ShareRecommendation = {
   confidence: number;
 };
 
+export type ShareTraditionalResult = {
+  winner: { name: string; score: number; why: string } | null;
+  runnerUps: { name: string; score: number }[];
+  note: string | null;
+  text: string;
+};
+
 export type CompareShareData = {
   categoryName: string;
   listings: ListingDTO[];
   attributeSchema: AttributeSchemaFieldDTO[];
   trends: Record<string, PriceTrend | null>;
   recommendation?: ShareRecommendation | null;
-  traditionalText?: string | null;
+  traditional?: ShareTraditionalResult | null;
 };
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null): string {
@@ -166,10 +173,43 @@ export function downloadComparePdf(data: CompareShareData) {
     y = 50;
   }
 
-  // AI recommendation section
+  // Traditional comparison section
+  if (data.traditional) {
+    const t = data.traditional;
+    if (y > doc.internal.pageSize.getHeight() - 120) {
+      doc.addPage();
+      y = 50;
+    }
+    y = sectionTitle(doc, "Traditional comparison", y) + 2;
+    if (t.winner) {
+      y = paragraph(doc, `Winner: ${t.winner.name} — ${t.winner.score}/100`, margin, y, contentWidth, 10) + 2;
+      y = paragraph(doc, `Why: ${t.winner.why}`, margin, y, contentWidth, 9) + 2;
+    }
+    if (t.runnerUps.length > 0) {
+      y = paragraph(
+        doc,
+        `Runner-up: ${t.runnerUps.map((r) => `${r.name} (${r.score}/100)`).join(" — ")}`,
+        margin,
+        y,
+        contentWidth,
+        9,
+      ) + 2;
+    }
+    if (t.note) {
+      y = paragraph(doc, t.note, margin, y + 2, contentWidth, 8) + 4;
+    }
+    y += 12;
+  }
+
+  // Kuwana recommendation section
   if (data.recommendation) {
     const rec = data.recommendation;
-    y = sectionTitle(doc, "AI recommendation (Kuwana, AI-assisted)", y) + 2;
+    if (y > doc.internal.pageSize.getHeight() - 160) {
+      doc.addPage();
+      y = 50;
+    }
+    y = sectionTitle(doc, "Kuwana recommendation", y) + 2;
+    y = paragraph(doc, rec.explanation.summary, margin, y, contentWidth, 9) + 2;
     y = paragraph(doc, `Best for you: ${rec.primary_option.listing_title} (${rec.primary_option.provider_name})`, margin, y, contentWidth);
     const recLines: string[] = [];
     recLines.push(`Decision score: ${rec.primary_option.value_score}/100`);
@@ -177,51 +217,31 @@ export function downloadComparePdf(data: CompareShareData) {
     if (rec.primary_option.key_differentiator) recLines.push(`Why: ${rec.primary_option.key_differentiator}`);
     if (rec.alternative_options.length > 0) {
       recLines.push(
-        `Also worth considering: ${rec.alternative_options.map((a) => `${a.listing_title} — ${a.key_differentiator}`).join(" | ")}`,
+        `Runner-up: ${rec.alternative_options.map((a) => `${a.listing_title} — ${a.key_differentiator}`).join(" | ")}`,
       );
     }
-    if (rec.explanation.key_tradeoffs.length > 0) {
-      recLines.push(`Tradeoffs to weigh: ${rec.explanation.key_tradeoffs.join(" | ")}`);
-    }
     if (rec.suggested_action) recLines.push(`Suggested next step: ${rec.suggested_action}`);
-    recLines.push(`Confidence: ${Math.round(rec.confidence * 100)}%`);
     y = paragraph(doc, recLines.join("\n"), margin + 4, y + 2, contentWidth - 8, 9, 4.5);
-    if (rec.explanation.data_traceability_notes) {
-      y = paragraph(doc, rec.explanation.data_traceability_notes, margin, y + 4, contentWidth, 8) + 4;
-    }
     y += 12;
   }
 
-  // Traditional comparison section
-  if (data.traditionalText) {
-    if (y > doc.internal.pageSize.getHeight() - 160) {
-      doc.addPage();
-      y = 50;
-    }
-    y = sectionTitle(doc, "Traditional comparison (rules-based Python engine, no AI)", y) + 2;
-    const lines = data.traditionalText.split("\n");
-    doc.setFont("courier", "normal");
-    doc.setFontSize(7.5);
-    for (const line of lines) {
-      if (y > doc.internal.pageSize.getHeight() - 50) {
-        doc.addPage();
-        y = 50;
-      }
-      doc.text(line, margin + 4, y);
-      y += 10;
-    }
-    y += 12;
-  }
-
-  // Footer note
-  if (y > doc.internal.pageSize.getHeight() - 60) {
+  // Disclaimer
+  if (y > doc.internal.pageSize.getHeight() - 70) {
     doc.addPage();
     y = 50;
   }
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text("Kuwana — compare with transparent, explainable decision scores.", margin, y);
+  y = paragraph(
+    doc,
+    "Kuwana is not a financial or advisory service — we help you make your own informed decision. This " +
+      "comparison and any recommendation are for informational purposes only.",
+    margin,
+    y,
+    contentWidth,
+    8,
+  );
 
   doc.save(`kuwana-compare-${slugify(data.categoryName)}.pdf`);
 }

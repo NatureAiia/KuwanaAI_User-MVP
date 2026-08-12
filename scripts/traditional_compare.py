@@ -27,9 +27,13 @@ Reads one JSON object from stdin:
       ]
     }
 
-Prints a human-readable comparison to stdout. Uses only the standard
-library so it runs anywhere Python 3.8+ is installed — no pandas/sklearn
-needed at request time.
+Prints one JSON object to stdout: `{"text": "<human-readable dump>",
+"winner": {"name", "score", "why"} | null, "runner_ups": [{"name", "score"}],
+"note": "<disclaimer>" | null}`. `text` keeps the full human-readable
+breakdown (audit trail / debugging); the other fields are what the app
+renders as structured UI instead of dumping `text` verbatim. Uses only the
+standard library so it runs anywhere Python 3.8+ is installed — no
+pandas/sklearn needed at request time.
 
 Run directly to smoke-test:
 
@@ -145,13 +149,13 @@ def compute_value_score(
     return total, "price 50% · benefit 50%"
 
 
-def run(payload: dict) -> str:
+def run(payload: dict) -> dict:
     category_name = payload.get("category_name") or "Unknown"
     category_slug = payload.get("category_slug") or ""
     schema = payload.get("attribute_schema") or []
     listings = payload.get("listings") or []
     if len(listings) < 1:
-        return "No listings to compare.\n"
+        return {"text": "No listings to compare.\n", "winner": None, "runner_ups": [], "note": None}
 
     prices = [_num(l.get("price")) for l in listings]
     prices = [p for p in prices if p is not None]
@@ -239,24 +243,38 @@ def run(payload: dict) -> str:
     lines.append("")
     lines.append(BAR)
     winner = scored[0]
+    winner_why = "; ".join(winner["reasons"]) if winner["reasons"] else "highest transparent value score"
     lines.append(f"WINNER: {winner['listing'].get('name')} — {winner['final']}/100")
-    lines.append(f"Why: {('; '.join(winner['reasons']) if winner['reasons'] else 'highest transparent value score')}.")
+    lines.append(f"Why: {winner_why}.")
 
-    if len(scored) > 1:
+    runner_ups = [
+        {"name": s["listing"].get("name") or "Unnamed", "score": s["final"]}
+        for s in scored[1:3]
+    ]
+    if runner_ups:
         lines.append("")
-        lines.append("Runner-up: " + " — ".join(
-            f"{s['listing'].get('name')} ({s['final']}/100)" for s in scored[1:3]
-        ))
+        lines.append("Runner-up: " + " — ".join(f"{r['name']} ({r['score']}/100)" for r in runner_ups))
 
+    note = "This is a deterministic rules-based comparison, not an AI recommendation."
     lines.append("")
-    lines.append("Note: this is a deterministic rules-based comparison, not an AI recommendation.")
-    return "\n".join(lines) + "\n"
+    lines.append(f"Note: {note[0].lower()}{note[1:]}")
+
+    return {
+        "text": "\n".join(lines) + "\n",
+        "winner": {
+            "name": winner["listing"].get("name") or "Unnamed",
+            "score": winner["final"],
+            "why": winner_why,
+        },
+        "runner_ups": runner_ups,
+        "note": note,
+    }
 
 
 if __name__ == "__main__":
     try:
         payload = json.load(sys.stdin)
     except json.JSONDecodeError as exc:
-        print(f"ERROR: could not read JSON payload: {exc}", file=sys.stderr)
+        print(json.dumps({"error": f"could not read JSON payload: {exc}"}), file=sys.stderr)
         sys.exit(1)
-    print(run(payload))
+    print(json.dumps(run(payload)))

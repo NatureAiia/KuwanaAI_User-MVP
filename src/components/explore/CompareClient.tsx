@@ -65,9 +65,22 @@ type RecommendationResponse = {
   gamification?: GamificationUpdate | null;
 };
 
+type TraditionalWinner = { name: string; score: number; why: string };
+type TraditionalRunnerUp = { name: string; score: number };
+
 type TraditionalComparisonResponse = {
   engine: "traditional";
   categoryName: string;
+  text: string;
+  winner: TraditionalWinner | null;
+  runnerUps: TraditionalRunnerUp[];
+  note: string | null;
+};
+
+type TraditionalResult = {
+  winner: TraditionalWinner | null;
+  runnerUps: TraditionalRunnerUp[];
+  note: string | null;
   text: string;
 };
 
@@ -104,7 +117,7 @@ export function CompareClient({
 
   // Traditional (Python, rules-based) comparison — deliberately separate from
   // the AI state so either engine can run independently of the other.
-  const [traditionalResult, setTraditionalResult] = useState<string | null>(null);
+  const [traditionalResult, setTraditionalResult] = useState<TraditionalResult | null>(null);
   const [loadingTraditional, setLoadingTraditional] = useState(false);
   const [traditionalError, setTraditionalError] = useState<string | null>(null);
 
@@ -196,7 +209,7 @@ export function CompareClient({
       });
       if (res.ok) {
         const data = (await res.json()) as TraditionalComparisonResponse;
-        setTraditionalResult(data.text);
+        setTraditionalResult({ winner: data.winner, runnerUps: data.runnerUps, note: data.note, text: data.text });
       } else {
         const data = await res.json().catch(() => null);
         setTraditionalError(
@@ -239,7 +252,7 @@ export function CompareClient({
     attributeSchema,
     trends,
     recommendation,
-    traditionalText: traditionalResult,
+    traditional: traditionalResult,
   };
 
   return (
@@ -534,11 +547,10 @@ export function CompareClient({
             </LinkButton>
           </div>
           {/* Clearly-labelled explanation of which engine is which, under the
-              buttons, so the Python-based traditional comparison isn't
-              mistaken for the AI one. */}
+              buttons, so the two results aren't mistaken for each other. */}
           <p className="max-w-xl text-[12px] leading-snug text-text-muted">
-            AI recommendation is personalised and LLM-assisted. Traditional comparison is a deterministic
-            rules-based engine written in Python — no AI — that prints exactly how it ranked each option.
+            Kuwana recommendation is personalised to your situation. Traditional comparison is a deterministic,
+            rules-based ranking — no personalization — that shows exactly how it scored each option.
           </p>
           {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
           {traditionalError && <p className="text-[13px] text-accent-coral">{traditionalError}</p>}
@@ -569,11 +581,11 @@ export function CompareClient({
         )}
 
         {traditionalResult && (
-          <div className="mt-3 overflow-hidden rounded-[var(--radius-card)] border border-border bg-bg-surface">
-            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
+          <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
+            <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                 <Scale size={13} />
-                Traditional comparison — Python engine output
+                Traditional comparison
               </p>
               <button
                 type="button"
@@ -583,9 +595,29 @@ export function CompareClient({
                 Hide
               </button>
             </div>
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap p-4 font-mono text-[11.5px] leading-relaxed text-text-secondary">
-              {traditionalResult}
-            </pre>
+
+            {traditionalResult.winner && (
+              <>
+                <p className="mt-3 font-display text-[16px] font-semibold">
+                  {traditionalResult.winner.name}{" "}
+                  <span className="text-accent-teal">{traditionalResult.winner.score}/100</span>
+                </p>
+                <p className="mt-1 text-[13px] leading-snug text-text-secondary">
+                  <span className="font-semibold text-text-primary">Why:</span> {traditionalResult.winner.why}
+                </p>
+              </>
+            )}
+
+            {traditionalResult.runnerUps.length > 0 && (
+              <p className="mt-2.5 text-[12.5px] leading-snug text-text-muted">
+                <span className="font-semibold">Runner-up:</span>{" "}
+                {traditionalResult.runnerUps.map((r) => `${r.name} (${r.score}/100)`).join(" — ")}
+              </p>
+            )}
+
+            {traditionalResult.note && (
+              <p className="mt-3 text-[11px] leading-snug text-text-muted">{traditionalResult.note}</p>
+            )}
           </div>
         )}
 
@@ -595,7 +627,7 @@ export function CompareClient({
               <SignalBloom value={recommendation.confidence * 100} size={40} color="teal" />
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-accent-teal">
-                  AI recommendation — AI-assisted
+                  Kuwana recommendation
                 </p>
                 <p className="font-display text-[15px] font-semibold">Best for you because…</p>
               </div>

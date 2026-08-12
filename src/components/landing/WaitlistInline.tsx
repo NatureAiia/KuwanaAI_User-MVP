@@ -4,8 +4,9 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import { SECTORS, type SectorSlug } from "@/lib/sectors";
 
-export function WaitlistInline() {
+export function WaitlistInline({ sector }: { sector: SectorSlug }) {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
   const isDesktop = useIsDesktop();
@@ -17,7 +18,7 @@ export function WaitlistInline() {
     await fetch("/api/waitlist", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, sector: "healthcare" }),
+      body: JSON.stringify({ email, sector }),
     });
     setStatus("done");
   }
@@ -25,7 +26,7 @@ export function WaitlistInline() {
   if (status === "done") {
     return (
       <p className="text-[14px] font-medium text-accent-teal">
-        You&apos;re on the list — we&apos;ll email you when Healthcare launches.
+        You&apos;re on the list — we&apos;ll email you when {SECTORS[sector].name} launches.
       </p>
     );
   }

@@ -91,9 +91,7 @@ export default async function AdminLlmPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-[24px] font-bold">AI models &amp; cost</h1>
-          <p className="text-text-secondary mt-1 text-[13px]">
-            Signed in as {admin.email} · <Link href="/admin" className="underline">back to admin</Link>
-          </p>
+          <p className="text-text-secondary mt-1 text-[13px]">Signed in as {admin.email}</p>
         </div>
         <div className="flex gap-1">
           {RANGES.map((r) => (

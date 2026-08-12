@@ -88,11 +88,20 @@ export async function POST(req: Request) {
   };
 
   try {
-    const text = await runPythonEngine(payload);
+    const stdout = await runPythonEngine(payload);
+    const engineResult = JSON.parse(stdout) as {
+      text: string;
+      winner: { name: string; score: number; why: string } | null;
+      runner_ups: { name: string; score: number }[];
+      note: string | null;
+    };
     return NextResponse.json({
       engine: "traditional",
       categoryName: category.name,
-      text,
+      text: engineResult.text,
+      winner: engineResult.winner,
+      runnerUps: engineResult.runner_ups,
+      note: engineResult.note,
     });
   } catch (err) {
     console.error("[traditional-comparison] engine failed:", err);

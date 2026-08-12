@@ -10,6 +10,9 @@ import { LandingFXLazy, HeroDeviceMockupLazy } from "@/components/landing/Landin
 import { ScrollButtons } from "@/components/landing/ScrollButtons";
 import { GetStartedButton } from "@/components/landing/GetStartedButton";
 import { HeaderGetStarted } from "@/components/landing/HeaderGetStarted";
+import { ComingSoonWaitlist } from "@/components/landing/ComingSoonWaitlist";
+import Typewriter from "@/components/ui/Typewriter";
+import Text3DFlip from "@/components/ui/Text3DFlip";
 
 const WEEKLY_PICKS = [
   { title: "Best value data bundles this week", sub: "Econet · NetOne · Telecel", score: 92 },
@@ -44,7 +47,22 @@ export default function LandingPage() {
       <header className="flex items-center justify-between px-5 py-4 md:px-10">
         <div className="flex items-center gap-2">
           <Image src="/kuwana-mark.png" alt="" width={28} height={28} />
-          <span className="font-display text-xl font-bold tracking-tight">kuwana.ai</span>
+          <Text3DFlip
+            text="kuwana.ai"
+            tag="span"
+            animation="enter"
+            intervalMs={45000}
+            color="var(--text-primary)"
+            font={{
+              fontFamily: "var(--font-display)",
+              fontSize: 20,
+              fontWeight: 700,
+              lineHeight: "1em",
+              letterSpacing: "-0.025em",
+              textAlign: "left",
+            }}
+            style={{ width: "auto", height: "auto", display: "inline-flex" }}
+          />
         </div>
         <nav className="flex items-center gap-3">
           <div className="hidden md:block">
@@ -76,8 +94,24 @@ export default function LandingPage() {
                 AI-assisted comparisons for Zimbabwe
               </span>
 
-              <h1 className="mt-4 font-display text-[32px] leading-[1.05] font-bold tracking-tight md:text-[46px]">
-                Compare smarter. <span className="text-accent-teal">Gain</span> more.
+              <h1 className="mt-4 flex flex-wrap items-baseline gap-x-2 font-display text-[32px] leading-[1.05] font-bold tracking-tight md:text-[46px]">
+                <span className="w-full">Compare smarter.</span>
+                <Typewriter
+                  texts={["Gain", "See", "Save", "Live", "Compare", "Kuwana", "Earn"]}
+                  typedColor="var(--accent-teal)"
+                  cursorColor="var(--accent-teal)"
+                  ease={{ type: "tween", duration: 0.04, delay: 3.5, ease: "easeInOut" }}
+                  deleteSpeed={0.03}
+                  font={{
+                    fontFamily: "inherit",
+                    fontSize: "inherit",
+                    fontWeight: "inherit",
+                    lineHeight: "inherit",
+                    letterSpacing: "inherit",
+                  }}
+                  style={{ width: "auto", height: "auto", display: "inline-flex" }}
+                />
+                <span>more.</span>
               </h1>
               <p className="mt-4 max-w-[46ch] text-[15px] leading-[1.6] text-text-secondary">
                 Explainable, total-cost, eligibility-aware comparisons across telecom, banking,
@@ -245,17 +279,13 @@ export default function LandingPage() {
         <section className="mx-auto max-w-[1120px] px-5 pb-16 md:px-10">
           <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface-raised p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div>
-              <h2 className="font-display text-[22px] font-semibold">
-                Browse now, sign up when you&apos;re ready
-              </h2>
+              <h2 className="font-display text-[22px] font-semibold">Coming soon — join the waitlist</h2>
               <p className="mt-1 text-[14px] text-text-secondary max-w-[48ch]">
-                Explore listings without an account. Create one to compare, save, and get
-                AI-explained recommendations.
+                Healthcare, Tech &amp; Electronics, Clothes, Hotels, and Retail &amp; Groceries are on
+                the way. Pick a category and we&apos;ll email you the moment it launches.
               </p>
             </div>
-            <LinkButton href="/explore/telecom" variant="secondary" size="lg">
-              Start exploring
-            </LinkButton>
+            <ComingSoonWaitlist />
           </div>
         </section>
       </main>
@@ -340,7 +370,7 @@ export default function LandingPage() {
 
 function FeatureStripItem({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="flex items-baseline gap-2">
+    <div className="flex flex-wrap items-baseline justify-center gap-2 text-center md:justify-start md:text-left">
       <span className="text-[13px] font-semibold text-text-primary">{title}</span>
       <span className="text-[12px] text-text-muted">— {desc}</span>
     </div>
