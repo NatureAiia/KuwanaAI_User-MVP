@@ -221,7 +221,7 @@ export default function LandingPage() {
                   alt="Ai Institute Africa"
                   width={488}
                   height={409}
-                  className="h-48 w-auto md:h-72"
+                  className="h-10 w-auto md:h-12"
                   priority={false}
                 />
               </li>
@@ -231,7 +231,7 @@ export default function LandingPage() {
                   alt="Kuwana"
                   width={240}
                   height={240}
-                  className="h-48 w-48 md:h-72 md:w-72"
+                  className="h-10 w-10 md:h-12 md:w-12"
                   priority={false}
                 />
               </li>

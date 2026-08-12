@@ -54,8 +54,10 @@ export function ProviderLogo({
   const [failed, setFailed] = useState(false);
 
   // Prefer the DB logoUrl (an admin-controlled URL), then fall back to
-  // the locally-fetched logo at /provider-logos/<slug>.<ext>.
-  const resolvedUrl = logoUrl && !failed ? logoUrl : providerLogoUrl(name);
+  // the locally-fetched logo at /provider-logos/<slug>.<ext>. Once the
+  // chosen source errors, stop trying to render an <img> entirely and
+  // drop to the initials badge — a broken <img> must never persist.
+  const resolvedUrl = failed ? null : (logoUrl ?? providerLogoUrl(name));
 
   if (resolvedUrl) {
     return (

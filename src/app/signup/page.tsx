@@ -215,6 +215,10 @@ export default function SignupPage() {
   // nostro at Stanbic, etc.). The "I don't bank" sentinel is exclusive so
   // the account-types follow-up step stays hidden for those users.
   const [banks, setBanks] = useState<string[]>([]);
+  // Free-text name captured when "Other" is picked in the banks list — shown
+  // as a short inline input above the account-types follow-up. Sent to the
+  // API in place of the literal "Other" marker whenever it's filled in.
+  const [otherBank, setOtherBank] = useState("");
   const [accountTypes, setAccountTypes] = useState<string[]>([]);
   // Mobile wallets (EcoCash, OneMoney, InnBucks, etc.) are tracked
   // separately from bank account types because they're issued by telecoms /
@@ -319,12 +323,26 @@ export default function SignupPage() {
       const supabase = createClient();
       const { error: signUpError } = await supabase.auth.signUp({ email, password });
       if (signUpError) {
-        setError(signUpError.message);
+        const alreadyRegistered = /already registered|already exists|already been used|taken/i.test(
+          signUpError.message,
+        );
+        setError(
+          alreadyRegistered
+            ? "This email can only be used once. If you already have an account, please log in instead."
+            : signUpError.message,
+        );
         setStep("account");
         return;
       }
 
       const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
+      // Replace the "Other" marker with whatever the user typed, if anything
+      // — otherwise keep "Other" so the selection still round-trips.
+      const finalBanks = banksSelected
+        ? banks
+            .filter((b) => b !== "Other")
+            .concat(otherBank.trim() ? [otherBank.trim()] : banks.includes("Other") ? ["Other"] : [])
+        : banks;
       // `insuranceSelected` is true when the user picked at least one real
       // insurer. "I don't have insurance" as the sole selection flips this
       // to false — same shape as the banks step's "I don't bank" sentinel.
@@ -352,7 +370,7 @@ export default function SignupPage() {
                   socialPlatforms,
                   telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
                   bankingFootprint: banksSelected
-                    ? { banks, account_types: accountTypes, wallets }
+                    ? { banks: finalBanks, account_types: accountTypes, wallets }
                     : undefined,
                   insuranceFootprint: {
                     providers: insurers,
@@ -403,6 +421,7 @@ export default function SignupPage() {
     planType,
     spend,
     banks,
+    otherBank,
     accountTypes,
     wallets,
     insurers,
@@ -746,6 +765,18 @@ export default function SignupPage() {
               onToggle={toggleBank}
               renderOption={(opt) => <ProviderChipMark name={opt} />}
             />
+            {banks.includes("Other") && (
+              <div>
+                <span className="text-[13px] font-medium text-text-secondary">Other bank name</span>
+                <input
+                  value={otherBank}
+                  onChange={(e) => setOtherBank(e.target.value)}
+                  placeholder="Other"
+                  autoComplete="off"
+                  className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                />
+              </div>
+            )}
             {banks.length > 0 && !banks.includes("I don't bank") && (
               <div>
                 <span className="text-[13px] font-medium text-text-secondary">Account types</span>
