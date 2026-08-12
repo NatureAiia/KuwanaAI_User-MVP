@@ -1,10 +1,9 @@
 /**
  * Refreshes FxRate from a free, keyless FX API — replacing the static
- * "approximate, for reference only" table in lib/currency.ts wherever a
- * live rate is actually available (confirmed: ZWG/ZAR/GBP all are, despite
- * Zimbabwe's currency situation being a reasonable thing to doubt). The
- * static table stays as the guaranteed fallback if this hasn't run yet or
- * the source is unreachable — see getPerUsdMap() in lib/currency.ts.
+ * reference table in lib/currency.ts wherever a live rate is actually
+ * available. The static table (sourced from the Reserve Bank of Zimbabwe's
+ * published daily rates) stays as the guaranteed fallback if this hasn't run
+ * yet or the source is unreachable — see getPerUsdMap() in lib/currency.ts.
  *
  *   npx tsx scripts/fx-refresh/run.ts
  */

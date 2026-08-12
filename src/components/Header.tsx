@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, ShoppingCart } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { StreakBadge } from "@/components/StreakBadge";
 
-export function Header() {
+export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -22,32 +23,51 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-bg-surface/95 px-5 backdrop-blur-sm md:static md:h-auto md:border-0 md:bg-transparent md:px-0 md:backdrop-blur-none">
-        <Link href="/" className="flex items-center gap-2">
+      <header className="fixed inset-x-0 top-0 z-40 grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-border bg-bg-surface/90 px-4 backdrop-blur-md md:px-6">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 justify-self-start"
+          aria-label="Kuwana home"
+        >
           <Image src="/kuwana-mark.png" alt="" width={32} height={32} className="rounded-full" />
-          <span className="font-display text-[16px] font-bold text-accent-teal">KuwanaAI</span>
+          <span className="font-display text-[16px] font-bold text-accent-teal">kuwana.ai</span>
         </Link>
 
-        <nav aria-label="Primary" className="hidden items-center gap-6 md:flex">
-          {NAV_ITEMS.map(({ href, label }) => {
-            const active = isNavItemActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={clsx(
-                  "text-[13px] font-medium",
-                  active ? "text-accent-sky" : "text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {label}
-              </Link>
-            );
-          })}
+        {/* Desktop nav — segmented pill dock, dead-centred. Icons everywhere;
+            labels from lg up (tablets get compact icon-only pills). The active
+            section gets a tinted fill + inset ring so the current page pops. */}
+        <nav aria-label="Primary" className="hidden justify-self-center md:block">
+          <ul className="flex items-center gap-1 rounded-full border border-border bg-bg-surface-raised/80 p-1 shadow-[0_10px_30px_-18px_rgba(2,6,23,0.5)]">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const active = isNavItemActive(pathname, href);
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    title={label}
+                    aria-label={label}
+                    aria-current={active ? "page" : undefined}
+                    className={clsx(
+                      "flex items-center gap-2 rounded-full px-2.5 py-2 text-[13px] font-semibold transition-all duration-200 lg:px-4",
+                      active
+                        ? "bg-accent-sky/15 text-accent-sky shadow-[inset_0_0_0_1px_var(--accent-sky)]"
+                        : "text-text-secondary hover:bg-bg-base hover:text-text-primary",
+                    )}
+                  >
+                    <Icon size={15} strokeWidth={active ? 2.5 : 2.1} />
+                    <span className="hidden lg:inline">{label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 justify-self-end">
+          {/* Streak badge sits directly left of the bell so the four
+              chrome buttons (streak, notifications, shopping list, theme)
+              form a single matched row. Hidden when there's no streak yet. */}
+          <StreakBadge currentStreak={currentStreak} />
           <Link
             href="/notifications"
             aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
@@ -60,11 +80,19 @@ export function Header() {
               </span>
             )}
           </Link>
+          <Link
+            href="/profile/saved"
+            aria-label="Shopping list"
+            className="tap-target flex items-center justify-center rounded-full border border-border bg-bg-surface text-text-secondary"
+          >
+            <ShoppingCart size={18} />
+          </Link>
           <ThemeToggle />
         </div>
       </header>
-      {/* Reserves the fixed header's height in normal flow so mobile content doesn't render underneath it. */}
-      <div className="h-16 md:hidden" aria-hidden="true" />
+      {/* Reserves the fixed header's height in normal flow at every breakpoint
+          so content never renders underneath it. */}
+      <div className="h-16" aria-hidden="true" />
     </>
   );
 }

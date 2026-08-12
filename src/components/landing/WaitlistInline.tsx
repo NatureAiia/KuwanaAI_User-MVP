@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import WaterButton from "@/components/ui/WaterButton";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 
 export function WaitlistInline() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "done">("idle");
+  const isDesktop = useIsDesktop();
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +31,11 @@ export function WaitlistInline() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-[420px] flex-col gap-2 sm:flex-row">
+    <form
+      ref={formRef}
+      onSubmit={handleSubmit}
+      className="flex w-full max-w-[420px] flex-col gap-2 sm:flex-row"
+    >
       <input
         type="email"
         required
@@ -36,9 +44,26 @@ export function WaitlistInline() {
         onChange={(e) => setEmail(e.target.value)}
         className="flex-1 rounded-xl border border-border bg-bg-surface px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
       />
-      <Button type="submit" disabled={status === "loading"}>
-        {status === "loading" ? "Joining…" : "Join waitlist"}
-      </Button>
+      {isDesktop ? (
+        <WaterButton
+          label={status === "loading" ? "Joining…" : "Join waitlist"}
+          disabled={status === "loading"}
+          onClick={() => formRef.current?.requestSubmit()}
+          paddingX={24}
+          paddingY={14}
+          rounded={14}
+          waterColor="#3E9BD6"
+          textColor="#ffffff"
+          font={{ fontSize: 14, fontWeight: 600 }}
+          glass={{ tint: "rgba(62, 155, 214, 0.18)", blur: 24, frost: 10 }}
+          borderOptions={{ color: "rgba(62, 155, 214, 0.5)", stroke: 1 }}
+          shadowOptions={{ color: "#141A1F", intensity: 40 }}
+        />
+      ) : (
+        <Button type="submit" disabled={status === "loading"}>
+          {status === "loading" ? "Joining…" : "Join waitlist"}
+        </Button>
+      )}
     </form>
   );
 }

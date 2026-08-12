@@ -17,14 +17,19 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
-  for (const [consentType, granted] of Object.entries(parsed.data)) {
-    if (granted === undefined) continue;
-    await prisma.consent.upsert({
-      where: { userId_consentType: { userId: user.id, consentType } },
-      update: { granted, grantedAt: new Date() },
-      create: { userId: user.id, consentType, granted },
-    });
-  }
+  // A consent save touches at most three rows; run them concurrently instead
+  // of a serialized round-trip each. Same upsert pattern as notifications.
+  await Promise.all(
+    Object.entries(parsed.data)
+      .filter(([, granted]) => granted !== undefined)
+      .map(([consentType, granted]) =>
+        prisma.consent.upsert({
+          where: { userId_consentType: { userId: user.id, consentType } },
+          update: { granted, grantedAt: new Date() },
+          create: { userId: user.id, consentType, granted },
+        }),
+      ),
+  );
 
   return privateJson({ ok: true });
 }

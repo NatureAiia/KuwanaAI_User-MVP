@@ -17,6 +17,9 @@ function listing(overrides: Partial<ListingDTO> & { id: string; price: number })
     lastVerifiedAt: new Date().toISOString(),
     sourceUrl: null,
     images: [],
+    description: null,
+    rating: null,
+    reviewCount: 0,
     provider: { id: "p1", name: "Provider", logoUrl: null, verified: true },
     ...overrides,
   };

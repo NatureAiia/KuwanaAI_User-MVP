@@ -1,9 +1,12 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { cache } from "react";
+import { ListingStatus } from "@prisma/client";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
 import { computePriceTrend, type PriceTrend } from "@/lib/priceTrend";
 import { CATALOG_TAG, PRICE_HISTORY_TAG } from "@/lib/cacheTags";
+import { loadFittedWeights, type FittedWeights } from "@/lib/fittedWeights";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 
 /**
@@ -95,35 +98,122 @@ async function readCategoryWithListings(
 ): Promise<CategoryWithListingsDTO | null> {
   const sector = await prisma.sectorConfig.findUnique({ where: { slug: sectorSlug } });
   if (!sector) return null;
+// Short-lived cross-request cache for the hot catalog reads below. React's
+// cache() (used above) only dedups within a single request, but every page
+// load on /explore, /compare and the listings API re-hits the same remote
+// Postgres queries. Listings/categories change only via ingestion and
+// approval flows, so a 30s window of staleness is invisible — and it turns
+// repeat navigation from ~1s of DB round-trips into a near-instant hit.
+// Also coalesces concurrent in-flight calls so a burst of requests doesn't
+// fan out into N identical queries. Deliberately not used for anything
+// user-specific (saved listings, profiles, streaks, auth).
+const CATALOG_TTL_MS = 30_000;
+const MAX_TTL_ENTRIES = 200;
 
-  const category = await prisma.category.findUnique({
-    where: { sectorId_slug: { sectorId: sector.id, slug: categorySlug } },
-    include: {
-      attributeSchema: { orderBy: { sortOrder: "asc" } },
-      listings: {
-        where: { status: "published" },
-        include: { provider: true },
-        orderBy: { price: "asc" },
-      },
-    },
-  });
-  if (!category) return null;
+function ttlCache<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => Promise<TResult>,
+  ttlMs: number,
+): (...args: TArgs) => Promise<TResult> {
+  const results = new Map<string, { value: TResult; expiresAt: number }>();
+  const inflight = new Map<string, Promise<TResult>>();
 
-  return {
-    id: category.id,
-    slug: category.slug,
-    name: category.name,
-    attributeSchema: category.attributeSchema.map((a) => ({
-      key: a.key,
-      label: a.label,
-      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
-      unit: a.unit,
-      isComparable: a.isComparable,
-      sortOrder: a.sortOrder,
-    })),
-    listings: category.listings.map(toListingDTO),
+  return (...args) => {
+    const key = JSON.stringify(args);
+
+    const hit = results.get(key);
+    if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.value);
+
+    const running = inflight.get(key);
+    if (running) return running;
+
+    const p = fn(...args);
+    inflight.set(key, p);
+    // Rejections are handled by the caller awaiting `p`; this side chain only
+    // records a successful value and cleans the in-flight slot on settle.
+    void p
+      .then((value) => {
+        if (results.size >= MAX_TTL_ENTRIES) {
+          const oldest = results.keys().next().value;
+          if (oldest !== undefined) results.delete(oldest);
+        }
+        results.set(key, { value, expiresAt: Date.now() + ttlMs });
+      })
+      .catch(() => {})
+      .finally(() => inflight.delete(key));
+    return p;
   };
 }
+
+export const getSectorCategories = cache(
+  ttlCache(async (sectorSlug: string): Promise<CategoryDTO[]> => {
+    const sector = await prisma.sectorConfig.findUnique({
+      where: { slug: sectorSlug },
+      include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
+    });
+    if (!sector) return [];
+    return sector.categories.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      attributeSchema: c.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+    }));
+  }, CATALOG_TTL_MS),
+);
+
+export const getCategoryWithListings = cache(
+  ttlCache(async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | null> => {
+    // Resolve sector + category in one query (relation filter on the join)
+    // instead of two round-trips — the caller is already waiting on this
+    // before it can render anything.
+    const category = await prisma.category.findFirst({
+      where: { slug: categorySlug, sector: { slug: sectorSlug } },
+      include: {
+        attributeSchema: { orderBy: { sortOrder: "asc" } },
+        listings: {
+          where: { status: "published" },
+          include: { provider: true },
+          orderBy: { price: "asc" },
+        },
+      },
+    });
+    if (!category) return null;
+
+    return {
+      id: category.id,
+      slug: category.slug,
+      name: category.name,
+      attributeSchema: category.attributeSchema.map((a) => ({
+        key: a.key,
+        label: a.label,
+        dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+        unit: a.unit,
+        isComparable: a.isComparable,
+        sortOrder: a.sortOrder,
+      })),
+      listings: category.listings.map(toListingDTO),
+    };
+  }, CATALOG_TTL_MS),
+);
+
+// Compare-page lookup by id: category + its attribute schema, with nothing
+// else attached. Static schema data, so safe for the shared TTL — and the
+// compare page is the one place that would otherwise re-fetch this raw on
+// every navigation from a listing.
+export const getCategorySchema = cache(
+  ttlCache(async (categoryId: string) => {
+    return prisma.category.findUnique({
+      where: { id: categoryId },
+      include: { attributeSchema: { orderBy: { sortOrder: "asc" } } },
+    });
+  }, CATALOG_TTL_MS),
+);
 
 export async function getTopListings(
   sectorSlug: string,
@@ -225,10 +315,15 @@ export async function getPersonalizedSpecials(
   }
 
   const engagedSectors = new Set([...candidates.values()].map((c) => c.sectorSlug));
-  for (const footprint of footprints) {
-    if (engagedSectors.has(footprint.sector)) continue;
-    const [firstCategory] = await getSectorCategories(footprint.sector);
-    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug: footprint.sector, categorySlug: firstCategory.slug });
+  // One lookup per footprint sector, in parallel — sequential awaits here
+  // would stack a DB round-trip per sector on every dashboard render.
+  const footprintFirstCategories = await Promise.all(
+    footprints
+      .filter((fp) => !engagedSectors.has(fp.sector))
+      .map(async (fp) => [fp.sector, (await getSectorCategories(fp.sector))[0]] as const),
+  );
+  for (const [sectorSlug, firstCategory] of footprintFirstCategories) {
+    if (firstCategory) candidates.set(firstCategory.id, { sectorSlug, categorySlug: firstCategory.slug });
   }
 
   if (candidates.size === 0) return [];
@@ -245,9 +340,29 @@ export async function getPersonalizedSpecials(
 }
 
 /**
- * Fetches ListingPriceHistory rows for the given listings and reduces each
- * to a PriceTrend (or null if there's no history yet). Keyed by listing id
- * so callers can look up a listing's trend alongside its other data.
+ * "Recommended for you" — sits above "Specials for you" on the home page.
+ * Recommends according to the user's profile across ALL categories, not just
+ * the ones their providers happen to have seeded:
+ *   1. Listings from the providers the user is already locked into (their
+ *      mobile network, their bank, their insurer) — across every category.
+ *   2. Top candidates from every category of each sector in their onboarding
+ *      footprint (so a banking user sees savings-account picks, an insured
+ *      user sees motor/health cover picks, etc.).
+ * Categories the user has already explicitly compared/saved are excluded so
+ * this section surfaces fresh ground rather than re-ranking what they've seen.
+ *
+ * Ranking (mirrors the notebook, kept in sync by hand until the model is
+ * fitted): each candidate listing gets a value score (price + first numeric
+ * benefit, 50/50 — same as computeDecisionScores), plus bonuses for being
+ * a "special" (price drop / below-median), freshness, and provider trust,
+ * clamped to 0-100.
+ *
+ * If `notebooks/data/fitted_weights.json` exists with an in-sample fit for
+ * this category (see `loadFittedWeights`), the score is computed via the
+ * fitted logistic-regression formula instead of the hand-tuned blend. The
+ * heuristic stays in charge until the notebook produces a fit — which is
+ * the production behavior until enough `action_taken` / saved-listing
+ * signals have accumulated for a category.
  */
 async function readListingPriceTrends(listingIds: string[]): Promise<Record<string, PriceTrend | null>> {
   if (listingIds.length === 0) return {};
@@ -258,21 +373,289 @@ async function readListingPriceTrends(listingIds: string[]): Promise<Record<stri
     // computePriceTrend only ever looks at recent movement.
     where: { listingId: { in: listingIds }, recordedAt: { gte: trendWindowStart() } },
     orderBy: { recordedAt: "asc" },
+
+function scoreWithFit(
+  fit: FittedWeights,
+  features: {
+    value_score: number;
+    special_bonus: number;
+    freshness_bonus: number;
+    trust_bonus: number;
+    trend_feature: number;
+  },
+): number {
+  return (
+    fit._intercept +
+    fit.value_score * features.value_score +
+    fit.special_bonus * features.special_bonus +
+    fit.freshness_bonus * features.freshness_bonus +
+    fit.trust_bonus * features.trust_bonus +
+    fit.trend_feature * features.trend_feature
+  );
+}
+
+/** All category ids across every sector present in a user's footprint. */
+async function getFootprintCategoryIds(footprints: { sector: string }[]): Promise<string[]> {
+  const sectors = new Set(footprints.map((fp) => fp.sector));
+  if (sectors.size === 0) return [];
+  const configs = await prisma.sectorConfig.findMany({
+    where: { slug: { in: [...sectors] } },
+    include: { categories: { select: { id: true } } },
+  });
+  return configs.flatMap((s) => s.categories.map((c) => c.id));
+}
+
+export async function getFavoriteProductSpecials(
+  userId: string,
+  limit = 4,
+): Promise<
+  {
+    sectorSlug: string;
+    categorySlug: string;
+    categoryName: string;
+    listings: (ListingDTO & { score: number; trend: PriceTrend | null; reason: string | null })[];
+  }[]
+> {
+  const [footprints, saved] = await Promise.all([
+    prisma.sectorFootprint.findMany({ where: { userId } }),
+    prisma.savedListing.findMany({ where: { userId }, select: { listing: { select: { providerId: true } } } }),
+  ]);
+
+  // 1. Extract provider names from footprints.
+  const providerNames = new Set<string>();
+  const PROVIDER_KEY_PATTERNS = ["provider", "network", "bank", "insurer"];
+  for (const fp of footprints) {
+    const data = (fp.data ?? {}) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(data)) {
+      if (!PROVIDER_KEY_PATTERNS.some((p) => key.toLowerCase().includes(p))) continue;
+      if (typeof value === "string") {
+        for (const token of value.split(/,| and | & /)) {
+          const t = token.trim();
+          if (t) providerNames.add(t);
+        }
+      } else if (Array.isArray(value)) {
+        for (const v of value) {
+          if (typeof v === "string" && v.trim()) providerNames.add(v.trim());
+        }
+      }
+    }
+  }
+  // 2. Explicit > implicit — providers the user has saved listings from.
+  for (const s of saved) providerNames.add(s.listing.providerId);
+
+  // Broaden beyond the user's own providers: pull candidates from every
+  // category of each sector in their onboarding footprint so the section
+  // recommends across ALL categories, not only the ones where the user's
+  // specific provider happens to have listings seeded.
+  const footprintCategoryIds = await getFootprintCategoryIds(footprints);
+
+  if (providerNames.size === 0 && footprintCategoryIds.length === 0) return [];
+
+  // Resolve provider names -> provider records. Match on exact name OR on
+  // providerId (saved listings give us the id directly).
+  const providers = await prisma.provider.findMany({
+    where: {
+      OR: [
+        { name: { in: [...providerNames] } },
+        { id: { in: [...providerNames].filter((n) => /^[0-9a-f-]{36}$/i.test(n)) } },
+      ],
+    },
+    select: { id: true, name: true },
   });
 
-  const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
-  for (const row of rows) {
-    const arr = grouped.get(row.listingId) ?? [];
-    arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
-    grouped.set(row.listingId, arr);
+  const favoriteProviderIds = new Set(providers.map((p) => p.id));
+  const favoriteProviderNames = new Set(providers.map((p) => p.name));
+
+  // Listings from those providers AND from the footprint sectors' categories,
+  // excluding categories the user has already explicitly engaged with — this
+  // section surfaces fresh ground, not a re-rank of what they've compared.
+  const engagedCategoryIds = new Set(
+    (await prisma.comparison.findMany({ where: { userId }, select: { categoryId: true } })).map(
+      (c) => c.categoryId,
+    ),
+  );
+
+  const favoriteListings = await prisma.listing.findMany({
+    where: {
+      status: "published",
+      OR: [
+        ...(favoriteProviderIds.size > 0 ? [{ providerId: { in: [...favoriteProviderIds] } }] : []),
+        ...(footprintCategoryIds.length > 0 ? [{ categoryId: { in: footprintCategoryIds } }] : []),
+      ],
+      ...(engagedCategoryIds.size > 0 ? { categoryId: { notIn: [...engagedCategoryIds] } } : {}),
+    },
+    include: { provider: true, category: { include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
+  });
+  if (favoriteListings.length === 0) return [];
+
+  const trends = await getListingPriceTrends(favoriteListings.map((l) => l.id));
+
+  // Per-category weights from the offline notebook (Section 5 of
+  // `notebooks/recommendation_engine.py`). Null when the notebook hasn't been
+  // run yet — production behavior, no error. Cached on mtime so a fresh
+  // notebook run is picked up on the next request without a server restart.
+  // Below `_accuracy < FITTED_FIT_FLOOR`, the in-sample fit isn't even a
+  // coin-flip better than random — fall through to the heuristic so the UI
+  // doesn't ship a confidently-wrong rank order.
+  const FITTED_FIT_FLOOR = 0.55;
+  const fitted = loadFittedWeights();
+
+  // Group by category so the home page shows one carousel per category, and
+  // rank within each category with the favorite-product score below.
+  const byCategory = new Map<
+    string,
+    { sectorSlug: string; sectorName: string; categorySlug: string; categoryName: string; listings: typeof favoriteListings }
+  >();
+  for (const listing of favoriteListings) {
+    const key = listing.category.id;
+    if (!byCategory.has(key)) {
+      byCategory.set(key, {
+        sectorSlug: listing.category.sector.slug,
+        sectorName: listing.category.sector.name,
+        categorySlug: listing.category.slug,
+        categoryName: listing.category.name,
+        listings: [],
+      });
+    }
+    byCategory.get(key)!.listings.push(listing);
   }
 
-  const result: Record<string, PriceTrend | null> = {};
-  for (const id of listingIds) {
-    result[id] = computePriceTrend(grouped.get(id) ?? []);
+  const results: {
+    sectorSlug: string;
+    categorySlug: string;
+    categoryName: string;
+    listings: (ListingDTO & { score: number; trend: PriceTrend | null; reason: string | null })[];
+  }[] = [];
+
+  for (const group of byCategory.values()) {
+    const dtos = group.listings.map(toListingDTO);
+    const attributeSchema = group.listings[0].category.attributeSchema.map((a) => ({
+      key: a.key,
+      label: a.label,
+      dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
+      unit: a.unit,
+      isComparable: a.isComparable,
+      sortOrder: a.sortOrder,
+    }));
+    const scores = computeDecisionScores(dtos, attributeSchema, trends);
+    const median =
+      dtos.map((d) => d.price).sort((a, b) => a - b)[Math.floor(dtos.length / 2)] ?? Number.POSITIVE_INFINITY;
+
+    // Decide per category whether to use the logistic-regression fit or the
+    // hand-tuned heuristic. The fit must exist AND its in-sample accuracy
+    // must clear the floor; otherwise the heuristic stays in charge.
+    const fittedForCategory = fitted?.weights[group.categorySlug];
+    const useFitted = !!(fittedForCategory && fittedForCategory._accuracy >= FITTED_FIT_FLOOR);
+
+    const ranked = dtos
+      .map((listing) => {
+        const trend = trends[listing.id] ?? null;
+        const trendingDown = trend?.direction === "down" && Math.abs(trend.changePercent) >= 5;
+        const belowMedian = listing.price <= median * 0.9;
+        const isSpecial = trendingDown || belowMedian;
+        const specialBonus = isSpecial ? 20 : 0;
+        const trustBonus = listing.provider.verified ? 5 : 0;
+        // Feature vector — same values the notebook fits against, so the
+        // coefficients drop in without translation.
+        const base = scores[listing.id]?.total ?? 0;
+        const trendPct = trend?.changePercent ?? 0;
+        const features = {
+          value_score: base,
+          special_bonus: specialBonus,
+          freshness_bonus: scores[listing.id]?.freshnessAdjustment ?? 0,
+          trust_bonus: trustBonus,
+          trend_feature: trendPct,
+        };
+        const score = useFitted
+          ? scoreWithFit(fittedForCategory!, features)
+          : base + specialBonus + trustBonus;
+        return {
+          ...listing,
+          score: Math.max(0, Math.min(100, score)),
+          trend,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    // Tag each listing with a `reason` (trending down / below median) so
+    // the UI can render a "why" badge. Done after ranking so the reason
+    // doesn't leak into the score computation.
+    const decorated = ranked.map((listing) => {
+      const trend = listing.trend;
+      const trendingDown = trend?.direction === "down" && Math.abs(trend.changePercent) >= 5;
+      const medianCheck =
+        listing.price <=
+        (dtos.map((d) => d.price).sort((a, b) => a - b)[Math.floor(dtos.length / 2)] ?? Number.POSITIVE_INFINITY) * 0.9;
+      const reason = trendingDown
+        ? `Price dropped ${Math.abs(trend!.changePercent)}% recently`
+        : medianCheck
+          ? "Priced below category median"
+          : null;
+      return { ...listing, reason };
+    });
+
+    // Filter out categories where the user's only favorite in that category
+    // is the same provider across all rows and there's no signal of a deal —
+    // we want *specials*, not just "your provider's regular catalog".
+    const hasSpecial = decorated.some((l) => !!l.reason);
+    if (!hasSpecial && ranked.length > 0) {
+      // Keep at most one non-special row from each provider as a fallback so
+      // the section isn't blank for users with footprint data but no price
+      // drops yet (the seed catalog never has price history).
+      const seen = new Set<string>();
+      const trimmed: typeof decorated = [];
+      for (const l of decorated) {
+        if (seen.has(l.provider.id)) continue;
+        seen.add(l.provider.id);
+        trimmed.push(l);
+        if (trimmed.length >= 2) break;
+      }
+      if (trimmed.length > 0) results.push({ ...group, listings: trimmed });
+    } else {
+      results.push({ ...group, listings: decorated });
+    }
   }
-  return result;
+
+  // Sort the categories themselves by the top listing's score, so the
+  // highest-value favorite-category carousel sits at the very top of the
+  // home page section.
+  results.sort((a, b) => (b.listings[0]?.score ?? 0) - (a.listings[0]?.score ?? 0));
+  // Silence the unused-variable warning for favoriteProviderNames — kept
+  // for future debug logging / "you use these providers" footer.
+  void favoriteProviderNames;
+
+  return results.slice(0, 3);
 }
+
+/**
+ * Fetches ListingPriceHistory rows for the given listings and reduces each
+ * to a PriceTrend (or null if there's no history yet). Keyed by listing id
+ * so callers can look up a listing's trend alongside its other data.
+ */
+export const getListingPriceTrends = cache(
+  ttlCache(async (listingIds: string[]): Promise<Record<string, PriceTrend | null>> => {
+    if (listingIds.length === 0) return {};
+
+    const rows = await prisma.listingPriceHistory.findMany({
+      where: { listingId: { in: listingIds } },
+      orderBy: { recordedAt: "asc" },
+    });
+
+    const grouped = new Map<string, { price: number; recordedAt: Date }[]>();
+    for (const row of rows) {
+      const arr = grouped.get(row.listingId) ?? [];
+      arr.push({ price: Number(row.price), recordedAt: row.recordedAt });
+      grouped.set(row.listingId, arr);
+    }
+
+    const result: Record<string, PriceTrend | null> = {};
+    for (const id of listingIds) {
+      result[id] = computePriceTrend(grouped.get(id) ?? []);
+    }
+    return result;
+  }, CATALOG_TTL_MS),
+);
 
 /**
  * Snapshots a listing's price into ListingPriceHistory before it changes.
@@ -294,8 +677,17 @@ async function readListingsByIds(ids: string[]): Promise<ListingDTO[]> {
   });
   return listings.map(toListingDTO);
 }
+export const getListingsByIds = cache(
+  ttlCache(async (ids: string[]): Promise<ListingDTO[]> => {
+    const listings = await prisma.listing.findMany({
+      where: { id: { in: ids }, status: "published" },
+      include: { provider: true },
+    });
+    return listings.map(toListingDTO);
+  }, CATALOG_TTL_MS),
+);
 
-export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string };
+export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string; pinned: boolean };
 
 /**
  * The most recent distinct listings a user engaged with, sourced from
@@ -305,32 +697,158 @@ export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string };
  * actually seen, so this under-counts rather than over-claims. Listings that
  * are no longer published (unpublished/rejected/deleted since) are silently
  * excluded via getListingsByIds' own status filter.
+ *
+ * Pinned listings float to the top regardless of recency (a pin says "I'm
+ * still deciding on this one"), so a pin survives even once the listing falls
+ * out of the recent-6 window. Unpinned items keep their recency order below.
  */
 export async function getRecentlyViewed(userId: string, limit = 6): Promise<RecentlyViewedListing[]> {
-  const events = await prisma.userEvent.findMany({
-    where: { userId, eventType: "action_taken" },
-    orderBy: { createdAt: "desc" },
-    take: limit * 3, // over-fetch to allow for de-duplication by listing
-    select: { metadata: true, createdAt: true },
-  });
+  const [pinned, events] = await Promise.all([
+    prisma.pinnedListing.findMany({
+      where: { userId },
+      orderBy: { pinnedAt: "desc" },
+      select: { listingId: true, pinnedAt: true },
+    }),
+    prisma.userEvent.findMany({
+      where: { userId, eventType: "action_taken" },
+      orderBy: { createdAt: "desc" },
+      take: limit * 3, // over-fetch to allow for de-duplication by listing
+      select: { metadata: true, createdAt: true },
+    }),
+  ]);
 
-  const viewedAtByListing = new Map<string, Date>();
+  const pinnedIds = new Set(pinned.map((p) => p.listingId));
+
+  const viewedAtById = new Map<string, Date>();
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtById.has(listingId)) continue;
+    viewedAtById.set(listingId, event.createdAt);
+  }
+
+  // Pinned first, in pin order; then recency order, skipping anything pinned
+  // so it doesn't appear twice.
+  const unpinnedLimit = Math.max(limit - pinned.length, 0);
+  const pickedIds = new Set<string>();
   const orderedIds: string[] = [];
   for (const event of events) {
     const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
-    if (!listingId || viewedAtByListing.has(listingId)) continue;
-    viewedAtByListing.set(listingId, event.createdAt);
+    if (!listingId || pinnedIds.has(listingId) || pickedIds.has(listingId)) continue;
+    pickedIds.add(listingId);
     orderedIds.push(listingId);
-    if (orderedIds.length >= limit) break;
+    if (orderedIds.length >= unpinnedLimit) break;
   }
-  if (orderedIds.length === 0) return [];
+  const allIds = [...pinned.map((p) => p.listingId), ...orderedIds];
+  if (allIds.length === 0) return [];
 
-  const listings = await getListingsByIds(orderedIds);
+  const pinnedAtById = new Map(pinned.map((p) => [p.listingId, p.pinnedAt]));
+
+  const listings = await getListingsByIds(allIds);
   const byId = new Map(listings.map((l) => [l.id, l]));
-  return orderedIds
+  return allIds
     .map((id) => byId.get(id))
     .filter((l): l is ListingDTO => !!l)
-    .map((listing) => ({ listing, viewedAt: viewedAtByListing.get(listing.id)!.toISOString() }));
+    .map((listing) => ({
+      listing,
+      viewedAt: (viewedAtById.get(listing.id) ?? pinnedAtById.get(listing.id) ?? new Date()).toISOString(),
+      pinned: pinnedIds.has(listing.id),
+    }));
+}
+
+/**
+ * Pin or unpin a listing for a user. Pins are independent of recency — a
+ * pinned listing floats to the top of the recents row and the history page
+ * until explicitly unpinned. Re-pinning an already-pinned listing is a no-op
+ * (the upsert's update is empty); unpinning a never-pinned listing is also a
+ * no-op.
+ */
+export async function setListingPinned(userId: string, listingId: string, pinned: boolean): Promise<void> {
+  if (pinned) {
+    await prisma.pinnedListing.upsert({
+      where: { userId_listingId: { userId, listingId } },
+      create: { userId, listingId },
+      update: {},
+    });
+  } else {
+    await prisma.pinnedListing.deleteMany({ where: { userId, listingId } });
+  }
+}
+
+export type RecentlyViewedDetailedListing = {
+  listing: ListingDTO;
+  category: { id: string; slug: string; name: string; sector: { slug: string; name: string } };
+  viewedAt: string;
+  pinned: boolean;
+};
+
+/**
+ * History-page variant of getRecentlyViewed that also resolves each listing's
+ * category and sector, so the history can be shown "no matter the category".
+ * Pinned listings are pulled to the top (the history keeps its recency order
+ * below them), so what a user pinned stays easy to find even after it scrolls
+ * off the dashboard row.
+ */
+export async function getRecentlyViewedDetailed(
+  userId: string,
+  limit = 100,
+): Promise<RecentlyViewedDetailedListing[]> {
+  const [pinned, events] = await Promise.all([
+    prisma.pinnedListing.findMany({
+      where: { userId },
+      orderBy: { pinnedAt: "desc" },
+      select: { listingId: true, pinnedAt: true },
+    }),
+    prisma.userEvent.findMany({
+      where: { userId, eventType: "action_taken" },
+      orderBy: { createdAt: "desc" },
+      take: limit * 3, // over-fetch to allow for de-duplication by listing
+      select: { metadata: true, createdAt: true },
+    }),
+  ]);
+
+  const pinnedIds = new Set(pinned.map((p) => p.listingId));
+
+  const viewedAtById = new Map<string, Date>();
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || viewedAtById.has(listingId)) continue;
+    viewedAtById.set(listingId, event.createdAt);
+  }
+
+  const unpinnedLimit = Math.max(limit - pinned.length, 0);
+  const pickedIds = new Set<string>();
+  const orderedIds: string[] = [];
+  for (const event of events) {
+    const listingId = (event.metadata as { listingId?: string } | null)?.listingId;
+    if (!listingId || pinnedIds.has(listingId) || pickedIds.has(listingId)) continue;
+    pickedIds.add(listingId);
+    orderedIds.push(listingId);
+    if (orderedIds.length >= unpinnedLimit) break;
+  }
+  const allIds = [...pinned.map((p) => p.listingId), ...orderedIds];
+  if (allIds.length === 0) return [];
+
+  const pinnedAtById = new Map(pinned.map((p) => [p.listingId, p.pinnedAt]));
+
+  const listings = await prisma.listing.findMany({
+    where: { id: { in: allIds }, status: "published" },
+    include: { provider: true, category: { include: { sector: true } } },
+  });
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return allIds
+    .map((id) => byId.get(id))
+    .flatMap((l) => (l ? [l] : []))
+    .map((l) => ({
+      listing: toListingDTO(l),
+      category: {
+        id: l.category.id,
+        slug: l.category.slug,
+        name: l.category.name,
+        sector: { slug: l.category.sector.slug, name: l.category.sector.name },
+      },
+      viewedAt: (viewedAtById.get(l.id) ?? pinnedAtById.get(l.id) ?? new Date()).toISOString(),
+      pinned: pinnedIds.has(l.id),
+    }));
 }
 
 /**
@@ -407,35 +925,34 @@ export type TrendingListing = { listing: ListingDTO; comparisonCount: number };
  * tally-over-Comparison-rows approach as getAlsoCompared, but time-windowed
  * and ranked across a sector rather than scoped to one listing's neighbors.
  */
-export async function getTrendingListings(
-  sectorSlug?: string,
-  limit = 6,
-  windowDays = 7,
-): Promise<TrendingListing[]> {
-  const since = new Date(Date.now() - windowDays * 86_400_000);
-  const comparisons = await prisma.comparison.findMany({
-    where: {
-      createdAt: { gte: since },
-      ...(sectorSlug ? { category: { sector: { slug: sectorSlug } } } : {}),
-    },
-    select: { listingIds: true },
-  });
+export const getTrendingListings = ttlCache<[string?, number?, number?], TrendingListing[]>(
+  async (sectorSlug?, limit = 6, windowDays = 7): Promise<TrendingListing[]> => {
+    const since = new Date(Date.now() - windowDays * 86_400_000);
+    const comparisons = await prisma.comparison.findMany({
+      where: {
+        createdAt: { gte: since },
+        ...(sectorSlug ? { category: { sector: { slug: sectorSlug } } } : {}),
+      },
+      select: { listingIds: true },
+    });
 
-  const counts = new Map<string, number>();
-  for (const comparison of comparisons) {
-    for (const id of comparison.listingIds) counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
+    const counts = new Map<string, number>();
+    for (const comparison of comparisons) {
+      for (const id of comparison.listingIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
 
-  const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
-  if (rankedIds.length === 0) return [];
+    const rankedIds = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+    if (rankedIds.length === 0) return [];
 
-  const listings = await getListingsByIds(rankedIds);
-  const byId = new Map(listings.map((l) => [l.id, l]));
-  return rankedIds
-    .map((id) => byId.get(id))
-    .filter((l): l is ListingDTO => !!l)
-    .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
-}
+    const listings = await getListingsByIds(rankedIds);
+    const byId = new Map(listings.map((l) => [l.id, l]));
+    return rankedIds
+      .map((id) => byId.get(id))
+      .filter((l): l is ListingDTO => !!l)
+      .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
+  },
+  CATALOG_TTL_MS,
+);
 
 export type ProviderListingStats = { comparisonAppearances: number; savedCount: number };
 
@@ -634,3 +1151,22 @@ export const getMarketOverview = unstable_cache(readMarketOverview, ["market-ove
   revalidate: CATALOG_TTL_SECONDS,
 });
 
+
+// Social intelligence feed
+export async function getSocialMentionsForProvider(providerName: string, limit = 20) {
+  return prisma.socialPriceMention.findMany({
+    where: { matchedProvider: providerName },
+    orderBy: { discoveredAt: "desc" },
+    take: limit,
+  });
+}
+
+// Admin-only write path - enforced via requireAdmin() checking ADMIN_EMAILS allowlist
+export const AdminWrite = {
+  async publishListing(id: string) {
+    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.published } });
+  },
+  async rejectListing(id: string) {
+    return prisma.listing.update({ where: { id }, data: { status: ListingStatus.rejected } });
+  },
+};

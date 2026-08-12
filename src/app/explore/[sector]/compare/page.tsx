@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { getListingsByIds, getListingPriceTrends } from "@/lib/catalog";
+import { getListingsByIds, getListingPriceTrends, getCategorySchema } from "@/lib/catalog";
 import { requireUser } from "@/lib/auth";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
@@ -12,30 +12,39 @@ export default async function ComparePage({
   searchParams,
 }: {
   params: Promise<{ sector: string }>;
-  searchParams: Promise<{ category?: string; ids?: string }>;
+  searchParams: Promise<{ category?: string; ids?: string; budget?: string; constraint?: string }>;
 }) {
   const { sector } = await params;
-  const { category: categoryId, ids } = await searchParams;
+  const { category: categoryId, ids, budget, constraint } = await searchParams;
 
   if (!categoryId || !ids) notFound();
+
+  const budgetFlexibility = budget === "low" || budget === "medium" || budget === "high" ? budget : null;
+  const constraints = constraint
+    ? constraint
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean)
+        .slice(0, 3)
+    : [];
 
   const listingIds = ids.split(",").filter(Boolean);
   if (listingIds.length < 2) notFound();
 
-  const category = await prisma.category.findUnique({
-    where: { id: categoryId },
-    include: { attributeSchema: { orderBy: { sortOrder: "asc" } } },
-  });
+  // Fire the four independent reads (category, listings, price trends, and
+  // the Supabase auth round-trip) concurrently — the auth call in particular
+  // is pure network latency that used to serialize after the DB work.
+  const [category, listings, trends, user] = await Promise.all([
+    getCategorySchema(categoryId),
+    getListingsByIds(listingIds),
+    getListingPriceTrends(listingIds),
+    requireUser(),
+  ]);
   if (!category) notFound();
-
-  const listings = await getListingsByIds(listingIds);
   if (listings.length < 2) notFound();
-
-  const trends = await getListingPriceTrends(listingIds);
 
   // Browsing/comparing without an account is supported, so this can't
   // require auth — just show nothing pre-saved for anonymous visitors.
-  const user = await requireUser();
   const initialSavedIds = user
     ? (
         await prisma.savedListing.findMany({
@@ -59,6 +68,10 @@ export default async function ComparePage({
       <Header />
       <h1 className="mt-4 font-display text-[22px] font-bold">Compare {category.name}</h1>
       <CompareClientLazy
+      {/* The "Compare <category>" header row (title + share-as-PDF button)
+          lives inside CompareClient so the share button can reach the AI /
+          traditional comparison results that are generated client-side. */}
+      <CompareClient
         sectorSlug={sector}
         categoryId={categoryId}
         categoryName={category.name}
@@ -66,6 +79,8 @@ export default async function ComparePage({
         attributeSchema={attributeSchema}
         trends={trends}
         initialSavedIds={initialSavedIds}
+        budgetFlexibility={budgetFlexibility}
+        constraints={constraints}
       />
       <BottomTabBar />
     </div>

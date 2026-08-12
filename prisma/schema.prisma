@@ -42,6 +42,7 @@ model User {
   consents        Consent[]
   comparisons     Comparison[]
   savedListings   SavedListing[]
+  pinnedListings  PinnedListing[]
   recommendations Recommendation[]
   events          UserEvent[]
   xp              UserXp?
@@ -79,6 +80,8 @@ enum Sector {
   pharmacy
   electronics
   fashion
+  hotels
+  retail
 }
 
 model SectorFootprint {
@@ -224,6 +227,7 @@ model Listing {
 
   priceHistory    ListingPriceHistory[]
   savedBy         SavedListing[]
+  pinnedBy        PinnedListing[]
   recommendations Recommendation[]
   notifications   Notification[]
 
@@ -290,6 +294,21 @@ model SavedListing {
   // in-memory sort.
   @@index([userId, savedAt(sort: Desc)])
   @@map("saved_listings")
+}
+
+model PinnedListing {
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String   @map("listing_id")
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  pinnedAt  DateTime @default(now()) @map("pinned_at")
+
+  @@id([userId, listingId])
+  // Mirrors saved_listings: the PK covers a plain userId filter, and a
+  // (userId, pinnedAt) index keeps the "pins first" recents ordering an
+  // index scan instead of an in-memory sort.
+  @@index([userId, pinnedAt(sort: Desc)])
+  @@map("pinned_listings")
 }
 
 model Recommendation {

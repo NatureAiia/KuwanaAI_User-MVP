@@ -12,6 +12,32 @@ const bodySchema = z.object({
   eventType: z.enum(CLIENT_REPORTABLE_EVENTS),
   sector: sectorEnum.optional(),
   metadata: boundedJsonRecord(20, 2_000).optional(),
+  eventType: z.enum([
+    "profile_completed",
+    "comparison_viewed",
+    "comparison_completed",
+    "recommendation_viewed",
+    "item_saved",
+    "action_taken",
+    "daily_visit",
+  ]),
+  sector: z
+    .enum([
+      "telecom",
+      "banking",
+      "insurance",
+      "education",
+      "healthcare",
+      "transport",
+      "utilities",
+      "pharmacy",
+      "electronics",
+      "fashion",
+      "hotels",
+      "retail",
+    ])
+    .optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function POST(req: Request) {

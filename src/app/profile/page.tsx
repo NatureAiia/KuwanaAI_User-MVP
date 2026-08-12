@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Award, Bookmark, ChevronRight, Settings, Trophy } from "lucide-react";
+import { Flame, Award, ShoppingBag, ChevronRight, Settings, Trophy } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { SignalBloom } from "@/components/SignalBloom";
@@ -80,9 +80,9 @@ export default async function ProfilePage() {
           className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
         >
           <div className="flex items-center gap-3">
-            <Bookmark size={18} className="text-accent-teal" />
+            <ShoppingBag size={18} className="text-accent-teal" />
             <div>
-              <p className="text-[14px] font-medium">Saved & comparison history</p>
+              <p className="text-[14px] font-medium">Shopping list</p>
               <p className="text-[12px] text-text-muted">{savedCount} saved</p>
             </div>
           </div>

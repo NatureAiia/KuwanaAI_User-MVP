@@ -1,0 +1,145 @@
+// prisma/schema.3tier.prisma
+// Full 3-Tier extension on top of original schema.prisma
+// Tier 1: public (OLTP) - original 26 models
+// Tier 2: analytics (OLAP) - aggregates, TimescaleDB
+// Tier 3: serving - pgvector extension, Redis/Meilisearch external
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["public", "analytics"]
+}
+
+// Enable extensions at top level via migration
+// CREATE EXTENSION IF NOT EXISTS vector;
+// CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+// ================= TIER 1: OLTP CORE (public) =================
+// [PASTE FULL public schema from prisma/schema.prisma here]
+// For brevity in this file, we extend Listing with vector:
+
+model Listing {
+  id               String              @id @default(uuid()) @db.Uuid
+  categoryId       String              @map("category_id") @db.Uuid
+  category         Category            @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  sectorId         String?             @map("sector_id") @db.Uuid
+  sector           SectorConfig?       @relation(fields: [sectorId], references: [id], onDelete: SetNull)
+  providerId       String?             @map("provider_id") @db.Uuid
+  provider         Provider?           @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  title            String
+  slug             String?
+  description      String?             @db.Text
+  attributes       Json                @default("{}")
+  status           ListingStatus       @default(DRAFT)
+  freshnessStatus  FreshnessStatus     @default(FRESH) @map("freshness_status")
+  effectiveFrom    DateTime?           @map("effective_from")
+  effectiveTo      DateTime?           @map("effective_to")
+  // Tier 3 addition
+  embedding        Unsupported("vector(1536)")? // pgvector
+  searchBlob       String?             @map("search_blob") @db.Text // flattened for Meilisearch sync
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  priceHistory     ListingPriceHistory[]
+  savedBy          SavedListing[]
+  recommendations  Recommendation[]
+  notifications    Notification[]
+
+  @@index([categoryId])
+  @@index([providerId])
+  @@index([status])
+  @@index([sectorId])
+  @@schema("public")
+  @@map("listings")
+}
+
+// ... [All other Tier 1 models from original schema remain in public schema] ...
+// For full file, copy original schema.prisma content and add @@schema("public") to each model
+
+// ================= TIER 2: ANALYTICS (analytics schema) =================
+
+model ListingPriceDaily {
+  id        String   @id @default(uuid()) @db.Uuid
+  listingId String   @map("listing_id") @db.Uuid
+  date      DateTime @db.Date
+  avgPrice  Decimal  @db.Decimal(12,2) @map("avg_price")
+  minPrice  Decimal  @db.Decimal(12,2) @map("min_price")
+  maxPrice  Decimal  @db.Decimal(12,2) @map("max_price")
+  currency  String
+  count     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([listingId, date])
+  @@index([date])
+  @@schema("analytics")
+  @@map("listing_price_daily")
+}
+
+model SectorPriceIndex {
+  id         String   @id @default(uuid()) @db.Uuid
+  sector     Sector
+  date       DateTime @db.Date
+  indexValue Decimal  @db.Decimal(12,4) @map("index_value")
+  fxAdjusted Boolean  @default(false) @map("fx_adjusted")
+  baselineDate DateTime? @map("baseline_date") @db.Date
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([sector, date])
+  @@schema("analytics")
+  @@map("sector_price_index")
+}
+
+model UserEventDaily {
+  userId    String    @map("user_id") @db.Uuid
+  date      DateTime  @db.Date
+  eventType EventType @map("event_type")
+  count     Int
+  xpEarned  Int       @map("xp_earned")
+  
+  @@id([userId, date, eventType])
+  @@schema("analytics")
+  @@map("user_event_daily")
+}
+
+model LeaderboardSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  period    String   // daily, weekly, monthly
+  date      DateTime @db.Date
+  ranking   Json     // [{ userId, xp, level, rank }]
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([period, date])
+  @@schema("analytics")
+  @@map("leaderboard_snapshots")
+}
+
+model MessageEmbedding {
+  id          String   @id @default(uuid()) @db.Uuid
+  messageId   String   @unique @map("message_id") @db.Uuid
+  // message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade) // cross-schema relation not supported, enforce via app
+  embedding   Unsupported("vector(1536)")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@schema("analytics")
+  @@map("message_embeddings")
+}
+
+// Enums duplicated from Tier1 for analytics schema isolation
+enum Sector { TELECOMS ENERGY INSURANCE BANKING HEALTHCARE RETAIL_GROCERY FUEL EDUCATION HOUSING TRANSPORT }
+enum EventType { FOOTPRINT_CREATED COMPARISON_CREATED LISTING_SAVED CONVERSATION_STARTED RECOMMENDATION_VIEWED PROFILE_COMPLETED DAILY_LOGIN REFERRAL_COMPLETED }
+enum ListingStatus { DRAFT PENDING_REVIEW PUBLISHED REJECTED ARCHIVED }
+enum FreshnessStatus { FRESH STALE EXPIRED }
+
+// Minimal placeholders to make this file valid - in real project copy full public models with @@schema("public")
+model Category { id String @id @default(uuid()) @db.Uuid listings Listing[] @@schema("public") @@map("categories") }
+model SectorConfig { id String @id @default(uuid()) @db.Uuid listings Listing[] @@schema("public") @@map("sector_configs") }
+model Provider { id String @id @default(uuid()) @db.Uuid listings Listing[] @@schema("public") @@map("providers") }
+model ListingPriceHistory { id String @id @default(uuid()) @db.Uuid listingId String @map("listing_id") @db.Uuid listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade) @@schema("public") @@map("listing_price_history") }
+model SavedListing { userId String @map("user_id") @db.Uuid listingId String @map("listing_id") @db.Uuid listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade) @@id([userId, listingId]) @@schema("public") @@map("saved_listings") }
+model Recommendation { id String @id @default(uuid()) @db.Uuid listingId String? @map("listing_id") @db.Uuid listing Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull) @@schema("public") @@map("recommendations") }
+model Notification { id String @id @default(uuid()) @db.Uuid listingId String? @map("listing_id") @db.Uuid listing Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull) @@schema("public") @@map("notifications") }

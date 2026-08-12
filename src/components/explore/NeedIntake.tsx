@@ -30,10 +30,14 @@ export function NeedIntake({ enableImageSearch = false }: { enableImageSearch?: 
       const data = res.ok ? await res.json() : null;
 
       if (data?.sectorSlug) {
-        const url = data.categorySlug
-          ? `/explore/${data.sectorSlug}?category=${data.categorySlug}`
-          : `/explore/${data.sectorSlug}`;
-        router.push(url);
+        // Carry budget flexibility + constraints through to the compare page
+        // (via the explore URL) so the AI recommendation is tailored to them.
+        const params = new URLSearchParams();
+        if (data.categorySlug) params.set("category", data.categorySlug);
+        if (data.budgetFlexibility) params.set("budget", data.budgetFlexibility);
+        if (data.constraints?.length) params.set("constraint", data.constraints.slice(0, 3).join(","));
+        const qs = params.toString();
+        router.push(qs ? `/explore/${data.sectorSlug}?${qs}` : `/explore/${data.sectorSlug}`);
       } else {
         setNotSure(true);
       }
