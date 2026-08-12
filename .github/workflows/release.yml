@@ -43,15 +43,15 @@ jobs:
       web-digest: ${{ steps.build-web.outputs.digest }}
       migrate-digest: ${{ steps.build-migrate.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: sigstore/cosign-installer@v3.7.0
+      - uses: sigstore/cosign-installer@v4.1.2
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -59,7 +59,7 @@ jobs:
 
       - name: Derive tags
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_WEB }}
           tags: |
@@ -70,7 +70,7 @@ jobs:
 
       - name: Derive migrator tags
         id: meta-migrate
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.IMAGE_MIGRATE }}
           tags: |
@@ -86,7 +86,7 @@ jobs:
       # and is only ever injected at runtime by the cluster.
       - name: Build and push web image
         id: build-web
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runner
@@ -105,7 +105,7 @@ jobs:
 
       - name: Build and push migrator image
         id: build-migrate
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: migrator
@@ -129,7 +129,7 @@ jobs:
           MIGRATE_DIGEST: ${{ steps.build-migrate.outputs.digest }}
 
       - name: Scan the published image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.IMAGE_WEB }}@${{ steps.build-web.outputs.digest }}
           format: table
@@ -163,9 +163,9 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.4
 
