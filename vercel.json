@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/freshness", "schedule": "0 3 * * *" },
     { "path": "/api/cron/quest-rotation", "schedule": "5 3 * * *" },
-    { "path": "/api/cron/fx-refresh", "schedule": "10 3 * * *" }
+    { "path": "/api/cron/fx-refresh", "schedule": "10 3 * * *" },
+    { "path": "/api/cron/scrape", "schedule": "20 3 * * *" }
   ]
 }

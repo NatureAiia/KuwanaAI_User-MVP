@@ -64,3 +64,13 @@ export const NewProviderFormLazy = dynamic(
   () => import("@/components/admin/NewProviderForm").then((m) => m.NewProviderForm),
   { loading: () => <Skeleton height={220} /> },
 );
+
+export const ScrapeSourceFormLazy = dynamic(
+  () => import("@/components/admin/ScrapeSourceForm").then((m) => m.ScrapeSourceForm),
+  { loading: () => <Skeleton height={260} /> },
+);
+
+export const ScrapeSearchBoxLazy = dynamic(
+  () => import("@/components/admin/ScrapeSearchBox").then((m) => m.ScrapeSearchBox),
+  { loading: () => <Skeleton height={220} /> },
+);

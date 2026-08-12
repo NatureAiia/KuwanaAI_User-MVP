@@ -10,7 +10,10 @@ type AdminAuditAction =
   | "llm_model_changed"
   | "advert_created"
   | "advert_updated"
-  | "advert_deleted";
+  | "advert_deleted"
+  | "scrape_item_approved"
+  | "scrape_item_rejected"
+  | "scrape_source_created";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -21,7 +24,7 @@ type AdminAuditAction =
 export async function logAdminAction(params: {
   adminEmail: string;
   action: AdminAuditAction;
-  targetType: "listing" | "provider" | "user" | "setting" | "advert";
+  targetType: "listing" | "provider" | "user" | "setting" | "advert" | "scrape_source" | "scraped_item";
   targetId: string;
   detail: string;
 }): Promise<void> {

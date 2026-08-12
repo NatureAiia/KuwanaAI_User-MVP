@@ -138,6 +138,8 @@ model Category {
   attributeSchema AttributeSchemaField[]
   listings        Listing[]
   comparisons     Comparison[]
+  scrapeSources   ScrapeSource[]
+  scrapedItems    ScrapedItem[]
 
   @@unique([sectorId, slug])
   @@map("categories")
@@ -178,7 +180,8 @@ model Provider {
   ownerUserId String? @unique @map("owner_user_id")
   owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
 
-  listings Listing[]
+  listings     Listing[]
+  scrapedItems ScrapedItem[]
 
   @@map("providers")
 }
@@ -228,6 +231,7 @@ model Listing {
   pinnedBy        PinnedListing[]
   recommendations Recommendation[]
   notifications   Notification[]
+  scrapedItems    ScrapedItem[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -523,6 +527,73 @@ model SocialPriceMention {
   @@map("social_price_mentions")
 }
 
+enum ScrapeTrigger {
+  cron
+  admin_manual
+}
+
+/// A provider page an admin wants crawled periodically for pricing (see
+/// scripts/scrape, /admin/scraper). Distinct from SocialPriceMention's free
+/// social scan — this targets known provider/regulator URLs on a schedule.
+model ScrapeSource {
+  id         String    @id @default(uuid())
+  name       String
+  url        String
+  categoryId String?   @map("category_id")
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  enabled    Boolean   @default(true)
+  lastRunAt  DateTime? @map("last_run_at")
+  lastError  String?   @map("last_error")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  items ScrapedItem[]
+
+  @@index([enabled])
+  @@map("scrape_sources")
+}
+
+enum ScrapeItemStatus {
+  pending
+  approved
+  rejected
+}
+
+/// A candidate listing extracted from a scraped/searched page, awaiting
+/// admin review — never written to Listing directly. See
+/// /admin/scraper and src/app/api/admin/scraped-items.
+model ScrapedItem {
+  id                  String           @id @default(uuid())
+  sourceId            String?          @map("source_id")
+  source              ScrapeSource?    @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  // Carried alongside sourceId (from ScrapeSource.categoryId) or set directly
+  // on an admin-search hit — the only categorization ScrapedItem has, needed
+  // to create a Listing on approval when there's no suggestedListingId.
+  categoryId          String?          @map("category_id")
+  category            Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  sourceUrl           String           @map("source_url")
+  triggeredBy         ScrapeTrigger    @map("triggered_by")
+  // Firecrawl markdown snapshot of the page at fetch time — kept so an admin
+  // can see exactly what the extraction was based on, not just its output.
+  rawContent          String           @map("raw_content")
+  // Candidate listing fields: {name, price, currency, description, attributes, providerNameGuess, categorySlug}
+  extractedData       Json             @map("extracted_data")
+  confidence          Float
+  suggestedProviderId String?          @map("suggested_provider_id")
+  suggestedProvider   Provider?        @relation(fields: [suggestedProviderId], references: [id], onDelete: SetNull)
+  suggestedListingId  String?          @map("suggested_listing_id")
+  suggestedListing    Listing?         @relation(fields: [suggestedListingId], references: [id], onDelete: SetNull)
+  status              ScrapeItemStatus @default(pending)
+  reviewedByEmail     String?          @map("reviewed_by_email")
+  reviewedAt          DateTime?        @map("reviewed_at")
+  rejectionReason     String?          @map("rejection_reason")
+  discoveredAt        DateTime         @default(now()) @map("discovered_at")
+
+  // The admin review queue's status filter, newest first.
+  @@index([status, discoveredAt(sort: Desc)])
+  @@index([sourceId])
+  @@map("scraped_items")
+}
+
 /// Live FX reference rates (units per 1 USD), refreshed by
 /// scripts/fx-refresh — overrides the static, hand-maintained defaults in
 /// lib/currency.ts wherever a live rate exists. `code` matches
@@ -545,6 +616,9 @@ enum AdminAuditAction {
   provider_unlinked
   user_role_changed
   llm_model_changed
+  scrape_item_approved
+  scrape_item_rejected
+  scrape_source_created
   advert_created
   advert_updated
   advert_deleted

@@ -41,6 +41,10 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // of it, and a wrong answer degrades to "no confident match" rather than
   // showing a user something false.
   intake: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  // Every extraction lands in an admin review queue before it touches a
+  // listing, so a wrong answer costs a reviewer a click rather than showing a
+  // user something false — the cheap rung is the right default here too.
+  scrape_extract: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */
@@ -58,7 +62,8 @@ export type ComplexitySignals =
       turnCount: number;
       messageLength: number;
       groundedListings: number;
-    };
+    }
+  | { feature: "scrape_extract"; contentLength: number; attributeCount: number };
 
 /** Clamps to 0..1 so every scorer below can add freely without overshooting. */
 function clamp01(value: number): number {
@@ -106,6 +111,15 @@ export function scoreComplexity(signals: ComplexitySignals): number {
       // Grounding data must be reasoned over rather than recited.
       const grounding = clamp01(signals.groundedListings / 4) * 0.2;
       return clamp01(image + depth + length + grounding);
+    }
+
+    case "scrape_extract": {
+      // A long page (a full tariff table) takes more reasoning to pick the
+      // right numbers out of than a short one, and more target fields means
+      // more chances to drop or mis-map one.
+      const length = clamp01((signals.contentLength - 2000) / 8000);
+      const breadth = clamp01((signals.attributeCount - 3) / 12);
+      return clamp01(length * 0.6 + breadth * 0.4);
     }
   }
 }
