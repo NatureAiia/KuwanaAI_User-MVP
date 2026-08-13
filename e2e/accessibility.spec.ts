@@ -21,7 +21,13 @@ for (const theme of ["light", "dark"] as const) {
       if (theme === "dark") {
         await page.addInitScript(() => localStorage.setItem("kuwana-theme", "dark"));
       }
-      await page.goto(path, { waitUntil: "networkidle" });
+      // "networkidle" is flaky here in dev: Turbopack's HMR client and
+      // CurrencyProvider's fx-rates fetch (React StrictMode double-invokes
+      // its effect) mean the network is rarely idle for a full 500ms window,
+      // so goto() intermittently hangs to its 30s timeout. "load" plus a
+      // short explicit wait for the page to settle is what Playwright's own
+      // docs recommend instead of networkidle.
+      await page.goto(path, { waitUntil: "load" });
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
 
       const violations = results.violations.map((v) => ({

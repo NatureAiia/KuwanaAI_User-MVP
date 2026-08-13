@@ -331,6 +331,7 @@ function Text3DFlipBase(props: Text3DFlipProps) {
         tag,
         {
           ref: scope,
+          role: "text",
           "aria-label": content,
           style: {
             ...font,

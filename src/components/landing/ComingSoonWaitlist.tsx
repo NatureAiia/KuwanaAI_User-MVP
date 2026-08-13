@@ -14,6 +14,7 @@ export function ComingSoonWaitlist() {
       <select
         value={sector}
         onChange={(e) => setSector(e.target.value as SectorSlug)}
+        aria-label="Sector you'd like early access to"
         className="tap-target rounded-xl border border-border bg-bg-surface px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
       >
         {COMING_SOON.map((s) => (
