@@ -50,6 +50,7 @@ model User {
   notifications   Notification[]
   conversations   Conversation[]
   ownedProvider   Provider?
+  corporateRequests CorporateRequest[]
 
   @@map("users")
 }
@@ -135,11 +136,12 @@ model Category {
   name     String
   slug     String
 
-  attributeSchema AttributeSchemaField[]
-  listings        Listing[]
-  comparisons     Comparison[]
-  scrapeSources   ScrapeSource[]
-  scrapedItems    ScrapedItem[]
+  attributeSchema   AttributeSchemaField[]
+  listings          Listing[]
+  comparisons       Comparison[]
+  scrapeSources     ScrapeSource[]
+  scrapedItems      ScrapedItem[]
+  corporateRequests CorporateRequest[]
 
   @@unique([sectorId, slug])
   @@map("categories")
@@ -179,9 +181,17 @@ model Provider {
   // account shouldn't delete the provider or its listings.
   ownerUserId String? @unique @map("owner_user_id")
   owner       User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  // Set by an admin to link every "corporate" role user whose email matches
+  // this domain (e.g. "cbz.co.zw") to this Provider — many logins to one
+  // company, unlike ownerUserId above which is strictly one-to-one for the
+  // informal "provider" role. Resolved at request time in corporateAuth.ts,
+  // the same domain-match pattern orgVerification.ts already uses for
+  // REGULATORS, rather than a separate per-user join table.
+  corporateDomain String? @unique @map("corporate_domain")
 
-  listings     Listing[]
-  scrapedItems ScrapedItem[]
+  listings          Listing[]
+  scrapedItems      ScrapedItem[]
+  corporateRequests CorporateRequest[]
 
   @@map("providers")
 }
@@ -226,12 +236,13 @@ model Listing {
   status          ListingStatus   @default(published)
   rejectionReason String?         @map("rejection_reason")
 
-  priceHistory    ListingPriceHistory[]
-  savedBy         SavedListing[]
-  pinnedBy        PinnedListing[]
-  recommendations Recommendation[]
-  notifications   Notification[]
-  scrapedItems    ScrapedItem[]
+  priceHistory      ListingPriceHistory[]
+  savedBy           SavedListing[]
+  pinnedBy          PinnedListing[]
+  recommendations   Recommendation[]
+  notifications     Notification[]
+  scrapedItems      ScrapedItem[]
+  corporateRequests CorporateRequest[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -256,6 +267,53 @@ model ListingPriceHistory {
   // ordered by time — this is the exact access pattern.
   @@index([listingId, recordedAt])
   @@map("listing_price_history")
+}
+
+enum CorporateRequestType {
+  edit
+  new_listing
+}
+
+enum CorporateRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+/// A "corporate" role account's proposed price/product change, awaiting
+/// admin review — never written to Listing directly (mirrors ScrapedItem's
+/// pending/approved/rejected shape above, but submitted by the business
+/// itself rather than extracted from a scraped page). See
+/// /corporate/products and /admin/corporate-requests.
+model CorporateRequest {
+  id                String                 @id @default(uuid())
+  providerId        String                 @map("provider_id")
+  provider          Provider               @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  submittedByUserId String                 @map("submitted_by_user_id")
+  submittedBy       User                   @relation(fields: [submittedByUserId], references: [id], onDelete: Cascade)
+  type              CorporateRequestType
+  // Set for `edit` — the listing this request proposes to change.
+  listingId         String?                @map("listing_id")
+  listing           Listing?               @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  // Set for `new_listing` — needed to know the attribute schema when
+  // creating the Listing on approval, since there's no existing row yet.
+  categoryId        String?                @map("category_id")
+  category          Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // {name, description, price, currency, attributes, images}
+  proposedData      Json                   @map("proposed_data")
+  // The business's justification for the change — expected here (formal,
+  // audited accounts) even though the informal provider self-edit flow has
+  // no equivalent field.
+  reason            String
+  status            CorporateRequestStatus @default(pending)
+  reviewedByEmail   String?                @map("reviewed_by_email")
+  reviewedAt        DateTime?              @map("reviewed_at")
+  rejectionReason   String?                @map("rejection_reason")
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  @@index([providerId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("corporate_requests")
 }
 
 // ---------------------------------------------------------------------------
@@ -622,6 +680,9 @@ enum AdminAuditAction {
   advert_created
   advert_updated
   advert_deleted
+  corporate_request_approved
+  corporate_request_rejected
+  corporate_domain_linked
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the

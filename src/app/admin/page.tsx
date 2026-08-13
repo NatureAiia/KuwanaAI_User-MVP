@@ -11,6 +11,7 @@ const ADMIN_LINKS = [
   { href: "/admin/users", label: "Users", blurb: "The only way to grant Corporate/Regulator/Provider access." },
   { href: "/admin/social-mentions", label: "Social price mentions", blurb: "Review free-scanner posts that mention a price." },
   { href: "/admin/scraper", label: "Web scraper", blurb: "Review scraped/searched pricing before it becomes a listing." },
+  { href: "/admin/corporate-requests", label: "Corporate requests", blurb: "Price/product changes submitted by corporate accounts, awaiting approval." },
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change." },
   { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend." },
 ];
@@ -30,16 +31,25 @@ export default async function AdminHubPage() {
   const admin = await requireAdmin();
   if (!admin) notFound();
 
-  const [usersByRole, listingsByStatus, providerCount, linkedProviderCount, pendingReviewCount, pendingScrapedCount, usage] =
-    await Promise.all([
-      prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
-      prisma.listing.groupBy({ by: ["status"], _count: { _all: true } }),
-      prisma.provider.count(),
-      prisma.provider.count({ where: { ownerUserId: { not: null } } }),
-      prisma.listing.count({ where: { status: "pending_review" } }),
-      prisma.scrapedItem.count({ where: { status: "pending" } }),
-      getUsageReport(30),
-    ]);
+  const [
+    usersByRole,
+    listingsByStatus,
+    providerCount,
+    linkedProviderCount,
+    pendingReviewCount,
+    pendingScrapedCount,
+    pendingCorporateRequestCount,
+    usage,
+  ] = await Promise.all([
+    prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
+    prisma.listing.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.provider.count(),
+    prisma.provider.count({ where: { ownerUserId: { not: null } } }),
+    prisma.listing.count({ where: { status: "pending_review" } }),
+    prisma.scrapedItem.count({ where: { status: "pending" } }),
+    prisma.corporateRequest.count({ where: { status: "pending" } }),
+    getUsageReport(30),
+  ]);
 
   const roleCounts: Record<string, number> = { consumer: 0, corporate: 0, regulator: 0, provider: 0 };
   for (const row of usersByRole) roleCounts[row.role] = row._count._all;
@@ -133,6 +143,9 @@ export default async function AdminHubPage() {
                   )}
                   {link.href === "/admin/scraper" && pendingScrapedCount > 0 && (
                     <Badge tone="sky">{pendingScrapedCount} pending</Badge>
+                  )}
+                  {link.href === "/admin/corporate-requests" && pendingCorporateRequestCount > 0 && (
+                    <Badge tone="sky">{pendingCorporateRequestCount} pending</Badge>
                   )}
                 </div>
                 <p className="mt-1 text-[12.5px] text-text-secondary">{link.blurb}</p>

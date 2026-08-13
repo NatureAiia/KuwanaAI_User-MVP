@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Card";
 import { NewListingFormLazy, NewProviderFormLazy } from "@/components/LazyClients";
 import { ListingRowActions } from "@/components/admin/ListingRowActions";
 import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
+import { CorporateDomainLink } from "@/components/admin/CorporateDomainLink";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
 
 const STATUS_TONE = {
@@ -141,15 +142,18 @@ export default async function AdminCatalogPage({
         <h2 className="font-display text-[16px] font-semibold">Providers</h2>
         <p className="mt-1 text-[12.5px] text-text-secondary">
           Link a provider to a user&apos;s email to let that account manage it via /provider —
-          the only way a &quot;provider&quot; role account can self-submit listings.
+          the only way a &quot;provider&quot; role account can self-submit listings. Link a
+          corporate domain to let every &quot;corporate&quot; role account on that domain (e.g.
+          every @cbz.co.zw address) submit edit/new-product requests via /corporate/products.
         </p>
         <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
-          <table className="w-full min-w-[520px] border-collapse text-[13px]">
+          <table className="w-full min-w-[680px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border bg-bg-surface-raised text-left">
                 <th className="p-3 font-medium text-text-muted">Provider</th>
                 <th className="p-3 font-medium text-text-muted">Verified</th>
                 <th className="p-3 font-medium text-text-muted">Owner</th>
+                <th className="p-3 font-medium text-text-muted">Corporate domain</th>
               </tr>
             </thead>
             <tbody>
@@ -162,11 +166,14 @@ export default async function AdminCatalogPage({
                   <td className="p-3">
                     <ProviderOwnerLink providerId={p.id} currentOwnerEmail={p.owner?.email ?? null} />
                   </td>
+                  <td className="p-3">
+                    <CorporateDomainLink providerId={p.id} currentDomain={p.corporateDomain} />
+                  </td>
                 </tr>
               ))}
               {providers.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="p-6 text-center text-text-muted">
+                  <td colSpan={4} className="p-6 text-center text-text-muted">
                     No providers yet.
                   </td>
                 </tr>

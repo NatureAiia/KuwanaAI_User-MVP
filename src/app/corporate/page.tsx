@@ -8,6 +8,7 @@ import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
+import { CorporatePortalNav } from "@/components/corporate/CorporatePortalNav";
 
 export default async function CorporateDashboardPage({
   searchParams,
@@ -49,6 +50,8 @@ export default async function CorporateDashboardPage({
         Live pricing and trend rollups across every sector on Kuwana — computed from the same listing
         and price-history data consumers see.
       </p>
+
+      <CorporatePortalNav active="/corporate" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link

@@ -54,6 +54,12 @@ export const ProviderListingFormLazy = dynamic(
   { loading: () => <Skeleton height={420} /> },
 );
 
+/** Corporate's edit/new-product request wizard — reuses the provider portal's step components. */
+export const CorporateProductRequestFormLazy = dynamic(
+  () => import("@/components/corporate/CorporateProductRequestForm").then((m) => m.CorporateProductRequestForm),
+  { loading: () => <Skeleton height={420} /> },
+);
+
 /** Admin-only forms — never worth shipping to a consumer's bundle. */
 export const NewListingFormLazy = dynamic(
   () => import("@/components/admin/NewListingForm").then((m) => m.NewListingForm),

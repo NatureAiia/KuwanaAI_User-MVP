@@ -13,6 +13,18 @@ const updateSchema = z.object({
   // the provider contact's email, not their internal user id. Pass null to
   // unlink. Resolved to ownerUserId server-side below.
   ownerEmail: z.string().email().nullable().optional(),
+  // Links every "corporate" role user whose email domain matches (e.g.
+  // "cbz.co.zw") to this Provider — see requireOwnCorporateOrg(). Pass null
+  // to unlink. Unlike ownerEmail this isn't resolved to a user id: it's
+  // matched live, per-request, against whichever corporate accounts exist
+  // now or sign up later on that domain.
+  corporateDomain: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Must be a domain, e.g. cbz.co.zw")
+    .nullable()
+    .optional(),
 });
 
 // No DELETE here deliberately — Provider -> Listing is onDelete: Cascade,
@@ -27,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = updateSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { ownerEmail, ...rest } = parsed.data;
+  const { ownerEmail, corporateDomain, ...rest } = parsed.data;
 
   let ownerUserId: string | null | undefined;
   if (ownerEmail === null) {
@@ -50,7 +62,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const provider = await prisma.provider.update({
       where: { id },
-      data: { ...rest, ...(ownerUserId !== undefined ? { ownerUserId } : {}) },
+      data: {
+        ...rest,
+        ...(ownerUserId !== undefined ? { ownerUserId } : {}),
+        ...(corporateDomain !== undefined ? { corporateDomain } : {}),
+      },
     });
 
     if (ownerUserId !== undefined) {
@@ -65,6 +81,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
     }
 
+    if (corporateDomain !== undefined) {
+      await logAdminAction({
+        adminEmail: admin.email,
+        action: "corporate_domain_linked",
+        targetType: "provider",
+        targetId: provider.id,
+        detail: corporateDomain
+          ? `Linked corporate domain ${corporateDomain} to "${provider.name}"`
+          : `Unlinked the corporate domain from "${provider.name}"`,
+      });
+    }
+
     return NextResponse.json({ provider });
   } catch (err) {
     // The alreadyLinked check above is a look-then-act race — two concurrent
@@ -75,7 +103,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // instead of a raw 500.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       return NextResponse.json(
-        { error: `${ownerEmail} already owns another provider — try again` },
+        {
+          error: corporateDomain
+            ? `${corporateDomain} is already linked to another provider — try again`
+            : `${ownerEmail} already owns another provider — try again`,
+        },
         { status: 409 },
       );
     }
