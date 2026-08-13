@@ -123,6 +123,22 @@ verified separately: applied live, then behaviorally tested with a rolled-
 back transaction confirming a `users` insert with no matching `auth.users`
 row is correctly rejected.
 
+## Auth email rate limit
+
+`supabase.auth.signUp()` ([signup/page.tsx](../src/app/signup/page.tsx)) sends
+its confirmation email through Supabase's built-in mailer unless a custom SMTP
+provider is configured in the dashboard (Authentication → Emails → SMTP
+Settings) — there's no `supabase/config.toml` or SMTP setup in this repo, so
+today every project on this schema is on the default mailer. That default is
+capped very low (a handful of emails/hour, shared across the whole project) and
+returns the signup error surfaced verbatim on line 332 as "email rate limit
+exceeded" once it's hit — this is Supabase's own GoTrue limit, not the app's
+`src/lib/rateLimit.ts`, and repeated signup testing burns through it fast.
+
+Before real users hit this, configure SMTP as above. Until then, either wait
+out the window or turn off "Confirm email" under Authentication → Providers →
+Email for dev/testing.
+
 ## When you rebuild on another platform
 
 Nothing here is Supabase-locked except the trigger section, so the move is
