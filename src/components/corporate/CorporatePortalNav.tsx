@@ -30,6 +30,7 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
   const initial = companyName.trim().charAt(0).toUpperCase() || "K";
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a one-time user preference from localStorage, not deriving render output
     setCollapsed(window.localStorage.getItem(COLLAPSE_KEY) === "1");
   }, []);
 

@@ -18,7 +18,7 @@ export function CorporateHeader({ companyName }: { companyName: string }) {
   const isHub = pathname === "/corporate";
 
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3 md:px-8">
+    <header className="flex items-center justify-between gap-3 border-b border-border bg-bg-surface px-5 py-3 md:px-8">
       <div className="flex items-center gap-2">
         {!isHub && (
           <button
@@ -33,8 +33,8 @@ export function CorporateHeader({ companyName }: { companyName: string }) {
         <Link href="/corporate" className="flex items-center gap-2.5">
           <Image src="/kuwana-mark.png" alt="" width={26} height={26} className="rounded-full" />
           <div className="leading-tight">
-            <p className="text-[10.5px] uppercase tracking-wide text-text-muted">Kuwana for Business</p>
-            <p className="font-display text-[14px] font-bold">{companyName}</p>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-sky">Kuwana for Business</p>
+            <p className="font-display text-[14px] font-bold text-text-primary">{companyName}</p>
           </div>
         </Link>
       </div>

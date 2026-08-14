@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { clsx } from "clsx";
+import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
@@ -8,6 +10,8 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card } from "@/components/ui/Card";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
+import { CorporateStatCard } from "@/components/corporate/CorporateStatCard";
+import { SectorTrendBar } from "@/components/corporate/SectorTrendBar";
 
 export default async function CorporateDashboardPage({
   searchParams,
@@ -79,43 +83,47 @@ export default async function CorporateDashboardPage({
       {bySector.length > 0 && (
         <>
           <section className="mt-6">
-            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Key insights</h2>
+            <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+              <BarChart3 size={13} strokeWidth={2.25} /> Key insights
+            </h2>
             <div className="mt-2 grid gap-2.5 sm:grid-cols-3">
-              <Card className="!p-3.5">
-                <p className="text-[11px] text-text-muted">Sectors tracked</p>
-                <p className="mt-1 font-mono text-[20px] font-semibold">{bySector.length}</p>
-              </Card>
-              <Card className="!p-3.5">
-                <p className="text-[11px] text-text-muted">Best buyer-side movement</p>
+              <CorporateStatCard icon={BarChart3} tone="sky" label="Sectors tracked">
+                <p className="font-mono text-[20px] font-semibold">{bySector.length}</p>
+              </CorporateStatCard>
+              <CorporateStatCard icon={TrendingDown} tone="teal" label="Best buyer-side movement">
                 {bestOpportunity && bestOpportunity.trendingDown > 0 ? (
                   <>
-                    <p className="mt-1 text-[14px] font-semibold">{bestOpportunity.sectorName}</p>
+                    <p className="text-[14px] font-semibold">{bestOpportunity.sectorName}</p>
                     <p className="text-[11px] text-text-muted">{bestOpportunity.trendingDown} listing(s) trending down</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-[13px] text-text-muted">No downward movement in view.</p>
+                  <p className="text-[13px] text-text-muted">No downward movement in view.</p>
                 )}
-              </Card>
-              <Card className="!p-3.5">
-                <p className="text-[11px] text-text-muted">Most supplier risk</p>
+              </CorporateStatCard>
+              <CorporateStatCard icon={ShieldAlert} tone="coral" label="Most supplier risk">
                 {mostRisk && mostRisk.unverifiedCount > 0 ? (
                   <>
-                    <p className="mt-1 text-[14px] font-semibold">{mostRisk.sectorName}</p>
+                    <p className="text-[14px] font-semibold">{mostRisk.sectorName}</p>
                     <p className="text-[11px] text-text-muted">{mostRisk.unverifiedCount} unverified listing(s)</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-[13px] text-text-muted">No unverified suppliers in view.</p>
+                  <p className="text-[13px] text-text-muted">No unverified suppliers in view.</p>
                 )}
-              </Card>
+              </CorporateStatCard>
             </div>
           </section>
 
           <section className="mt-6">
-            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Recommended actions</h2>
+            <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+              <Lightbulb size={13} strokeWidth={2.25} /> Recommended actions
+            </h2>
             <div className="mt-2 flex flex-col gap-2">
               {bestOpportunity && bestOpportunity.trendingDown > 0 && (
-                <Card className="flex items-center justify-between gap-3 !p-3.5">
-                  <p className="text-[13px]">
+                <Card className="flex items-center gap-3 !p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-teal/10 text-accent-teal">
+                    <TrendingDown size={16} strokeWidth={2} />
+                  </span>
+                  <p className="flex-1 text-[13px]">
                     Re-quote <strong>{bestOpportunity.sectorName}</strong> now — {bestOpportunity.trendingDown}{" "}
                     listing(s) are trending down, so renewing at last quarter&apos;s rate may overpay.
                   </p>
@@ -128,8 +136,11 @@ export default async function CorporateDashboardPage({
                 </Card>
               )}
               {mostRisk && mostRisk.unverifiedCount > 0 && (
-                <Card className="flex items-center justify-between gap-3 !p-3.5">
-                  <p className="text-[13px]">
+                <Card className="flex items-center gap-3 !p-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-coral/10 text-accent-coral">
+                    <ShieldQuestion size={16} strokeWidth={2} />
+                  </span>
+                  <p className="flex-1 text-[13px]">
                     Confirm supplier verification before committing spend in <strong>{mostRisk.sectorName}</strong> —{" "}
                     {mostRisk.unverifiedCount} listing(s) there are from an unverified provider.
                   </p>
@@ -154,7 +165,9 @@ export default async function CorporateDashboardPage({
 
       {competitorWatch.length > 0 && (
         <section className="mt-6">
-          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Competitor watch</h2>
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <Radar size={13} strokeWidth={2.25} /> Competitor watch
+          </h2>
           <p className="mt-1 text-[12px] text-text-secondary">
             Your products against the closest cross-provider substitute by price and spec — see{" "}
             <Link href="/corporate/products" className="text-accent-sky hover:underline">
@@ -173,11 +186,21 @@ export default async function CorporateDashboardPage({
                   className={`bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[13.5px] font-medium">{entry.myListing.name}</p>
-                      <p className="text-[11px] text-text-muted">
-                        {entry.sectorName} / {entry.categoryName}
-                      </p>
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={clsx(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          cheaper ? "bg-accent-teal/10 text-accent-teal" : "bg-accent-coral/10 text-accent-coral",
+                        )}
+                      >
+                        {cheaper ? <TrendingDown size={15} strokeWidth={2} /> : <TrendingUp size={15} strokeWidth={2} />}
+                      </span>
+                      <div>
+                        <p className="text-[13.5px] font-medium">{entry.myListing.name}</p>
+                        <p className="text-[11px] text-text-muted">
+                          {entry.sectorName} / {entry.categoryName}
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[13.5px]">
@@ -204,7 +227,9 @@ export default async function CorporateDashboardPage({
 
       <section className="mt-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">By sector</h2>
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <LayoutGrid size={13} strokeWidth={2.25} /> By sector
+          </h2>
           {bySector.length > 0 && (
             <ExportCsvButton
               filename={`kuwana-market-intelligence${activeSector ? `-${activeSector}` : ""}.csv`}
@@ -228,20 +253,29 @@ export default async function CorporateDashboardPage({
           )}
         </div>
         <div className="mt-2 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {bySector.map((s) => (
-            <Card key={s.sectorSlug} className="!p-3.5">
-              <p className="text-[13px] font-semibold">{s.sectorName}</p>
-              <p className="mt-1 font-mono text-[19px] font-semibold">${s.avgPrice.toFixed(2)}</p>
-              <p className="text-[11px] text-text-muted">avg. price · {s.listingCount} listings</p>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <CorporateTag tone="teal">↓ {s.trendingDown} down</CorporateTag>
-                <CorporateTag tone="coral">↑ {s.trendingUp} up</CorporateTag>
-                {s.unverifiedCount > 0 && (
-                  <CorporateTag tone="neutral">{s.unverifiedCount} unverified</CorporateTag>
-                )}
-              </div>
-            </Card>
-          ))}
+          {bySector.map((s) => {
+            const Icon = SECTORS[s.sectorSlug as SectorSlug]?.icon ?? Building2;
+            return (
+              <Card key={s.sectorSlug} className="!p-3.5">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-sky/10 text-accent-sky">
+                    <Icon size={15} strokeWidth={2} />
+                  </span>
+                  <p className="text-[13px] font-semibold">{s.sectorName}</p>
+                </div>
+                <p className="mt-2 font-mono text-[19px] font-semibold">${s.avgPrice.toFixed(2)}</p>
+                <p className="text-[11px] text-text-muted">avg. price · {s.listingCount} listings</p>
+                <SectorTrendBar down={s.trendingDown} up={s.trendingUp} />
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  <CorporateTag tone="teal">↓ {s.trendingDown} down</CorporateTag>
+                  <CorporateTag tone="coral">↑ {s.trendingUp} up</CorporateTag>
+                  {s.unverifiedCount > 0 && (
+                    <CorporateTag tone="neutral">{s.unverifiedCount} unverified</CorporateTag>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
           {bySector.length === 0 && <p className="text-[13px] text-text-muted">No live listings in this sector yet.</p>}
         </div>
       </section>
