@@ -320,6 +320,11 @@ export default function LandingPage() {
                     Explore
                   </Link>
                 </li>
+                <li>
+                  <Link href="/teams" className="hover:text-white">
+                    Team
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>

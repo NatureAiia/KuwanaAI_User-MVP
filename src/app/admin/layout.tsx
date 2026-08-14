@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Falls back to the allowlist path (see requireAdmin) where an operator's
   // email grants access before their User row exists at all.
-  const username = dbUser?.username ?? admin.email;
+  const username = admin.email;
 
   const pendingCounts: Record<string, number> = {
     "/admin/catalog": pendingReviewCount,

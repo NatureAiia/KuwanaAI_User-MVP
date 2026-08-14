@@ -54,7 +54,7 @@ export default async function AdminHubPage() {
     <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Admin</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
-        Signed in as {username} ({admin.email})
+        Signed in as {username}
       </p>
 
       <section className="mt-6">
