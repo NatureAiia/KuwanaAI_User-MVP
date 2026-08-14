@@ -648,6 +648,23 @@ export async function recordPriceChange(listingId: string, previousPrice: number
   await prisma.listingPriceHistory.create({ data: { listingId, price: previousPrice } });
 }
 
+/**
+ * Appends a ListingUpdateLog row — the "what changed and by whom" trail
+ * shown in the corporate portal's product list and (source only, never
+ * actorLabel for an admin edit — see PROVENANCE_LABEL in listingDisplay.ts)
+ * on the public listing page. Called by every write path that sets
+ * Listing.lastUpdateSource: admin edit, scraper approval, corporate direct
+ * edit.
+ */
+export async function logListingUpdate(params: {
+  listingId: string;
+  source: "admin" | "scraper" | "corporate";
+  actorLabel: string;
+  changeSummary: string;
+}): Promise<void> {
+  await prisma.listingUpdateLog.create({ data: params });
+}
+
 export const getListingsByIds = cache(
   ttlCache(async (ids: string[]): Promise<ListingDTO[]> => {
     const listings = await prisma.listing.findMany({
@@ -886,6 +903,42 @@ export async function getClosestMatches(listingId: string, limit = 3): Promise<L
 
   const matches = findClosestMatches(toListingDTO(listing), siblings.map(toListingDTO), attributeSchema, limit);
   return matches.map((m) => m.listing);
+}
+
+export type CompetitorWatchEntry = {
+  myListing: ListingDTO;
+  categoryName: string;
+  sectorName: string;
+  competitors: ListingDTO[];
+};
+
+/**
+ * "Competitor Watch" for the corporate portal — for each of a business's own
+ * published listings, the closest-priced/closest-spec competing listings
+ * from other providers in the same category. Reuses getClosestMatches
+ * (already excludes same-provider candidates, see similarListings.ts) rather
+ * than a separate competitor-ranking implementation — the "cross-provider
+ * substitute" concept is identical, this just groups it per-product for a
+ * business's own catalog instead of per single listing page.
+ */
+export async function getCompetitorWatch(providerId: string, limitPerProduct = 3): Promise<CompetitorWatchEntry[]> {
+  const myListings = await prisma.listing.findMany({
+    where: { providerId, status: "published" },
+    include: { provider: true, category: { include: { sector: true } } },
+    orderBy: { name: "asc" },
+  });
+  if (myListings.length === 0) return [];
+
+  const results = await Promise.all(
+    myListings.map(async (listing) => ({
+      myListing: toListingDTO(listing),
+      categoryName: listing.category.name,
+      sectorName: listing.category.sector.name,
+      competitors: await getClosestMatches(listing.id, limitPerProduct),
+    })),
+  );
+
+  return results.filter((r) => r.competitors.length > 0);
 }
 
 export type TrendingListing = { listing: ListingDTO; comparisonCount: number };

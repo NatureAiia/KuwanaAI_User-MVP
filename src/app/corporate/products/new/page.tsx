@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { emailDomain } from "@/lib/orgVerification";
-import { Header } from "@/components/Header";
 import { CorporateProductRequestFormLazy } from "@/components/LazyClients";
 
 export default async function NewCorporateProductPage() {
@@ -24,12 +23,5 @@ export default async function NewCorporateProductPage() {
     orderBy: [{ sector: { name: "asc" } }, { name: "asc" }],
   });
 
-  return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-      <Header />
-      <div className="mt-6">
-        <CorporateProductRequestFormLazy mode="new_listing" categories={categories} />
-      </div>
-    </div>
-  );
+  return <CorporateProductRequestFormLazy mode="new_listing" categories={categories} />;
 }

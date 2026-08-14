@@ -4,7 +4,7 @@ import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { logAdminAction } from "@/lib/adminAudit";
-import { recordPriceChange } from "@/lib/catalog";
+import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { boundedJsonRecord } from "@/lib/zodShared";
 
@@ -98,11 +98,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         rejectionReason: null,
         lastVerifiedAt: new Date(),
         freshnessStatus: "fresh",
+        lastUpdateSource: "scraper",
       },
     });
     if (previous && Number(previous.price) !== price) {
       await recordPriceChange(listing.id, Number(previous.price));
     }
+    await logListingUpdate({
+      listingId: listing.id,
+      source: "scraper",
+      actorLabel: "Web scraper",
+      changeSummary: `Updated from ${item.sourceUrl}`,
+    });
     listingId = listing.id;
   } else {
     const providerId = edits.providerId ?? item.suggestedProviderId;
@@ -129,7 +136,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         sourceUrl: item.sourceUrl,
         status: "pending_review",
         freshnessStatus: "unverified",
+        lastUpdateSource: "scraper",
       },
+    });
+    await logListingUpdate({
+      listingId: listing.id,
+      source: "scraper",
+      actorLabel: "Web scraper",
+      changeSummary: `Discovered from ${item.sourceUrl}`,
     });
     listingId = listing.id;
   }

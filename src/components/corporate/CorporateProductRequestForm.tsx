@@ -21,9 +21,11 @@ const STEP_LABELS: Record<Step, string> = {
 };
 
 // Reuses the provider portal's step components (category/details/specs are
-// identical concerns) but never writes to Listing — it always POSTs a
-// CorporateRequest for Kuwana to review, and requires a business
-// justification the informal provider self-edit flow doesn't ask for.
+// identical concerns). mode="new_listing" POSTs a CorporateRequest for
+// Kuwana to review (a never-before-seen product); mode="edit" PATCHes the
+// listing directly and applies immediately — it's the business's own
+// product, so no review hop, just a required reason that becomes the
+// ListingUpdateLog entry shoppers' "last updated by" line is built from.
 export function CorporateProductRequestForm({
   mode,
   categories,
@@ -85,31 +87,37 @@ export function CorporateProductRequestForm({
           field.dataType === "number" ? Number(raw) : field.dataType === "boolean" ? raw === "yes" : raw;
       }
 
-      const proposedData = {
-        name,
-        description: description.trim() || null,
-        price: Number(price),
-        currency,
-        attributes,
-        images,
-      };
-
-      const body =
+      const res =
         mode === "edit"
-          ? { type: "edit" as const, listingId: listing!.id, proposedData, reason }
-          : { type: "new_listing" as const, categoryId, proposedData, reason };
-
-      const res = await fetch("/api/corporate/requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+          ? await fetch(`/api/corporate/listings/${listing!.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name,
+                description: description.trim() || null,
+                price: Number(price),
+                currency,
+                attributes,
+                images,
+                reason,
+              }),
+            })
+          : await fetch("/api/corporate/requests", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "new_listing" as const,
+                categoryId,
+                proposedData: { name, description: description.trim() || null, price: Number(price), currency, attributes, images },
+                reason,
+              }),
+            });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setError(typeof data?.error === "string" ? data.error : "Something went wrong — please try again.");
         return;
       }
-      router.push("/corporate/requests");
+      router.push(mode === "edit" ? "/corporate/products" : "/corporate/requests");
       router.refresh();
     } finally {
       setLoading(false);
@@ -203,7 +211,7 @@ export function CorporateProductRequestForm({
             <p className="font-display text-[16px] font-semibold">Why this change?</p>
             <p className="mt-1 text-[12.5px] text-text-secondary">
               {mode === "edit"
-                ? "This won't go live until Kuwana reviews it. A clear reason (e.g. a rate change effective date) helps it get reviewed faster."
+                ? "This applies immediately — it's your own product. The reason is kept as a record of why the data changed (e.g. correcting a scraper error, a rate change effective date)."
                 : "This new product won't appear in the catalog until Kuwana reviews it."}
             </p>
             <textarea
@@ -220,7 +228,7 @@ export function CorporateProductRequestForm({
                 Back
               </Button>
               <Button type="button" onClick={submit} disabled={loading}>
-                {loading ? "Submitting…" : "Submit request"}
+                {loading ? "Saving…" : mode === "edit" ? "Save changes" : "Submit request"}
               </Button>
             </div>
           </div>

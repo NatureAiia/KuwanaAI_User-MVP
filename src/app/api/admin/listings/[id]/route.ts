@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { notifyListingDecision } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/adminAudit";
-import { recordPriceChange } from "@/lib/catalog";
+import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { boundedJsonRecord } from "@/lib/zodShared";
 
@@ -49,13 +49,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       ...(attributes ? { attributes: attributes as Prisma.InputJsonValue } : {}),
       // Approving clears any stale rejection reason from a prior round.
       ...(rest.status === "published" ? { rejectionReason: null } : {}),
-      ...(markVerifiedNow ? { lastVerifiedAt: new Date(), freshnessStatus: rest.freshnessStatus ?? "fresh" } : {}),
+      ...(markVerifiedNow
+        ? { lastVerifiedAt: new Date(), freshnessStatus: rest.freshnessStatus ?? "fresh", lastUpdateSource: "admin" }
+        : {}),
     },
     include: { provider: { select: { ownerUserId: true } } },
   });
 
   if (previous && rest.price !== undefined && Number(previous.price) !== rest.price) {
     await recordPriceChange(id, Number(previous.price));
+  }
+
+  // markVerifiedNow is the existing "this edit counts as verification" flag
+  // — reused here rather than a new condition, so the provenance trail lines
+  // up exactly with what already bumps lastVerifiedAt/freshnessStatus above.
+  if (markVerifiedNow) {
+    const changedFields = Object.keys(rest).filter((k) => k !== "status" && k !== "rejectionReason");
+    await logListingUpdate({
+      listingId: listing.id,
+      source: "admin",
+      actorLabel: admin.email,
+      changeSummary: changedFields.length > 0 ? `Updated ${changedFields.join(", ")}` : `Edited "${listing.name}"`,
+    });
   }
 
   // Tell the provider only on an actual approve/reject action from the

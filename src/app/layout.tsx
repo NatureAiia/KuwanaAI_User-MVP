@@ -9,6 +9,7 @@ import { SoftNavTracker } from "@/components/SoftNavTracker";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { THEME_INIT_SCRIPT } from "@/lib/themeScript";
 import "./globals.css";
+import "@/bones/registry";
 
 const bricolage = Bricolage_Grotesque({
   variable: "--font-display",

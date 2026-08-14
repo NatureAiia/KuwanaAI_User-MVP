@@ -188,6 +188,9 @@ model Provider {
   // the same domain-match pattern orgVerification.ts already uses for
   // REGULATORS, rather than a separate per-user join table.
   corporateDomain String? @unique @map("corporate_domain")
+  // Company-profile field for the corporate portal ("even profile should be
+  // for the company, not a person") — /corporate/profile edits this directly.
+  description     String?
 
   listings          Listing[]
   scrapedItems      ScrapedItem[]
@@ -207,6 +210,17 @@ enum ListingStatus {
   pending_review
   published
   rejected
+}
+
+// Who/what most recently wrote this listing's data — surfaced publicly on
+// /listing/[id] ("Last updated by ...") so a shopper can tell a scraper's
+// guess apart from the business's own confirmation. `seed` is the default so
+// every pre-existing/admin-seeded row has a defined value without a backfill.
+enum ListingUpdateSource {
+  admin
+  scraper
+  corporate
+  seed
 }
 
 model Listing {
@@ -235,6 +249,7 @@ model Listing {
   // listings a provider submits through /provider.
   status          ListingStatus   @default(published)
   rejectionReason String?         @map("rejection_reason")
+  lastUpdateSource ListingUpdateSource @default(seed) @map("last_update_source")
 
   priceHistory      ListingPriceHistory[]
   savedBy           SavedListing[]
@@ -243,6 +258,7 @@ model Listing {
   notifications     Notification[]
   scrapedItems      ScrapedItem[]
   corporateRequests CorporateRequest[]
+  updateLogs        ListingUpdateLog[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -267,6 +283,28 @@ model ListingPriceHistory {
   // ordered by time — this is the exact access pattern.
   @@index([listingId, recordedAt])
   @@map("listing_price_history")
+}
+
+/// Append-only "what changed and by whom" trail for a listing — mirrors
+/// ListingPriceHistory's shape but for the full edit (name/description/
+/// attributes/etc, not just price), written by every write path that sets
+/// Listing.lastUpdateSource (admin edit, scraper approval, corporate direct
+/// edit). Shown in the corporate portal's product list and (source only,
+/// never actorLabel for admin) on the public listing page.
+model ListingUpdateLog {
+  id            String              @id @default(uuid())
+  listingId     String              @map("listing_id")
+  listing       Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  source        ListingUpdateSource
+  // Admin email / "Web scraper" / the provider's name — internal record only,
+  // never rendered on the public listing page for source: admin (see
+  // PROVENANCE_LABEL in listingDisplay.ts).
+  actorLabel    String              @map("actor_label")
+  changeSummary String              @map("change_summary")
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  @@index([listingId, createdAt(sort: Desc)])
+  @@map("listing_update_logs")
 }
 
 enum CorporateRequestType {

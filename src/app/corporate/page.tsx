@@ -2,13 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getMarketOverview } from "@/lib/catalog";
+import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
+import { emailDomain } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
-import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/Card";
-import { LogoutButton } from "@/components/LogoutButton";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
-import { CorporatePortalNav } from "@/components/corporate/CorporatePortalNav";
+import { CorporateTag } from "@/components/corporate/CorporateTag";
 
 export default async function CorporateDashboardPage({
   searchParams,
@@ -36,22 +35,22 @@ export default async function CorporateDashboardPage({
   const bestOpportunity = [...bySector].sort((a, b) => b.trendingDown - a.trendingDown)[0];
   const mostRisk = [...bySector].sort((a, b) => b.unverifiedCount - a.unverifiedCount)[0];
 
+  // Competitor Watch is per-product, so it only applies once this account is
+  // linked to a Provider (see requireOwnCorporateOrg's domain-match) — an
+  // unlinked account still gets the sector-wide rollups above, just not this.
+  const domain = user.email ? emailDomain(user.email) : null;
+  const provider = domain
+    ? await prisma.provider.findFirst({ where: { corporateDomain: domain }, select: { id: true } })
+    : null;
+  const competitorWatch = provider ? await getCompetitorWatch(provider.id) : [];
+
   return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-      <Header />
-      <div className="mt-4 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] text-text-secondary">Corporate account</p>
-          <h1 className="font-display text-[24px] font-bold">Market Intelligence</h1>
-        </div>
-        <LogoutButton />
-      </div>
-      <p className="mt-2 text-[13px] text-text-secondary">
+    <div>
+      <h1 className="font-display text-[20px] font-bold">Market Intelligence</h1>
+      <p className="mt-1 text-[13px] text-text-secondary">
         Live pricing and trend rollups across every sector on Kuwana — computed from the same listing
         and price-history data consumers see.
       </p>
-
-      <CorporatePortalNav active="/corporate" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
@@ -80,26 +79,28 @@ export default async function CorporateDashboardPage({
       {bySector.length > 0 && (
         <>
           <section className="mt-6">
-            <h2 className="font-display text-[16px] font-semibold">Key insights</h2>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Card>
-                <p className="text-[12px] text-text-muted">Best buyer-side movement</p>
+            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Key insights</h2>
+            <div className="mt-2 grid gap-2.5 sm:grid-cols-3">
+              <Card className="!p-3.5">
+                <p className="text-[11px] text-text-muted">Sectors tracked</p>
+                <p className="mt-1 font-mono text-[20px] font-semibold">{bySector.length}</p>
+              </Card>
+              <Card className="!p-3.5">
+                <p className="text-[11px] text-text-muted">Best buyer-side movement</p>
                 {bestOpportunity && bestOpportunity.trendingDown > 0 ? (
                   <>
-                    <p className="mt-1 font-display text-[16px] font-semibold">{bestOpportunity.sectorName}</p>
-                    <p className="text-[11px] text-text-muted">
-                      {bestOpportunity.trendingDown} listing(s) trending down
-                    </p>
+                    <p className="mt-1 text-[14px] font-semibold">{bestOpportunity.sectorName}</p>
+                    <p className="text-[11px] text-text-muted">{bestOpportunity.trendingDown} listing(s) trending down</p>
                   </>
                 ) : (
                   <p className="mt-1 text-[13px] text-text-muted">No downward movement in view.</p>
                 )}
               </Card>
-              <Card>
-                <p className="text-[12px] text-text-muted">Most supplier risk</p>
+              <Card className="!p-3.5">
+                <p className="text-[11px] text-text-muted">Most supplier risk</p>
                 {mostRisk && mostRisk.unverifiedCount > 0 ? (
                   <>
-                    <p className="mt-1 font-display text-[16px] font-semibold">{mostRisk.sectorName}</p>
+                    <p className="mt-1 text-[14px] font-semibold">{mostRisk.sectorName}</p>
                     <p className="text-[11px] text-text-muted">{mostRisk.unverifiedCount} unverified listing(s)</p>
                   </>
                 ) : (
@@ -109,11 +110,11 @@ export default async function CorporateDashboardPage({
             </div>
           </section>
 
-          <section className="mt-8">
-            <h2 className="font-display text-[16px] font-semibold">Recommended actions</h2>
-            <div className="mt-3 flex flex-col gap-2">
+          <section className="mt-6">
+            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Recommended actions</h2>
+            <div className="mt-2 flex flex-col gap-2">
               {bestOpportunity && bestOpportunity.trendingDown > 0 && (
-                <Card className="flex items-center justify-between gap-3">
+                <Card className="flex items-center justify-between gap-3 !p-3.5">
                   <p className="text-[13px]">
                     Re-quote <strong>{bestOpportunity.sectorName}</strong> now — {bestOpportunity.trendingDown}{" "}
                     listing(s) are trending down, so renewing at last quarter&apos;s rate may overpay.
@@ -127,7 +128,7 @@ export default async function CorporateDashboardPage({
                 </Card>
               )}
               {mostRisk && mostRisk.unverifiedCount > 0 && (
-                <Card className="flex items-center justify-between gap-3">
+                <Card className="flex items-center justify-between gap-3 !p-3.5">
                   <p className="text-[13px]">
                     Confirm supplier verification before committing spend in <strong>{mostRisk.sectorName}</strong> —{" "}
                     {mostRisk.unverifiedCount} listing(s) there are from an unverified provider.
@@ -151,9 +152,59 @@ export default async function CorporateDashboardPage({
         </>
       )}
 
-      <section className="mt-8">
+      {competitorWatch.length > 0 && (
+        <section className="mt-6">
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">Competitor watch</h2>
+          <p className="mt-1 text-[12px] text-text-secondary">
+            Your products against the closest cross-provider substitute by price and spec — see{" "}
+            <Link href="/corporate/products" className="text-accent-sky hover:underline">
+              My Products
+            </Link>{" "}
+            to request a price change.
+          </p>
+          <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
+            {competitorWatch.map((entry, i) => {
+              const cheapestCompetitor = entry.competitors[0];
+              const delta = entry.myListing.price - cheapestCompetitor.price;
+              const cheaper = delta < 0;
+              return (
+                <div
+                  key={entry.myListing.id}
+                  className={`bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-[13.5px] font-medium">{entry.myListing.name}</p>
+                      <p className="text-[11px] text-text-muted">
+                        {entry.sectorName} / {entry.categoryName}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-[13.5px]">
+                        {entry.myListing.currency} {entry.myListing.price.toFixed(2)}
+                      </span>
+                      <CorporateTag tone={cheaper ? "teal" : "coral"}>
+                        {cheaper ? "↓" : "↑"} {Math.abs(delta).toFixed(2)} vs. {cheapestCompetitor.provider.name}
+                      </CorporateTag>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {entry.competitors.map((c) => (
+                      <CorporateTag key={c.id} tone="neutral">
+                        {c.provider.name}: {c.currency} {c.price.toFixed(2)}
+                      </CorporateTag>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <section className="mt-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display text-[16px] font-semibold">By sector</h2>
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">By sector</h2>
           {bySector.length > 0 && (
             <ExportCsvButton
               filename={`kuwana-market-intelligence${activeSector ? `-${activeSector}` : ""}.csv`}
@@ -176,19 +227,19 @@ export default async function CorporateDashboardPage({
             />
           )}
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-2 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {bySector.map((s) => (
-            <Card key={s.sectorSlug}>
-              <p className="font-display text-[15px] font-semibold">{s.sectorName}</p>
-              <p className="mt-1 font-mono text-[22px] font-semibold">${s.avgPrice.toFixed(2)}</p>
+            <Card key={s.sectorSlug} className="!p-3.5">
+              <p className="text-[13px] font-semibold">{s.sectorName}</p>
+              <p className="mt-1 font-mono text-[19px] font-semibold">${s.avgPrice.toFixed(2)}</p>
               <p className="text-[11px] text-text-muted">avg. price · {s.listingCount} listings</p>
-              <div className="mt-3 flex gap-4 text-[12px]">
-                <span className="text-accent-teal">↓ {s.trendingDown} trending down</span>
-                <span className="text-accent-coral">↑ {s.trendingUp} trending up</span>
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <CorporateTag tone="teal">↓ {s.trendingDown} down</CorporateTag>
+                <CorporateTag tone="coral">↑ {s.trendingUp} up</CorporateTag>
+                {s.unverifiedCount > 0 && (
+                  <CorporateTag tone="neutral">{s.unverifiedCount} unverified</CorporateTag>
+                )}
               </div>
-              {s.unverifiedCount > 0 && (
-                <p className="mt-2 text-[11px] text-accent-coral">{s.unverifiedCount} unverified provider listing(s)</p>
-              )}
             </Card>
           ))}
           {bySector.length === 0 && <p className="text-[13px] text-text-muted">No live listings in this sector yet.</p>}

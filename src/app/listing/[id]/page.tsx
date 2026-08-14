@@ -19,7 +19,7 @@ import { CompareToggleButton } from "@/components/explore/CompareToggleButton";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { FormattedPrice } from "@/components/FormattedPrice";
-import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE } from "@/lib/listingDisplay";
+import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE, PROVENANCE_LABEL } from "@/lib/listingDisplay";
 
 export async function generateMetadata({
   params,
@@ -244,7 +244,9 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
               )}
             </div>
             <p className="mt-1.5 text-[11px] text-text-muted">
-              Last verified {listing.lastVerifiedAt.toLocaleDateString()}
+              Last updated by{" "}
+              {listing.lastUpdateSource === "corporate" ? listing.provider.name : PROVENANCE_LABEL[listing.lastUpdateSource]},{" "}
+              {listing.lastVerifiedAt.toLocaleDateString()}
             </p>
 
             {trend && trend.points.length >= 2 && (

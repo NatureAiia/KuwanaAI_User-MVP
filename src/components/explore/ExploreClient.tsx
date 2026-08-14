@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { ArrowUpDown, ShieldCheck } from "lucide-react";
+import { Skeleton } from "boneyard-js/react";
 import { ListingCard } from "@/components/ListingCard";
+import { ListingCardFixture } from "@/components/explore/ListingCardFixture";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingRequirements } from "@/lib/eligibility";
@@ -168,22 +170,29 @@ export function ExploreClient({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-        {sortedListings.map((listing) => (
-          <ListingCard
-            key={listing.id}
-            listing={listing}
-            score={scores[listing.id]?.total ?? 0}
-            trend={data?.trends[listing.id] ?? null}
-            sectorSlug={sectorSlug}
-            categorySlug={activeCategorySlug}
-            selected={data ? isSelected(data.id, listing.id) : false}
-            onToggleSelect={toggleSelect}
-            initialSaved={savedIds.has(listing.id)}
-            requirements={requirementsById.get(listing.id)}
-          />
-        ))}
-      </div>
+      <Skeleton
+        name="explore-listings"
+        loading={loading}
+        transition
+        fixture={<ListingCardFixture />}
+      >
+        <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {sortedListings.map((listing) => (
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              score={scores[listing.id]?.total ?? 0}
+              trend={data?.trends[listing.id] ?? null}
+              sectorSlug={sectorSlug}
+              categorySlug={activeCategorySlug}
+              selected={data ? isSelected(data.id, listing.id) : false}
+              onToggleSelect={toggleSelect}
+              initialSaved={savedIds.has(listing.id)}
+              requirements={requirementsById.get(listing.id)}
+            />
+          ))}
+        </div>
+      </Skeleton>
 
       <CompareTrayBar />
     </div>

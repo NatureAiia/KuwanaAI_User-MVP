@@ -15,21 +15,15 @@ const proposedDataSchema = z.object({
   images: z.array(z.string().url()).max(8).default([]),
 });
 
-// A corporate account only ever proposes a change — reason is required
-// (these are formal, audited accounts, unlike the informal provider
-// self-edit flow which has no equivalent field) and the request always
-// lands as `pending`; the route never lets the client set the status.
-export const createCorporateRequestSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("edit"),
-    listingId: z.string(),
-    proposedData: proposedDataSchema,
-    reason: z.string().trim().min(1).max(1000),
-  }),
-  z.object({
-    type: z.literal("new_listing"),
-    categoryId: z.string(),
-    proposedData: proposedDataSchema,
-    reason: z.string().trim().min(1).max(1000),
-  }),
-]);
+// Only "new_listing" goes through this request/review flow now — a
+// never-before-seen product is exactly the case worth Kuwana's first look
+// (same reasoning as ScrapedItem's pending/approved/rejected state for a
+// brand-new candidate). Editing a listing the business already owns is a
+// direct write instead (PATCH /api/corporate/listings/[id]) since it's
+// their own data — see corporateListingSchema.ts.
+export const createCorporateRequestSchema = z.object({
+  type: z.literal("new_listing"),
+  categoryId: z.string(),
+  proposedData: proposedDataSchema,
+  reason: z.string().trim().min(1).max(1000),
+});

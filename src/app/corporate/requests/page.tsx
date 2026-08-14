@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { emailDomain } from "@/lib/orgVerification";
-import { Header } from "@/components/Header";
-import { Badge, Card } from "@/components/ui/Card";
-import { CorporatePortalNav } from "@/components/corporate/CorporatePortalNav";
+import { Card } from "@/components/ui/Card";
+import { CorporateTag } from "@/components/corporate/CorporateTag";
 
 const STATUS_TONE = {
   pending: "sky",
@@ -26,16 +25,12 @@ export default async function CorporateRequestsPage() {
 
   if (!provider) {
     return (
-      <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-        <Header />
-        <CorporatePortalNav active="/corporate/requests" />
-        <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
-          <h1 className="font-display text-[20px] font-bold">Not linked yet</h1>
-          <p className="mt-2 text-[13px] text-text-secondary">
-            Your account has corporate access, but your company isn&apos;t linked to a product
-            catalog yet. Ask an admin to link your email domain at /admin/catalog.
-          </p>
-        </div>
+      <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
+        <h1 className="font-display text-[18px] font-bold">Not linked yet</h1>
+        <p className="mt-2 text-[13px] text-text-secondary">
+          Your account has corporate access, but your company isn&apos;t linked to a product
+          catalog yet. Ask an admin to link your email domain at /admin/catalog.
+        </p>
       </div>
     );
   }
@@ -47,25 +42,19 @@ export default async function CorporateRequestsPage() {
   });
 
   return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-      <Header />
-      <div className="mt-4">
-        <p className="text-[13px] text-text-secondary">Corporate account</p>
-        <h1 className="font-display text-[24px] font-bold">Requests</h1>
-      </div>
+    <div>
+      <h1 className="font-display text-[20px] font-bold">Requests</h1>
 
-      <CorporatePortalNav active="/corporate/requests" />
-
-      <div className="mt-6 grid gap-3">
+      <div className="mt-4 grid gap-2.5">
         {requests.map((r) => {
           const proposed = r.proposedData as { name: string };
           return (
-            <Card key={r.id}>
+            <Card key={r.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-medium">
+                <p className="text-[13.5px] font-medium">
                   {r.type === "edit" ? `Edit "${r.listing?.name ?? proposed.name}"` : `New product "${proposed.name}"`}
                 </p>
-                <Badge tone={STATUS_TONE[r.status]}>{r.status}</Badge>
+                <CorporateTag tone={STATUS_TONE[r.status]}>{r.status}</CorporateTag>
               </div>
               <p className="mt-1.5 text-[12.5px] text-text-secondary">{r.reason}</p>
               {r.status === "rejected" && r.rejectionReason && (

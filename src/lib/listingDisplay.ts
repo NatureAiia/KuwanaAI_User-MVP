@@ -20,3 +20,16 @@ export const FRESHNESS_TONE: Record<ListingDTO["freshnessStatus"], "teal" | "sky
   stale: "sky",
   unverified: "coral",
 };
+
+/**
+ * Public-facing label for who/what last touched a listing's data
+ * (Listing.lastUpdateSource) — deliberately excludes "corporate", which is
+ * rendered as the provider's own name at the call site instead of a generic
+ * label, and deliberately never includes an admin's email even internally
+ * (see ListingUpdateLog.actorLabel for that) — this is what shoppers see.
+ */
+export const PROVENANCE_LABEL: Record<"admin" | "scraper" | "seed", string> = {
+  admin: "Kuwana Team",
+  scraper: "Automated web scan",
+  seed: "Kuwana Team",
+};

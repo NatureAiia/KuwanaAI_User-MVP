@@ -3,11 +3,9 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { emailDomain } from "@/lib/orgVerification";
-import { Header } from "@/components/Header";
-import { LogoutButton } from "@/components/LogoutButton";
 import { LinkButton } from "@/components/ui/Button";
-import { Badge, Card } from "@/components/ui/Card";
-import { CorporatePortalNav } from "@/components/corporate/CorporatePortalNav";
+import { CorporateTag } from "@/components/corporate/CorporateTag";
+import { PROVENANCE_LABEL } from "@/lib/listingDisplay";
 
 export default async function CorporateProductsPage() {
   const user = await requireUser();
@@ -23,16 +21,12 @@ export default async function CorporateProductsPage() {
 
   if (!provider) {
     return (
-      <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-        <Header />
-        <CorporatePortalNav active="/corporate/products" />
-        <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
-          <h1 className="font-display text-[20px] font-bold">Not linked yet</h1>
-          <p className="mt-2 text-[13px] text-text-secondary">
-            Your account has corporate access, but your company isn&apos;t linked to a product
-            catalog yet. Ask an admin to link your email domain at /admin/catalog.
-          </p>
-        </div>
+      <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
+        <h1 className="font-display text-[18px] font-bold">Not linked yet</h1>
+        <p className="mt-2 text-[13px] text-text-secondary">
+          Your account has corporate access, but your company isn&apos;t linked to a product
+          catalog yet. Ask an admin to link your email domain at /admin/catalog.
+        </p>
       </div>
     );
   }
@@ -44,50 +38,52 @@ export default async function CorporateProductsPage() {
   });
 
   return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
-      <Header />
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[13px] text-text-secondary">Corporate account</p>
-          <h1 className="font-display text-[24px] font-bold">{provider.name}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <LinkButton href="/corporate/products/new" size="md">
-            + Request new product
-          </LinkButton>
-          <LogoutButton />
-        </div>
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-[20px] font-bold">Products</h1>
+        <LinkButton href="/corporate/products/new" size="md">
+          + Request new product
+        </LinkButton>
       </div>
 
-      <CorporatePortalNav active="/corporate/products" />
-
-      <div className="mt-6 grid gap-3">
-        {listings.map((l) => (
-          <Card key={l.id} className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-border">
+        {listings.map((l, i) => (
+          <div
+            key={l.id}
+            className={`flex flex-wrap items-center justify-between gap-3 bg-bg-surface p-3.5 ${
+              i > 0 ? "border-t border-border" : ""
+            }`}
+          >
             <div>
-              <p className="font-medium">{l.name}</p>
+              <p className="text-[13.5px] font-medium">{l.name}</p>
               <p className="text-[11px] text-text-muted">
                 {l.category.sector.name} / {l.category.name}
               </p>
+              <p className="mt-0.5 text-[11px] text-text-muted">
+                Last updated by {l.lastUpdateSource === "corporate" ? "you" : PROVENANCE_LABEL[l.lastUpdateSource]},{" "}
+                {l.lastVerifiedAt.toLocaleDateString()}
+              </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="font-mono text-[14px]">
+              <span className="font-mono text-[13.5px]">
                 {l.currency} {Number(l.price).toFixed(2)}
               </span>
-              <Badge tone={l.status === "published" ? "teal" : l.status === "pending_review" ? "sky" : "neutral"}>
+              <CorporateTag tone={l.status === "published" ? "teal" : l.status === "pending_review" ? "sky" : "neutral"}>
                 {l.status.replace("_", " ")}
-              </Badge>
+              </CorporateTag>
               <Link
                 href={`/corporate/products/${l.id}/edit`}
                 className="tap-target text-[12.5px] font-semibold text-accent-sky hover:underline"
               >
-                Request edit
+                Edit
               </Link>
             </div>
-          </Card>
+          </div>
         ))}
         {listings.length === 0 && (
-          <p className="text-[13px] text-text-muted">No products yet — request your first one above.</p>
+          <p className="bg-bg-surface p-6 text-center text-[13px] text-text-muted">
+            No products yet — request your first one above.
+          </p>
         )}
       </div>
     </div>
