@@ -28,6 +28,7 @@ const PROTECTED_PREFIXES = [
   "/regulator",
   "/notifications",
   "/provider",
+  "/wallet",
 ];
 
 function isProtectedPath(pathname: string) {

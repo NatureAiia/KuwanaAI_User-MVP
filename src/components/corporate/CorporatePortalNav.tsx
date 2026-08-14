@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LineChart, Package, ClipboardList, Building2, ChevronsLeft, ChevronsRight, type LucideIcon } from "lucide-react";
+import { LineChart, Package, ClipboardList, Building2, Wallet, ChevronsLeft, ChevronsRight, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
@@ -13,6 +13,7 @@ const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/corporate/products", label: "My Products", icon: Package },
   { href: "/corporate/requests", label: "Requests", icon: ClipboardList },
   { href: "/corporate/profile", label: "Company Profile", icon: Building2 },
+  { href: "/wallet", label: "Wallet", icon: Wallet },
 ];
 
 // Resolves the active section from the URL itself (usePathname) rather than

@@ -192,7 +192,7 @@ export default function SignupPage() {
   const historyRef = useRef<Step[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -364,7 +364,7 @@ export default function SignupPage() {
               ? { role, regulatorName, consents }
               : {
                   role: "consumer" as const,
-                  fullName,
+                  username,
                   ageRange,
                   occupation,
                   socialPlatforms,
@@ -411,7 +411,7 @@ export default function SignupPage() {
     role,
     email,
     password,
-    fullName,
+    username,
     organizationName,
     regulatorName,
     ageRange,
@@ -437,7 +437,7 @@ export default function SignupPage() {
   function canContinue(s: ConsumerStep | "orgDetails") {
     switch (s) {
       case "account":
-        return !!(fullName.trim() && email.trim() && password.length >= 6);
+        return !!(/^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) && email.trim() && password.length >= 6);
       case "personal":
         return !!(ageRange && occupation);
       case "telecom":
@@ -543,12 +543,19 @@ export default function SignupPage() {
           <div className="mt-8 space-y-4">
             <h1 className="font-display text-[24px] font-bold">Create your account</h1>
             <label className="block">
-              <span className="text-[13px] font-medium text-text-secondary">Full name</span>
+              <span className="text-[13px] font-medium text-text-secondary">Username</span>
               <input
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                minLength={3}
+                maxLength={20}
+                pattern="[a-zA-Z0-9_]+"
+                title="Letters, numbers, and underscores only"
                 className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
+              <span className="mt-1 block text-[12px] text-text-muted">
+                This is your unique ID on Kuwana — letters, numbers, and underscores only.
+              </span>
             </label>
             <label className="block">
               <span className="text-[13px] font-medium text-text-secondary">Email</span>

@@ -4,19 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Card, Badge } from "@/components/ui/Card";
 import { getUsageReport } from "@/lib/ai/usage";
-
-const ADMIN_LINKS = [
-  { href: "/admin/catalog", label: "Catalog", blurb: "Providers and listings across every sector — create, edit, retire." },
-  { href: "/admin/adverts", label: "Adverts", blurb: "Promo slots that rotate through the explore page's ad card." },
-  { href: "/admin/users", label: "Users", blurb: "The only way to grant Corporate/Regulator/Provider access." },
-  { href: "/admin/social-mentions", label: "Social price mentions", blurb: "Review free-scanner posts that mention a price." },
-  { href: "/admin/scraper", label: "Web scraper", blurb: "Review scraped/searched pricing before it becomes a listing." },
-  { href: "/admin/corporate-requests", label: "Corporate requests", blurb: "Price/product changes submitted by corporate accounts, awaiting approval." },
-  { href: "/admin/pricing-intelligence", label: "Pricing intelligence", blurb: "Outlier pricing and sector-wide fee comparison across every category." },
-  { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status." },
-  { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change." },
-  { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend." },
-];
+import { ADMIN_LINKS } from "@/lib/adminNav";
 
 const ROLE_LABELS: Record<string, string> = {
   consumer: "Consumer",
@@ -34,6 +22,7 @@ export default async function AdminHubPage() {
   if (!admin) notFound();
 
   const [
+    dbUser,
     usersByRole,
     listingsByStatus,
     providerCount,
@@ -43,6 +32,7 @@ export default async function AdminHubPage() {
     pendingCorporateRequestCount,
     usage,
   ] = await Promise.all([
+    prisma.user.findUnique({ where: { id: admin.id }, select: { username: true } }),
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
     prisma.listing.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.provider.count(),
@@ -52,6 +42,7 @@ export default async function AdminHubPage() {
     prisma.corporateRequest.count({ where: { status: "pending" } }),
     getUsageReport(30),
   ]);
+  const username = dbUser?.username ?? admin.email;
 
   const roleCounts: Record<string, number> = { consumer: 0, corporate: 0, regulator: 0, provider: 0 };
   for (const row of usersByRole) roleCounts[row.role] = row._count._all;
@@ -60,9 +51,11 @@ export default async function AdminHubPage() {
   for (const row of listingsByStatus) statusCounts[row.status] = row._count._all;
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Admin</h1>
-      <p className="mt-1 text-[13px] text-text-secondary">Signed in as {admin.email}</p>
+      <p className="mt-1 text-[13px] text-text-secondary">
+        Signed in as {username} ({admin.email})
+      </p>
 
       <section className="mt-6">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">The four portals</h2>
@@ -132,7 +125,8 @@ export default async function AdminHubPage() {
         </div>
       </section>
 
-      <section className="mt-6">
+      {/* Desktop nav lives in the sidebar (see AdminSidebar) — this grid is the mobile equivalent, since the sidebar is hidden below md. */}
+      <section className="mt-6 md:hidden">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">Manage</h2>
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {ADMIN_LINKS.map((link) => (

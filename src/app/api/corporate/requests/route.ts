@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireOwnCorporateOrg } from "@/lib/corporateAuth";
 import { createCorporateRequestSchema } from "@/lib/corporateRequestSchema";
+import { computeRequestDueAt } from "@/lib/corporateRequestSla";
 
 // Only "new_listing" requests are created here — editing a listing the
 // business already owns is a direct write (PATCH /api/corporate/listings/[id]),
@@ -24,6 +25,7 @@ export async function POST(req: Request) {
       categoryId: data.categoryId,
       proposedData: data.proposedData as Prisma.InputJsonValue,
       reason: data.reason,
+      dueAt: computeRequestDueAt(),
     },
   });
 

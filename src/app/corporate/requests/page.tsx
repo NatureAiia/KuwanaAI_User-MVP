@@ -1,9 +1,11 @@
-import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { emailDomain } from "@/lib/orgVerification";
+import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { Card } from "@/components/ui/Card";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
+import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
+import { SlaBadge } from "@/components/corporate/SlaBadge";
+import { DownloadRequestPdfButton } from "@/components/corporate/DownloadRequestPdfButton";
+import { formatDateTime } from "@/lib/format";
 
 const STATUS_TONE = {
   pending: "sky",
@@ -12,32 +14,13 @@ const STATUS_TONE = {
 } as const;
 
 export default async function CorporateRequestsPage() {
-  const user = await requireUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
-  if (dbUser?.role !== "corporate") redirect("/dashboard");
-
-  const domain = user.email ? emailDomain(user.email) : null;
-  const provider = domain
-    ? await prisma.provider.findFirst({ where: { corporateDomain: domain } })
-    : null;
-
-  if (!provider) {
-    return (
-      <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
-        <h1 className="font-display text-[18px] font-bold">Not linked yet</h1>
-        <p className="mt-2 text-[13px] text-text-secondary">
-          Your account has corporate access, but your company isn&apos;t linked to a product
-          catalog yet. Ask an admin to link your email domain at /admin/catalog.
-        </p>
-      </div>
-    );
-  }
+  const result = await requireCorporateProvider();
+  if ("notLinked" in result) return <NotLinkedCard />;
+  const { provider } = result;
 
   const requests = await prisma.corporateRequest.findMany({
     where: { providerId: provider.id },
-    include: { listing: { select: { name: true } } },
+    include: { listing: { select: { name: true, price: true, currency: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -47,23 +30,50 @@ export default async function CorporateRequestsPage() {
 
       <div className="mt-4 grid gap-2.5">
         {requests.map((r) => {
-          const proposed = r.proposedData as { name: string };
+          const proposed = r.proposedData as { name: string; price: number; currency: string };
           return (
             <Card key={r.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[13.5px] font-medium">
                   {r.type === "edit" ? `Edit "${r.listing?.name ?? proposed.name}"` : `New product "${proposed.name}"`}
                 </p>
-                <CorporateTag tone={STATUS_TONE[r.status]}>{r.status}</CorporateTag>
+                <div className="flex items-center gap-1.5">
+                  <SlaBadge dueAt={r.dueAt} status={r.status} />
+                  <CorporateTag tone={STATUS_TONE[r.status]}>{r.status}</CorporateTag>
+                </div>
               </div>
               <p className="mt-1.5 text-[12.5px] text-text-secondary">{r.reason}</p>
               {r.status === "rejected" && r.rejectionReason && (
                 <p className="mt-1.5 text-[12.5px] text-accent-coral">Reviewer note: {r.rejectionReason}</p>
               )}
-              <p className="mt-2 text-[11px] text-text-muted">
-                Submitted {r.createdAt.toISOString().replace("T", " ").slice(0, 19)}
-                {r.reviewedAt && ` · Reviewed ${r.reviewedAt.toISOString().replace("T", " ").slice(0, 19)}`}
-              </p>
+              {r.status === "approved" && r.reviewNote && (
+                <p className="mt-1.5 text-[12.5px] text-text-secondary">Reviewer note: {r.reviewNote}</p>
+              )}
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] text-text-muted">
+                  Submitted {formatDateTime(r.createdAt)}
+                  {r.reviewedAt && ` · Reviewed ${formatDateTime(r.reviewedAt)}`}
+                </p>
+                {r.status !== "pending" && (
+                  <DownloadRequestPdfButton
+                    data={{
+                      id: r.id,
+                      type: r.type,
+                      providerName: provider.name,
+                      listingName: r.listing?.name ?? proposed.name,
+                      price: proposed.price,
+                      currency: proposed.currency,
+                      reason: r.reason,
+                      status: r.status,
+                      reviewedByEmail: r.reviewedByEmail,
+                      reviewedAt: r.reviewedAt,
+                      reviewNote: r.reviewNote,
+                      rejectionReason: r.rejectionReason,
+                      createdAt: r.createdAt,
+                    }}
+                  />
+                )}
+              </div>
             </Card>
           );
         })}

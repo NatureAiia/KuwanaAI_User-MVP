@@ -15,7 +15,7 @@ export default async function AdminUsersPage() {
   });
 
   return (
-    <div className="mx-auto max-w-[720px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Users</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         {users.length} user(s). Corporate/Provider/Regulator can now self-register with a verified

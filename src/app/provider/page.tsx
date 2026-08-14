@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getProviderListingStats } from "@/lib/catalog";
 import { Header } from "@/components/Header";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { LogoutButton } from "@/components/LogoutButton";
 import { LinkButton } from "@/components/ui/Button";
 import { ProviderStatsRow } from "@/components/provider/ProviderStatsRow";
@@ -35,7 +36,7 @@ export default async function ProviderPortalPage({
 
   if (!provider) {
     return (
-      <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+      <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
         <Header />
         <div className="mt-6 rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
           <h1 className="font-display text-[20px] font-bold">Not linked yet</h1>
@@ -44,6 +45,7 @@ export default async function ProviderPortalPage({
             an admin to link your email at /admin/catalog.
           </p>
         </div>
+        <BottomTabBar />
       </div>
     );
   }
@@ -92,7 +94,7 @@ export default async function ProviderPortalPage({
   }
 
   return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -156,6 +158,8 @@ export default async function ProviderPortalPage({
           comparisonAppearances: stats[l.id]?.comparisonAppearances ?? 0,
         }))}
       />
+
+      <BottomTabBar />
     </div>
   );
 }

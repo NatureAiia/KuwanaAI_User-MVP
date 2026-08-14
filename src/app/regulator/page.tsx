@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getComplianceActivity } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
+import { BottomTabBar } from "@/components/BottomTabBar";
 import { Card, Badge } from "@/components/ui/Card";
 import { LogoutButton } from "@/components/LogoutButton";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
@@ -39,7 +40,7 @@ export default async function RegulatorDashboardPage({
   const totalUnverified = bySector.reduce((sum, s) => sum + s.unverifiedCount, 0);
 
   return (
-    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-12 pt-6 md:px-10">
+    <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
       <div className="mt-4 flex items-center justify-between">
         <div>
@@ -233,6 +234,8 @@ export default async function RegulatorDashboardPage({
           ))}
         </div>
       </section>
+
+      <BottomTabBar />
     </div>
   );
 }

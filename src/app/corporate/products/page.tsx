@@ -1,35 +1,16 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { emailDomain } from "@/lib/orgVerification";
+import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { LinkButton } from "@/components/ui/Button";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
+import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { PROVENANCE_LABEL } from "@/lib/listingDisplay";
+import { formatDate } from "@/lib/format";
 
 export default async function CorporateProductsPage() {
-  const user = await requireUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
-  if (dbUser?.role !== "corporate") redirect("/dashboard");
-
-  const domain = user.email ? emailDomain(user.email) : null;
-  const provider = domain
-    ? await prisma.provider.findFirst({ where: { corporateDomain: domain } })
-    : null;
-
-  if (!provider) {
-    return (
-      <div className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-6">
-        <h1 className="font-display text-[18px] font-bold">Not linked yet</h1>
-        <p className="mt-2 text-[13px] text-text-secondary">
-          Your account has corporate access, but your company isn&apos;t linked to a product
-          catalog yet. Ask an admin to link your email domain at /admin/catalog.
-        </p>
-      </div>
-    );
-  }
+  const result = await requireCorporateProvider();
+  if ("notLinked" in result) return <NotLinkedCard />;
+  const { provider } = result;
 
   const listings = await prisma.listing.findMany({
     where: { providerId: provider.id },
@@ -61,7 +42,7 @@ export default async function CorporateProductsPage() {
               </p>
               <p className="mt-0.5 text-[11px] text-text-muted">
                 Last updated by {l.lastUpdateSource === "corporate" ? "you" : PROVENANCE_LABEL[l.lastUpdateSource]},{" "}
-                {l.lastVerifiedAt.toLocaleDateString()}
+                {formatDate(l.lastVerifiedAt)}
               </p>
             </div>
             <div className="flex items-center gap-3">

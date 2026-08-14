@@ -88,7 +88,7 @@ export default async function AdminLlmPage({
   const maxDailyCost = Math.max(...report.daily.map((p) => p.costUsd), 0);
 
   return (
-    <div className="mx-auto max-w-[860px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1040px] px-5 py-8 md:px-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-[24px] font-bold">AI models &amp; cost</h1>

@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { clsx } from "clsx";
 import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid, Scale } from "lucide-react";
-import { requireUser } from "@/lib/auth";
+import { requireCorporateUser } from "@/lib/corporateAuth";
 import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
 import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
@@ -19,11 +18,7 @@ export default async function CorporateDashboardPage({
 }: {
   searchParams: Promise<{ sector?: string }>;
 }) {
-  const user = await requireUser();
-  if (!user) redirect("/login");
-
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
-  if (dbUser?.role !== "corporate") redirect("/dashboard");
+  const user = await requireCorporateUser();
 
   const { sector: sectorFilter } = await searchParams;
   const activeSector =

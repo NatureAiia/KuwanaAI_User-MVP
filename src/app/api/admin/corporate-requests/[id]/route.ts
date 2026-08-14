@@ -8,7 +8,7 @@ import { recordPriceChange } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("approve") }),
+  z.object({ action: z.literal("approve"), note: z.string().max(500).optional() }),
   z.object({ action: z.literal("reject"), reason: z.string().max(500).optional() }),
 ]);
 
@@ -99,7 +99,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   await prisma.corporateRequest.update({
     where: { id },
-    data: { status: "approved", reviewedByEmail: admin.email, reviewedAt: new Date() },
+    data: {
+      status: "approved",
+      reviewedByEmail: admin.email,
+      reviewedAt: new Date(),
+      reviewNote: parsed.data.note ?? null,
+    },
   });
   await logAdminAction({
     adminEmail: admin.email,

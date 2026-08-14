@@ -14,7 +14,7 @@ export default async function AdminAdvertsPage() {
   const adverts = await prisma.advert.findMany({ orderBy: { createdAt: "desc" } });
 
   return (
-    <div className="mx-auto max-w-[1000px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1200px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Adverts</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         {adverts.length} advert(s). Active ones rotate through the explore page&apos;s ad slot, one minute each.

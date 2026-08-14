@@ -16,7 +16,11 @@ type AdminAuditAction =
   | "scrape_source_created"
   | "corporate_request_approved"
   | "corporate_request_rejected"
-  | "corporate_domain_linked";
+  | "corporate_domain_linked"
+  | "discount_rule_created"
+  | "discount_rule_deleted"
+  | "economic_driver_upserted"
+  | "economic_driver_deleted";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -35,7 +39,9 @@ export async function logAdminAction(params: {
     | "advert"
     | "scrape_source"
     | "scraped_item"
-    | "corporate_request";
+    | "corporate_request"
+    | "discount_rule"
+    | "economic_driver";
   targetId: string;
   detail: string;
 }): Promise<void> {

@@ -25,7 +25,14 @@ const consentsSchema = z.object({
 
 const consumerSchema = z.object({
   role: z.literal("consumer"),
-  fullName: z.string().min(1),
+  // A unique handle, not a display name — enforced unique on `users.username`
+  // in route.ts/schema.prisma. Restricted to a safe ID charset since it's
+  // used as a stable identifier, not just shown on a profile.
+  username: z
+    .string()
+    .min(3)
+    .max(20)
+    .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
   ageRange: z.string().optional(),
   occupation: z.string().optional(),
   location: z.string().optional(),

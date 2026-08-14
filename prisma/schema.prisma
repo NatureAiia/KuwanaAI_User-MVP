@@ -33,6 +33,9 @@ enum Role {
 model User {
   id              String   @id @default(uuid())
   email           String   @unique
+  // The user-facing unique handle captured at signup (replaces the old free-text
+  // "full name" field) — doubles as a stable, human-picked identifier alongside `id`.
+  username        String   @unique
   role            Role     @default(consumer)
   createdAt       DateTime @default(now()) @map("created_at")
   // Grants access to specific gated sub-features regardless of role (e.g.
@@ -370,7 +373,14 @@ model CorporateRequest {
   status            CorporateRequestStatus @default(pending)
   reviewedByEmail   String?                @map("reviewed_by_email")
   reviewedAt        DateTime?              @map("reviewed_at")
+  // Admin's confirmation note on approval — a lightweight "digital sign-off"
+  // (this app has no e-signature capture anywhere), distinct from
+  // rejectionReason which is shown back to the business, not internal.
+  reviewNote        String?                @map("review_note")
   rejectionReason   String?                @map("rejection_reason")
+  // Set on creation (see corporateRequestSla.ts) so the review queue can
+  // surface how close a request is to breaching its review window.
+  dueAt             DateTime?              @map("due_at")
   createdAt         DateTime               @default(now()) @map("created_at")
 
   @@index([providerId])

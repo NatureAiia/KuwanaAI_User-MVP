@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, X } from "lucide-react";
 import { Badge, Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { SlaBadge } from "@/components/corporate/SlaBadge";
 
 type ProposedData = {
   name: string;
@@ -25,11 +26,14 @@ export function CorporateRequestReview({
     proposedData: ProposedData;
     listing: { id: string; name: string; price: unknown; currency: string } | null;
     category: { name: string; sector: { name: string } } | null;
+    dueAt?: Date | string | null;
   };
 }) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState(false);
+  const [signingOff, setSigningOff] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [approvalNote, setApprovalNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -40,7 +44,7 @@ export function CorporateRequestReview({
       const res = await fetch(`/api/admin/corporate-requests/${request.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "approve" }),
+        body: JSON.stringify({ action: "approve", note: approvalNote || undefined }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -86,6 +90,7 @@ export function CorporateRequestReview({
             New product{request.category ? ` — ${request.category.sector.name} / ${request.category.name}` : ""}
           </Badge>
         )}
+        <SlaBadge dueAt={request.dueAt ?? null} status="pending" />
       </div>
 
       <div className="grid gap-2 text-[13px] sm:grid-cols-2">
@@ -137,11 +142,33 @@ export function CorporateRequestReview({
             </Button>
           </div>
         </div>
+      ) : signingOff ? (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-[12px] text-text-secondary">
+            Confirming applies this change to the live catalog immediately. Optionally leave an internal note.
+          </p>
+          <input
+            autoFocus
+            placeholder="Sign-off note (optional, internal only)"
+            value={approvalNote}
+            onChange={(e) => setApprovalNote(e.target.value)}
+            className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[12px]"
+          />
+          <div className="flex gap-1.5">
+            <Button onClick={approve} disabled={loading} className="!bg-accent-teal">
+              <Check size={14} />
+              {loading ? "Approving…" : "Confirm approval"}
+            </Button>
+            <Button variant="ghost" size="md" onClick={() => setSigningOff(false)} disabled={loading}>
+              Cancel
+            </Button>
+          </div>
+        </div>
       ) : (
         <div className="flex gap-1.5">
-          <Button onClick={approve} disabled={loading} className="!bg-accent-teal">
+          <Button onClick={() => setSigningOff(true)} disabled={loading} className="!bg-accent-teal">
             <Check size={14} />
-            {loading ? "Approving…" : "Approve"}
+            Approve
           </Button>
           <Button variant="secondary" onClick={() => setRejecting(true)} disabled={loading}>
             <X size={14} />

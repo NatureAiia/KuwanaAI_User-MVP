@@ -26,7 +26,7 @@ export default async function SocialMentionsPage({
   });
 
   return (
-    <div className="mx-auto max-w-[880px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1080px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Social price mentions</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Public posts from the free social scanner (Reddit, Telegram) that mention a price.

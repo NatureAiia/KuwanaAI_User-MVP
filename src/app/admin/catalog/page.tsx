@@ -47,7 +47,7 @@ export default async function AdminCatalogPage({
   ]);
 
   return (
-    <div className="mx-auto max-w-[1000px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1200px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Catalog</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         {listings.length} listing(s) across {categories.length} categor{categories.length === 1 ? "y" : "ies"} ·{" "}

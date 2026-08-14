@@ -73,6 +73,7 @@ export function computeOutlierScore(price: number, stats: PeerPriceStats): Outli
 export type ProviderFeeComparison = {
   listingId: string;
   listingName: string;
+  categoryId: string;
   categoryName: string;
   price: number;
   currency: string;
@@ -108,6 +109,7 @@ export async function getProviderFeeComparison(providerId: string): Promise<Prov
     results.push({
       listingId: listing.id,
       listingName: listing.name,
+      categoryId: listing.categoryId,
       categoryName: listing.category.name,
       price,
       currency: listing.currency,

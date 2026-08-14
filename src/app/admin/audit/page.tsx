@@ -20,7 +20,7 @@ export default async function AdminAuditPage() {
   const entries = await prisma.adminAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
 
   return (
-    <div className="mx-auto max-w-[880px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1080px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Audit log</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Every admin approve/reject, provider link/unlink, and role change — most recent first. Tracking started

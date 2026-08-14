@@ -38,6 +38,16 @@ export async function POST(req: Request) {
   }
   const data = parsed.data;
 
+  if (data.role === "consumer") {
+    const existingUsername = await prisma.user.findUnique({
+      where: { username: data.username },
+      select: { id: true },
+    });
+    if (existingUsername && existingUsername.id !== authUser.id) {
+      return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
+    }
+  }
+
   // The security boundary for Corporate/Regulator lives here, not in the
   // schema — both checks key off authUser.email (from Supabase's verified
   // session), which the client can't spoof, unlike a role in the request
@@ -67,19 +77,28 @@ export async function POST(req: Request) {
 
   const profileName =
     data.role === "consumer"
-      ? data.fullName
+      ? data.username
       : data.role === "corporate"
         ? data.organizationName
         : data.role === "provider"
           ? data.businessName
           : data.regulatorName;
 
+  // Only consumers pick a username at signup. Corporate/provider/regulator
+  // accounts still need one to satisfy `users.username`'s NOT NULL + UNIQUE
+  // constraint, so derive a stable one from their org name — it's never
+  // shown or editable for those roles.
+  const username =
+    data.role === "consumer"
+      ? data.username
+      : `${profileName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20) || data.role}_${authUser.id.slice(0, 8)}`;
+
   const gamification = await prisma.$transaction(
     async (tx) => {
       await tx.user.upsert({
         where: { id: authUser.id },
-        update: { email: authUser.email!, role: data.role },
-        create: { id: authUser.id, email: authUser.email!, role: data.role },
+        update: { email: authUser.email!, role: data.role, username },
+        create: { id: authUser.id, email: authUser.email!, role: data.role, username },
       });
 
       await tx.userProfile.upsert({

@@ -7,14 +7,14 @@ describe("onboardingBodySchema role", () => {
   it("accepts an explicit role: consumer", () => {
     const result = onboardingBodySchema.safeParse({
       role: "consumer",
-      fullName: "Test User",
+      username: "test_user",
       consents: CONSENTS,
     });
     expect(result.success).toBe(true);
   });
 
   it("defaults role to consumer when omitted", () => {
-    const result = onboardingBodySchema.safeParse({ fullName: "Test User", consents: CONSENTS });
+    const result = onboardingBodySchema.safeParse({ username: "test_user", consents: CONSENTS });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.role).toBe("consumer");
   });

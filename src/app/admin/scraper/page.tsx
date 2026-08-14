@@ -30,7 +30,7 @@ export default async function AdminScraperPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1100px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Web scraper</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Fetches and extracts pricing from the web — nothing here reaches the catalog until it&apos;s

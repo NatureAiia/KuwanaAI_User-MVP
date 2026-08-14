@@ -24,7 +24,7 @@ export default async function AdminTransactionsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-[880px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1080px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Transactions</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Every Paynow wallet top-up attempt, most recent first.

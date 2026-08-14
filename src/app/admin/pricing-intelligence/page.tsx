@@ -20,7 +20,7 @@ export default async function AdminPricingIntelligencePage() {
   const narrativesBySector = new Map(narrativeEntries);
 
   return (
-    <div className="mx-auto max-w-[880px] px-5 py-8 md:px-10">
+    <div className="mx-auto max-w-[1080px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Pricing intelligence</h1>
       <p className="mt-1 text-[13px] text-text-secondary">
         Outlier pricing and sector-wide fee comparison across every category — a listing is flagged when its price
