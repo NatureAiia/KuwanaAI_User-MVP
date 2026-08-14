@@ -68,11 +68,11 @@ export async function requireConsumerOrProvider(): Promise<
 }
 
 /**
- * No "admin" role exists in the Role enum yet (consumer/corporate/regulator/
- * provider only — see schema.prisma) — adding one is a real decision (who
- * else can hold it, does it need its own onboarding) that shouldn't be
- * smuggled in via a migration for one review page. This checks against a
- * plain email allowlist instead; swap for a real role once one exists.
+ * `admin` is now a real Role (see schema.prisma), but the original
+ * ADMIN_EMAILS allowlist stays as a fallback during the transition — any
+ * email in it is treated as admin even before its User row is migrated to
+ * role: admin (see scripts/migrate-admin-role.ts). Drop the allowlist check
+ * once every operator account has been migrated.
  */
 export async function requireAdmin(): Promise<
   (NonNullable<Awaited<ReturnType<typeof requireUser>>> & { email: string }) | null
@@ -83,8 +83,10 @@ export async function requireAdmin(): Promise<
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
+  const isAllowlisted = allowlist.includes(user.email.toLowerCase());
+  const isAdminRole = !isAllowlisted && (await getUserRole(user.id)) === "admin";
   // The `!user?.email` check above already guarantees email is a string —
   // this cast just reflects that in the type once, instead of every call
   // site that reads admin.email needing its own non-null assertion.
-  return allowlist.includes(user.email.toLowerCase()) ? (user as typeof user & { email: string }) : null;
+  return isAllowlisted || isAdminRole ? (user as typeof user & { email: string }) : null;
 }

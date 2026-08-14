@@ -12,7 +12,13 @@
 export type AiProvider = "anthropic" | "openrouter" | "ollama";
 
 /** Every distinct place the app calls a model. One selectable model each. */
-export const AI_FEATURES = ["chat", "recommendations", "intake", "scrape_extract"] as const;
+export const AI_FEATURES = [
+  "chat",
+  "recommendations",
+  "intake",
+  "scrape_extract",
+  "pricing_intelligence_narrative",
+] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
 export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
@@ -20,6 +26,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   recommendations: "Compare recommendation",
   intake: "Need-intake routing",
   scrape_extract: "Web-scrape extraction",
+  pricing_intelligence_narrative: "Pricing intelligence narrative",
 };
 
 export const AI_FEATURE_BLURBS: Record<AiFeature, string> = {
@@ -27,6 +34,8 @@ export const AI_FEATURE_BLURBS: Record<AiFeature, string> = {
   recommendations: "Structured pick-the-best-listing output on the compare screen.",
   intake: "Cheap, high-volume classifier routing a plain-language need to a sector/category.",
   scrape_extract: "Turns a scraped page into structured listing fields for admin review in /admin/scraper.",
+  pricing_intelligence_narrative:
+    "Explains outlier/peer pricing signals on /admin/pricing-intelligence and the corporate fee-comparison panel. Never decides which listing is an outlier — the heuristic already did that.",
 };
 
 export type ModelSpec = {
@@ -135,6 +144,7 @@ export const DEFAULT_MODELS: Record<AiFeature, string> = {
   recommendations: "llama-3.2-vision",
   intake: "llama-3.2-vision",
   scrape_extract: "llama-3.2-vision",
+  pricing_intelligence_narrative: "llama-3.2-vision",
 };
 
 /** Cost of one call in USD, from token counts. Used when the provider doesn't report a cost. */

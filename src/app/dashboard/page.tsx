@@ -16,6 +16,7 @@ const ROLE_DASHBOARD: Partial<Record<string, string>> = {
   corporate: "/corporate",
   regulator: "/regulator",
   provider: "/provider",
+  admin: "/admin",
 };
 
 export default async function DashboardPage() {

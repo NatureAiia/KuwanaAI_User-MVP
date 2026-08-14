@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Role } from "@prisma/client";
 
-const ROLES: Role[] = ["consumer", "corporate", "regulator", "provider"];
+const ROLES: Role[] = ["consumer", "corporate", "regulator", "provider", "admin"];
 
 export function UserRoleSelect({ userId, currentRole }: { userId: string; currentRole: Role }) {
   const router = useRouter();

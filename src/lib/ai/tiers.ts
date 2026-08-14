@@ -45,6 +45,10 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // listing, so a wrong answer costs a reviewer a click rather than showing a
   // user something false — the cheap rung is the right default here too.
   scrape_extract: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  // A narrative explaining outliers the heuristic already found — never the
+  // decision itself, so a weak-but-free rung is the right default; escalation
+  // only kicks in if that rung actually fails to produce usable prose.
+  pricing_intelligence_narrative: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */
@@ -63,7 +67,8 @@ export type ComplexitySignals =
       messageLength: number;
       groundedListings: number;
     }
-  | { feature: "scrape_extract"; contentLength: number; attributeCount: number };
+  | { feature: "scrape_extract"; contentLength: number; attributeCount: number }
+  | { feature: "pricing_intelligence_narrative"; outlierCount: number; listingCount: number };
 
 /** Clamps to 0..1 so every scorer below can add freely without overshooting. */
 function clamp01(value: number): number {
@@ -120,6 +125,15 @@ export function scoreComplexity(signals: ComplexitySignals): number {
       const length = clamp01((signals.contentLength - 2000) / 8000);
       const breadth = clamp01((signals.attributeCount - 3) / 12);
       return clamp01(length * 0.6 + breadth * 0.4);
+    }
+
+    case "pricing_intelligence_narrative": {
+      // A sector with more outliers to explain, or a bigger catalog to
+      // contextualize them against, takes more reasoning to summarize
+      // coherently than a quiet sector with a handful of listings.
+      const outliers = clamp01(signals.outlierCount / 10);
+      const scale = clamp01((signals.listingCount - 10) / 90);
+      return clamp01(outliers * 0.7 + scale * 0.3);
     }
   }
 }

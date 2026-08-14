@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { clsx } from "clsx";
-import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid } from "lucide-react";
+import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid, Scale } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
+import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
 import { emailDomain } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card } from "@/components/ui/Card";
@@ -47,6 +48,7 @@ export default async function CorporateDashboardPage({
     ? await prisma.provider.findFirst({ where: { corporateDomain: domain }, select: { id: true } })
     : null;
   const competitorWatch = provider ? await getCompetitorWatch(provider.id) : [];
+  const feeComparison = provider ? await getProviderFeeComparison(provider.id) : [];
 
   return (
     <div>
@@ -161,6 +163,47 @@ export default async function CorporateDashboardPage({
             </div>
           </section>
         </>
+      )}
+
+      {feeComparison.length > 0 && (
+        <section className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <Scale size={13} strokeWidth={2.25} /> Fee comparison
+          </h2>
+          <p className="mt-1 text-[12px] text-text-secondary">
+            Your listed price against the category peer median. A flagged listing sits far enough from its peers
+            to be worth a second look — not a claim that it&apos;s wrong.
+          </p>
+          <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
+            {feeComparison.map((f, i) => {
+              const belowMedian = f.price < f.peerMedian;
+              return (
+                <div
+                  key={f.listingId}
+                  className={`flex flex-wrap items-center justify-between gap-2 bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
+                >
+                  <div>
+                    <p className="text-[13.5px] font-medium">{f.listingName}</p>
+                    <p className="text-[11px] text-text-muted">{f.categoryName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[13.5px]">
+                      {f.currency} {f.price.toFixed(2)}
+                    </span>
+                    {f.sampleSize >= 5 ? (
+                      <CorporateTag tone={belowMedian ? "teal" : "coral"}>
+                        peer median {f.peerMedian.toFixed(2)}
+                      </CorporateTag>
+                    ) : (
+                      <CorporateTag tone="neutral">too few peers to compare</CorporateTag>
+                    )}
+                    {f.isOutlier && <CorporateTag tone="coral">worth a look (z {f.zScore.toFixed(2)})</CorporateTag>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {competitorWatch.length > 0 && (

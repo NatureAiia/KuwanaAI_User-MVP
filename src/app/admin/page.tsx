@@ -12,6 +12,8 @@ const ADMIN_LINKS = [
   { href: "/admin/social-mentions", label: "Social price mentions", blurb: "Review free-scanner posts that mention a price." },
   { href: "/admin/scraper", label: "Web scraper", blurb: "Review scraped/searched pricing before it becomes a listing." },
   { href: "/admin/corporate-requests", label: "Corporate requests", blurb: "Price/product changes submitted by corporate accounts, awaiting approval." },
+  { href: "/admin/pricing-intelligence", label: "Pricing intelligence", blurb: "Outlier pricing and sector-wide fee comparison across every category." },
+  { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status." },
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change." },
   { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend." },
 ];
