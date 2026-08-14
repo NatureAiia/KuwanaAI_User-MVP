@@ -12,6 +12,7 @@ import {
   type AiFeature,
 } from "@/lib/ai/models";
 import { LadderEditor } from "./LadderEditor";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 // Usage rows are written on every model call, so a cached render would show an
 // admin stale spend the moment anyone uses the app.
@@ -270,6 +271,7 @@ export default async function AdminLlmPage({
 
       <section className="mt-8">
         <h2 className="font-display text-text-secondary text-[14px] font-semibold">By model</h2>
+        <SearchableSection placeholder="Search models…">
         <Card className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[640px] text-[12px]">
             <thead className="text-text-muted border-border border-b text-[11px]">
@@ -285,7 +287,7 @@ export default async function AdminLlmPage({
             </thead>
             <tbody>
               {report.byModel.map((row) => (
-                <tr key={row.model} className="border-border/60 border-b last:border-0">
+                <tr key={row.model} data-search-row className="border-border/60 border-b last:border-0">
                   <td className="py-2">
                     <span className="font-medium">{row.label}</span>
                     <span className="text-text-muted ml-2 text-[10.5px]">{row.provider}</span>
@@ -303,10 +305,12 @@ export default async function AdminLlmPage({
             </tbody>
           </table>
         </Card>
+        </SearchableSection>
       </section>
 
       <section className="mt-8">
         <h2 className="font-display text-text-secondary text-[14px] font-semibold">By feature</h2>
+        <SearchableSection placeholder="Search features…">
         <Card className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[640px] text-[12px]">
             <thead className="text-text-muted border-border border-b text-[11px]">
@@ -322,7 +326,7 @@ export default async function AdminLlmPage({
             </thead>
             <tbody>
               {report.byFeature.map((row) => (
-                <tr key={row.feature} className="border-border/60 border-b last:border-0">
+                <tr key={row.feature} data-search-row className="border-border/60 border-b last:border-0">
                   <td className="py-2 font-medium">
                     {AI_FEATURE_LABELS[row.feature as AiFeature] ?? row.feature}
                   </td>
@@ -339,11 +343,13 @@ export default async function AdminLlmPage({
             </tbody>
           </table>
         </Card>
+        </SearchableSection>
       </section>
 
       <section className="mt-8">
         <h2 className="font-display text-text-secondary text-[14px] font-semibold">By user</h2>
         <p className="text-text-muted mt-1 text-[12px]">Top 50 by spend. Calls with no signed-in user aren&apos;t shown.</p>
+        <SearchableSection placeholder="Search users…">
         <Card className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[640px] text-[12px]">
             <thead className="text-text-muted border-border border-b text-[11px]">
@@ -359,7 +365,7 @@ export default async function AdminLlmPage({
             </thead>
             <tbody>
               {report.byUser.map((row) => (
-                <tr key={row.userId} className="border-border/60 border-b last:border-0">
+                <tr key={row.userId} data-search-row className="border-border/60 border-b last:border-0">
                   <td className="py-2 font-medium">{row.email ?? row.userId}</td>
                   <TotalsRow totals={row} />
                 </tr>
@@ -374,15 +380,17 @@ export default async function AdminLlmPage({
             </tbody>
           </table>
         </Card>
+        </SearchableSection>
       </section>
 
       {report.recentFailures.length > 0 && (
         <section className="mt-8">
           <h2 className="font-display text-text-secondary text-[14px] font-semibold">Recent failures</h2>
+          <SearchableSection placeholder="Search failures…">
           <Card className="mt-2">
             <ul className="flex flex-col gap-2">
               {report.recentFailures.map((failure) => (
-                <li key={failure.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
+                <li key={failure.id} data-search-row className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="coral">{failure.feature}</Badge>
                     <span className="text-text-muted font-mono text-[11px]">{failure.model}</span>
@@ -397,6 +405,7 @@ export default async function AdminLlmPage({
               ))}
             </ul>
           </Card>
+          </SearchableSection>
         </section>
       )}
     </div>

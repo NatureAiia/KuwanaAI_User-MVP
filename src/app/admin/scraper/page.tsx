@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Card";
 import { ScrapeSourceFormLazy, ScrapeSearchBoxLazy } from "@/components/LazyClients";
 import { ScrapeSourceRowActions } from "@/components/admin/ScrapeSourceRowActions";
 import { ScrapedItemReview, type ExtractedFields } from "@/components/admin/ScrapedItemReview";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 export default async function AdminScraperPage() {
   const admin = await requireAdmin();
@@ -44,7 +45,9 @@ export default async function AdminScraperPage() {
 
       <section className="mt-8">
         <h2 className="font-display text-[16px] font-semibold">Sources</h2>
-        <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+        <div className="mt-3">
+        <SearchableSection placeholder="Search sources…">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
           <table className="w-full min-w-[680px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border bg-bg-surface-raised text-left">
@@ -56,7 +59,7 @@ export default async function AdminScraperPage() {
             </thead>
             <tbody>
               {sources.map((s) => (
-                <tr key={s.id} className="border-b border-border last:border-0">
+                <tr key={s.id} data-search-row className="border-b border-border last:border-0">
                   <td className="p-3">
                     <p className="font-medium">{s.name}</p>
                     <a
@@ -90,6 +93,8 @@ export default async function AdminScraperPage() {
             </tbody>
           </table>
         </div>
+        </SearchableSection>
+        </div>
       </section>
 
       <section className="mt-8">
@@ -97,27 +102,32 @@ export default async function AdminScraperPage() {
           <h2 className="font-display text-[16px] font-semibold">Review queue</h2>
           {pendingItems.length > 0 && <Badge tone="sky">{pendingItems.length} pending</Badge>}
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3">
+        <SearchableSection placeholder="Search review queue…">
+        <div className="space-y-3">
           {pendingItems.map((item) => (
-            <ScrapedItemReview
-              key={item.id}
-              item={{
-                id: item.id,
-                sourceUrl: item.sourceUrl,
-                rawContent: item.rawContent,
-                confidence: item.confidence,
-                extractedData: item.extractedData as unknown as ExtractedFields,
-                categoryId: item.categoryId,
-                suggestedProvider: item.suggestedProvider,
-                suggestedListing: item.suggestedListing,
-              }}
-              categories={categories}
-              providers={providers}
-            />
+            <div key={item.id} data-search-row>
+              <ScrapedItemReview
+                item={{
+                  id: item.id,
+                  sourceUrl: item.sourceUrl,
+                  rawContent: item.rawContent,
+                  confidence: item.confidence,
+                  extractedData: item.extractedData as unknown as ExtractedFields,
+                  categoryId: item.categoryId,
+                  suggestedProvider: item.suggestedProvider,
+                  suggestedListing: item.suggestedListing,
+                }}
+                categories={categories}
+                providers={providers}
+              />
+            </div>
           ))}
           {pendingItems.length === 0 && (
             <p className="text-[13px] text-text-muted">Nothing pending — run a source or search above.</p>
           )}
+        </div>
+        </SearchableSection>
         </div>
       </section>
     </div>

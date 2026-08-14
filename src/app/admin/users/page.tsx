@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRoleSelect } from "@/components/admin/UserRoleSelect";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 export default async function AdminUsersPage() {
   const admin = await requireAdmin();
@@ -22,7 +23,9 @@ export default async function AdminUsersPage() {
         manually when verification can&apos;t apply.
       </p>
 
-      <div className="mt-6 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+      <div className="mt-6">
+      <SearchableSection placeholder="Search users…">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[560px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border bg-bg-surface-raised text-left">
@@ -33,7 +36,7 @@ export default async function AdminUsersPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id} className="border-b border-border last:border-0">
+              <tr key={u.id} data-search-row className="border-b border-border last:border-0">
                 <td className="p-3 font-medium">{u.email}</td>
                 <td className="p-3 text-text-secondary">{u.createdAt.toLocaleDateString()}</td>
                 <td className="p-3">
@@ -50,6 +53,8 @@ export default async function AdminUsersPage() {
             )}
           </tbody>
         </table>
+      </div>
+      </SearchableSection>
       </div>
     </div>
   );

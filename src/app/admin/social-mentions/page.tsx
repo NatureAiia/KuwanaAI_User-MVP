@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/Card";
 import { MentionReviewButton } from "@/components/admin/MentionReviewButton";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 import type { ExtractedPrice } from "@/lib/social-scan/extractPrices";
 
 export default async function SocialMentionsPage({
@@ -55,7 +56,9 @@ export default async function SocialMentionsPage({
         </Link>
       </div>
 
-      <div className="mt-5 space-y-3">
+      <div className="mt-5">
+      <SearchableSection placeholder="Search mentions…">
+      <div className="space-y-3">
         {mentions.length === 0 && (
           <p className="text-[13px] text-text-muted">
             {showReviewed ? "Nothing reviewed yet." : "No unreviewed mentions — run npm run scan:social."}
@@ -70,6 +73,7 @@ export default async function SocialMentionsPage({
           return (
             <div
               key={mention.id}
+              data-search-row
               className="rounded-[var(--radius-card)] border border-border bg-bg-surface p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -102,6 +106,8 @@ export default async function SocialMentionsPage({
             </div>
           );
         })}
+      </div>
+      </SearchableSection>
       </div>
     </div>
   );

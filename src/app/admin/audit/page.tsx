@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/Card";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 const ACTION_TONE: Record<string, "neutral" | "sky" | "teal" | "coral"> = {
   listing_approved: "teal",
@@ -26,11 +27,14 @@ export default async function AdminAuditPage() {
         2026-08-05; nothing before that was recorded.
       </p>
 
-      <div className="mt-5 flex flex-col gap-2">
+      <div className="mt-5">
+      <SearchableSection placeholder="Search audit log…">
+      <div className="flex flex-col gap-2">
         {entries.length === 0 && <p className="text-[13px] text-text-muted">No admin actions recorded yet.</p>}
         {entries.map((entry) => (
           <div
             key={entry.id}
+            data-search-row
             className="flex items-start justify-between gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-3"
           >
             <div>
@@ -45,6 +49,8 @@ export default async function AdminAuditPage() {
             </span>
           </div>
         ))}
+      </div>
+      </SearchableSection>
       </div>
     </div>
   );

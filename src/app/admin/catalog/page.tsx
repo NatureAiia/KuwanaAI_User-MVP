@@ -7,6 +7,7 @@ import { NewListingFormLazy, NewProviderFormLazy } from "@/components/LazyClient
 import { ListingRowActions } from "@/components/admin/ListingRowActions";
 import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
 import { CorporateDomainLink } from "@/components/admin/CorporateDomainLink";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
 
 const STATUS_TONE = {
@@ -80,7 +81,9 @@ export default async function AdminCatalogPage({
         <NewProviderFormLazy />
       </div>
 
-      <div className="mt-8 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+      <div className="mt-8">
+      <SearchableSection placeholder="Search listings…">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[820px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border bg-bg-surface-raised text-left">
@@ -95,7 +98,7 @@ export default async function AdminCatalogPage({
           </thead>
           <tbody>
             {listings.map((l) => (
-              <tr key={l.id} className="border-b border-border last:border-0">
+              <tr key={l.id} data-search-row className="border-b border-border last:border-0">
                 <td className="p-3 text-text-secondary">
                   {l.category.sector.name}
                   <span className="text-text-muted"> / {l.category.name}</span>
@@ -137,6 +140,8 @@ export default async function AdminCatalogPage({
           </tbody>
         </table>
       </div>
+      </SearchableSection>
+      </div>
 
       <div className="mt-8">
         <h2 className="font-display text-[16px] font-semibold">Providers</h2>
@@ -146,7 +151,9 @@ export default async function AdminCatalogPage({
           corporate domain to let every &quot;corporate&quot; role account on that domain (e.g.
           every @cbz.co.zw address) submit edit/new-product requests via /corporate/products.
         </p>
-        <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+        <div className="mt-3">
+        <SearchableSection placeholder="Search providers…">
+        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
           <table className="w-full min-w-[680px] border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-border bg-bg-surface-raised text-left">
@@ -158,7 +165,7 @@ export default async function AdminCatalogPage({
             </thead>
             <tbody>
               {providers.map((p) => (
-                <tr key={p.id} className="border-b border-border last:border-0">
+                <tr key={p.id} data-search-row className="border-b border-border last:border-0">
                   <td className="p-3 font-medium">{p.name}</td>
                   <td className="p-3">
                     <Badge tone={p.verified ? "teal" : "coral"}>{p.verified ? "Verified" : "Unverified"}</Badge>
@@ -180,6 +187,8 @@ export default async function AdminCatalogPage({
               )}
             </tbody>
           </table>
+        </div>
+        </SearchableSection>
         </div>
       </div>
     </div>

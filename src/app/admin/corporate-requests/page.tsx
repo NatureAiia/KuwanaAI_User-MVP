@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/Card";
 import { CorporateRequestReview } from "@/components/admin/CorporateRequestReview";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 export default async function AdminCorporateRequestsPage() {
   const admin = await requireAdmin();
@@ -32,29 +33,34 @@ export default async function AdminCorporateRequestsPage() {
           <h2 className="font-display text-[16px] font-semibold">Review queue</h2>
           {pendingRequests.length > 0 && <Badge tone="sky">{pendingRequests.length} pending</Badge>}
         </div>
-        <div className="mt-3 space-y-3">
+        <div className="mt-3">
+        <SearchableSection placeholder="Search requests…">
+        <div className="space-y-3">
           {pendingRequests.map((r) => (
-            <CorporateRequestReview
-              key={r.id}
-              request={{
-                id: r.id,
-                type: r.type,
-                reason: r.reason,
-                provider: r.provider,
-                proposedData: r.proposedData as {
-                  name: string;
-                  description?: string | null;
-                  price: number;
-                  currency: string;
-                },
-                listing: r.listing,
-                category: r.category,
-              }}
-            />
+            <div key={r.id} data-search-row>
+              <CorporateRequestReview
+                request={{
+                  id: r.id,
+                  type: r.type,
+                  reason: r.reason,
+                  provider: r.provider,
+                  proposedData: r.proposedData as {
+                    name: string;
+                    description?: string | null;
+                    price: number;
+                    currency: string;
+                  },
+                  listing: r.listing,
+                  category: r.category,
+                }}
+              />
+            </div>
           ))}
           {pendingRequests.length === 0 && (
             <p className="text-[13px] text-text-muted">Nothing pending right now.</p>
           )}
+        </div>
+        </SearchableSection>
         </div>
       </section>
     </div>

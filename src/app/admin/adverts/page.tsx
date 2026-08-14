@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/Card";
 import { AdvertForm } from "@/components/admin/AdvertForm";
 import { AdvertRowActions } from "@/components/admin/AdvertRowActions";
+import { SearchableSection } from "@/components/admin/SearchableSection";
 
 export default async function AdminAdvertsPage() {
   const admin = await requireAdmin();
@@ -23,7 +24,9 @@ export default async function AdminAdvertsPage() {
         <AdvertForm />
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-[var(--radius-card)] border border-border">
+      <div className="mt-6">
+      <SearchableSection placeholder="Search adverts…">
+      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[640px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border bg-bg-surface-raised text-left">
@@ -36,7 +39,7 @@ export default async function AdminAdvertsPage() {
           </thead>
           <tbody>
             {adverts.map((a) => (
-              <tr key={a.id} className="border-b border-border last:border-0">
+              <tr key={a.id} data-search-row className="border-b border-border last:border-0">
                 <td className="p-3">
                   <div className="relative h-14 w-14 overflow-hidden rounded-lg border border-border">
                     <Image src={a.imageUrl} alt="" fill sizes="56px" className="object-cover" />
@@ -61,6 +64,8 @@ export default async function AdminAdvertsPage() {
             )}
           </tbody>
         </table>
+      </div>
+      </SearchableSection>
       </div>
     </div>
   );
