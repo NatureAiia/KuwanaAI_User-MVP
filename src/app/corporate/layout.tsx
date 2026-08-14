@@ -32,8 +32,8 @@ export default async function CorporateLayout({ children }: { children: React.Re
     <div id="main-content" tabIndex={-1} className="flex min-h-screen flex-1 flex-col">
       <CorporateHeader companyName={companyName} />
       <div className="flex flex-1 flex-col md:flex-row">
-        <CorporatePortalNav />
-        <main className="flex-1 px-5 pb-12 pt-4 md:px-8 md:pt-6">{children}</main>
+        <CorporatePortalNav companyName={companyName} />
+        <main className="flex-1 bg-bg-base px-5 pb-12 pt-4 md:px-8 md:pt-6">{children}</main>
       </div>
     </div>
   );
