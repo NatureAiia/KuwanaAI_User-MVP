@@ -13,6 +13,7 @@ import { ProviderStatsRow } from "@/components/provider/ProviderStatsRow";
 import { ProviderFilterBar } from "@/components/provider/ProviderFilterBar";
 import { ProviderListingsTable } from "@/components/provider/ProviderListingsTable";
 import { SellerEngagementStrip } from "@/components/provider/SellerEngagementStrip";
+import { SellerWalletTile } from "@/components/provider/SellerWalletTile";
 
 const STATUSES = ["draft", "pending_review", "published", "rejected"] as const;
 type Status = (typeof STATUSES)[number];
@@ -32,7 +33,10 @@ export default async function ProviderPortalPage({
   const user = await requireUser();
   if (!user) redirect("/login");
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { role: true, walletBalanceUsd: true, walletBalanceZig: true },
+  });
   if (dbUser?.role !== "provider") redirect("/dashboard");
 
   const provider = await prisma.provider.findUnique({ where: { ownerUserId: user.id } });
@@ -127,6 +131,11 @@ export default async function ProviderPortalPage({
         level={xp?.level ?? 1}
         currentStreak={streak?.currentStreak ?? 0}
         badges={badges.map((b) => ({ name: b.badge.name }))}
+      />
+
+      <SellerWalletTile
+        usd={Number(dbUser.walletBalanceUsd).toFixed(2)}
+        zig={Number(dbUser.walletBalanceZig).toFixed(2)}
       />
 
       <ProviderStatsRow
