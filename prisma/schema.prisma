@@ -85,6 +85,7 @@ model User {
   assignedInvestigations  ListingInvestigation[]
   priceCapRulesCreated    PriceCapRule[]
   complaints              ConsumerComplaint[]
+  adminAlertRulesCreated  AdminAlertRule[]
 
   @@map("users")
 }
@@ -826,6 +827,12 @@ enum AdminAuditAction {
   social_mention_reviewed
   market_basket_item_created
   market_basket_item_deleted
+  investigation_flagged
+  investigation_updated
+  price_cap_rule_created
+  price_cap_rule_updated
+  price_cap_rule_deleted
+  complaint_promoted
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
@@ -1312,4 +1319,31 @@ model ConsumerComplaint {
   @@index([status, createdAt(sort: Desc)])
   @@index([listingId])
   @@map("consumer_complaints")
+}
+
+enum AdminAlertMetric {
+  total_providers
+  published_listings
+  pending_review_listings
+  open_investigations
+  pending_corporate_requests
+}
+
+/// Admin's counterpart to AlertRule — same threshold-crossing shape (see
+/// lib/alerts.ts) but every metric is a platform-wide count rather than one
+/// provider's own listings, so it isn't scoped by providerId. Evaluated live
+/// on read, same as AlertRule (no cron yet); kept as its own model instead of
+/// making AlertRule.providerId nullable, since every other AlertRule query
+/// in this codebase assumes a real provider.
+model AdminAlertRule {
+  id              String           @id @default(uuid())
+  metric          AdminAlertMetric
+  threshold       Decimal          @db.Decimal(12, 2)
+  direction       AlertDirection
+  enabled         Boolean          @default(true)
+  createdByUserId String           @map("created_by_user_id")
+  createdBy       User             @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@map("admin_alert_rules")
 }

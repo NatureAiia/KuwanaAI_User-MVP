@@ -32,13 +32,24 @@ type AdminAuditAction =
   | "scrape_source_deleted"
   | "social_mention_reviewed"
   | "market_basket_item_created"
-  | "market_basket_item_deleted";
+  | "market_basket_item_deleted"
+  | "investigation_flagged"
+  | "investigation_updated"
+  | "price_cap_rule_created"
+  | "price_cap_rule_updated"
+  | "price_cap_rule_deleted"
+  | "complaint_promoted";
 
 /**
- * Records who (an admin email, not a userId — the whole point is a record
- * that survives even if the admin's own account changes) did what to which
- * row. No FK to the target: an audit entry for listing_deleted has to
- * outlive the listing it's about.
+ * Records who did what to which row — despite the field name, not admin-only:
+ * a regulator account opening/updating a case, setting a price cap, or
+ * promoting a complaint logs here too (see src/app/api/regulator/*), same as
+ * an admin doing the equivalent action from /admin/investigations. One
+ * consolidated log for every privileged actor beats two disconnected ones,
+ * especially for enforcement actions (investigation_updated's detail carries
+ * the outcome — warning/fine/suspension — a regulator recorded).  No FK to
+ * the target: an audit entry for listing_deleted has to outlive the listing
+ * it's about.
  */
 export async function logAdminAction(params: {
   adminEmail: string;
@@ -57,7 +68,10 @@ export async function logAdminAction(params: {
     | "business_condition"
     | "api_key"
     | "social_mention"
-    | "market_basket_item";
+    | "market_basket_item"
+    | "investigation"
+    | "price_cap_rule"
+    | "complaint";
   targetId: string;
   detail: string;
 }): Promise<void> {

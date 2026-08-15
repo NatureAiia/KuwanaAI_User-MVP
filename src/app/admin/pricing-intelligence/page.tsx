@@ -4,6 +4,7 @@ import { Card, Badge } from "@/components/ui/Card";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { generateSectorNarrative } from "@/lib/pricingIntelligence";
 import { getCombinedPricingView } from "@/lib/combinedPricing";
+import { DownloadPricingIntelligenceReportButton } from "@/components/admin/DownloadReportButton";
 
 export default async function AdminPricingIntelligencePage() {
   const admin = await requireAdmin();
@@ -22,12 +23,35 @@ export default async function AdminPricingIntelligencePage() {
 
   return (
     <div className="mx-auto max-w-[1080px] px-5 py-8 md:px-10">
-      <h1 className="font-display text-[24px] font-bold">Pricing intelligence</h1>
-      <p className="mt-1 text-[13px] text-text-secondary">
-        Outlier pricing and sector-wide fee comparison across every category — a listing is flagged when its price
-        sits more than 2 standard deviations from its category peers&apos; distribution. Statistical signal, not a
-        margin calculation: there&apos;s no cost data behind these numbers.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-[24px] font-bold">Pricing intelligence</h1>
+          <p className="mt-1 text-[13px] text-text-secondary">
+            Outlier pricing and sector-wide fee comparison across every category — a listing is flagged when its
+            price sits more than 2 standard deviations from its category peers&apos; distribution. Statistical
+            signal, not a margin calculation: there&apos;s no cost data behind these numbers.
+          </p>
+        </div>
+        <DownloadPricingIntelligenceReportButton
+          data={{
+            bySector: bySector.map((s) => ({
+              sectorName: s.sectorName,
+              listingCount: s.listingCount,
+              outlierCount: s.outlierCount,
+              belowPeerMedianCount: s.belowPeerMedianCount,
+            })),
+            outliers: outliers.map((o) => ({
+              listingName: o.listingName,
+              providerName: o.providerName,
+              sectorName: o.sectorName,
+              categoryName: o.categoryName,
+              price: o.price,
+              currency: o.currency,
+              zScore: o.zScore,
+            })),
+          }}
+        />
+      </div>
 
       {economicDrivers.length > 0 && (
         <section className="mt-6">

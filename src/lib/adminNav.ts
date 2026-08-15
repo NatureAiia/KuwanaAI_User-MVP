@@ -15,6 +15,9 @@ import {
   KeyRound,
   Bell,
   ShoppingBasket,
+  Flag,
+  BellRing,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,6 +38,9 @@ export const ADMIN_LINKS: { href: string; label: string; blurb: string; icon: Lu
   { href: "/admin/economic-drivers", label: "Economic drivers", blurb: "FX rate, inflation and other macro indicators shown as pricing context.", icon: Landmark },
   { href: "/admin/market-baskets", label: "Market baskets", blurb: "Curated cost-of-living baskets tracked on the regulator price index.", icon: ShoppingBasket },
   { href: "/admin/business-conditions", label: "Business conditions", blurb: "Regulatory changes, competitor moves, and macro triggers worth watching.", icon: ShieldAlert },
+  { href: "/admin/investigations", label: "Investigations", blurb: "Enforcement cases against any provider's listings, market-wide.", icon: Flag },
+  { href: "/admin/alerts", label: "Alerts", blurb: "Platform-wide threshold watchers — providers, listings, cases, requests.", icon: BellRing },
+  { href: "/admin/live-feed", label: "Live feed", blurb: "Every recent listing change across every provider, refreshing automatically.", icon: Activity },
   { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status.", icon: Wallet },
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change.", icon: History },
   { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend.", icon: Cpu },

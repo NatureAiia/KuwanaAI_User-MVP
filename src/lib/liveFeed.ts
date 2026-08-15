@@ -10,6 +10,8 @@ export type ListingActivityEntry = {
   createdAt: Date;
 };
 
+export type GlobalListingActivityEntry = ListingActivityEntry & { providerName: string };
+
 /**
  * Recent activity across a provider's own listings — the "live feed" /
  * "real-time monitor" reinterpreted onto ListingUpdateLog (the only
@@ -29,6 +31,32 @@ export async function getRecentListingActivity(providerId: string, limit = 30): 
     id: row.id,
     listingId: row.listingId,
     listingName: row.listing.name,
+    source: row.source,
+    actorLabel: row.actorLabel,
+    changeSummary: row.changeSummary,
+    createdAt: row.createdAt,
+  }));
+}
+
+/**
+ * Admin's counterpart to getRecentListingActivity — same ListingUpdateLog
+ * trail, but across every provider rather than one, since "what just
+ * changed platform-wide" is what admin needs (the audit log is the closest
+ * existing thing, but it's admin-authored actions only, not every listing
+ * update from every source).
+ */
+export async function getRecentListingActivityGlobal(limit = 50): Promise<GlobalListingActivityEntry[]> {
+  const rows = await prisma.listingUpdateLog.findMany({
+    include: { listing: { select: { name: true, provider: { select: { name: true } } } } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    listingId: row.listingId,
+    listingName: row.listing.name,
+    providerName: row.listing.provider.name,
     source: row.source,
     actorLabel: row.actorLabel,
     changeSummary: row.changeSummary,
