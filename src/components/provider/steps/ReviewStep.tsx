@@ -48,7 +48,8 @@ export function ReviewStep({
       )}
       {currentStatus === "published" && (
         <p className="mt-3 rounded-xl border border-border bg-bg-surface-raised p-3 text-[12.5px] text-text-secondary">
-          This product is live. Saving takes it off the public catalog until an admin re-approves it.
+          This product is live. Description, image, and spec edits apply right away — changing the price takes it off
+          the public catalog until an admin re-approves it.
         </p>
       )}
 
