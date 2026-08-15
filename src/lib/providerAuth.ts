@@ -4,14 +4,39 @@ import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 
 /**
- * A "provider" role account only ever acts on the one Provider record an
- * admin linked it to (Provider.ownerUserId, set via /admin/catalog) — never
- * an arbitrary providerId a client might pass. Every provider-scoped route
- * should resolve the caller's own provider through this, not trust a
- * providerId in the request body.
+ * A "provider" role account only ever acts on the one Provider record it's
+ * attached to — either being the account that created the business
+ * (Provider.ownerUserId, set at signup or by an admin at /admin/catalog) or
+ * being a teammate the owner invited afterward (ProviderMember, see
+ * /provider/team) — never both, since ProviderMember.userId is unique and an
+ * owner never also rows themself into their own provider_members. `isOwner`
+ * lets a route/page gate owner-only actions (inviting/removing a teammate)
+ * without a second query. Shared by requireOwnProvider (API routes) and
+ * every /provider/** page, which does its own requireUser()/role redirect
+ * first and just needs the provider lookup — never resolve this any other
+ * way (e.g. a page's own `prisma.provider.findUnique({ where: {
+ * ownerUserId } })`), or an invited teammate silently can't reach anything.
  */
+export async function resolveOwnProvider(
+  userId: string,
+): Promise<{ id: string; name: string; isOwner: boolean } | null> {
+  const [owned, membership] = await Promise.all([
+    prisma.provider.findUnique({ where: { ownerUserId: userId }, select: { id: true, name: true } }),
+    prisma.providerMember.findUnique({
+      where: { userId },
+      select: { provider: { select: { id: true, name: true } } },
+    }),
+  ]);
+  const provider = owned ?? membership?.provider;
+  return provider ? { ...provider, isOwner: !!owned } : null;
+}
+
 export async function requireOwnProvider(): Promise<
-  | { user: NonNullable<Awaited<ReturnType<typeof requireUser>>>; provider: { id: string; name: string } }
+  | {
+      user: NonNullable<Awaited<ReturnType<typeof requireUser>>>;
+      provider: { id: string; name: string };
+      isOwner: boolean;
+    }
   | { response: NextResponse }
 > {
   const user = await requireUser();
@@ -26,10 +51,7 @@ export async function requireOwnProvider(): Promise<
     };
   }
 
-  const provider = await prisma.provider.findUnique({
-    where: { ownerUserId: user.id },
-    select: { id: true, name: true },
-  });
+  const provider = await resolveOwnProvider(user.id);
   if (!provider) {
     return {
       response: privateJson(
@@ -39,5 +61,6 @@ export async function requireOwnProvider(): Promise<
     };
   }
 
-  return { user, provider };
+  const { isOwner, ...providerRest } = provider;
+  return { user, provider: providerRest, isOwner };
 }

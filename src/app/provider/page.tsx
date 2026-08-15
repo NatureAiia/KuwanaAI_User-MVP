@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { LineChart } from "lucide-react";
+import { LineChart, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveOwnProvider } from "@/lib/providerAuth";
 import { getProviderListingStats } from "@/lib/catalog";
 import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -39,7 +40,7 @@ export default async function ProviderPortalPage({
   });
   if (dbUser?.role !== "provider") redirect("/dashboard");
 
-  const provider = await prisma.provider.findUnique({ where: { ownerUserId: user.id } });
+  const provider = await resolveOwnProvider(user.id);
 
   if (!provider) {
     return (
@@ -118,6 +119,12 @@ export default async function ProviderPortalPage({
             className="tap-target flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[13px] font-medium text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
           >
             <LineChart size={15} /> Insights
+          </Link>
+          <Link
+            href="/provider/team"
+            className="tap-target flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[13px] font-medium text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
+          >
+            <Users size={15} /> Team
           </Link>
           <LinkButton href="/provider/listings/new" size="md">
             + Add product

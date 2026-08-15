@@ -87,6 +87,7 @@ model User {
   notifications           Notification[]
   conversations           Conversation[]
   ownedProvider           Provider?
+  providerMembership      ProviderMember?
   corporateRequests       CorporateRequest[]
   discountRulesCreated    DiscountRule[]
   alertRulesCreated       AlertRule[]
@@ -248,8 +249,29 @@ model Provider {
   alertRules        AlertRule[]
   apiKeys           ApiKey[]
   investigations    ListingInvestigation[]
+  members           ProviderMember[]
 
   @@map("providers")
+}
+
+// Additional "provider" role users on the same small business, beyond the
+// single ownerUserId above — ownerUserId stays the account that created the
+// business (and the identity notifications/audit/XP-on-approval already key
+// off), this is purely for teammates the owner invites afterward at
+// /provider/team. userId is unique: unlike corporate's domain-match (which
+// doesn't fit here — sole traders use personal email domains shared by
+// millions of unrelated people), a provider-role person belongs to at most
+// one small business, added explicitly by email, not implicitly by domain.
+model ProviderMember {
+  id         String   @id @default(uuid())
+  providerId String   @map("provider_id")
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  userId     String   @unique @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([providerId])
+  @@map("provider_members")
 }
 
 enum FreshnessStatus {

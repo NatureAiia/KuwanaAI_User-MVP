@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { resolveOwnProvider } from "@/lib/providerAuth";
 import { Header } from "@/components/Header";
 import { ProviderListingFormLazy } from "@/components/LazyClients";
 
@@ -11,7 +12,7 @@ export default async function NewProviderListingPage() {
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
   if (dbUser?.role !== "provider") redirect("/dashboard");
 
-  const provider = await prisma.provider.findUnique({ where: { ownerUserId: user.id } });
+  const provider = await resolveOwnProvider(user.id);
   if (!provider) redirect("/provider");
 
   const categories = await prisma.category.findMany({

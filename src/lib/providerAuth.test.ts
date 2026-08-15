@@ -3,13 +3,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getUser = vi.fn();
 const userFindUnique = vi.fn();
 const providerFindUnique = vi.fn();
+const providerMemberFindUnique = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ auth: { getUser } }),
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { user: { findUnique: userFindUnique }, provider: { findUnique: providerFindUnique } },
+  prisma: {
+    user: { findUnique: userFindUnique },
+    provider: { findUnique: providerFindUnique },
+    providerMember: { findUnique: providerMemberFindUnique },
+  },
 }));
 
 const { requireOwnProvider } = await import("@/lib/providerAuth");
@@ -18,6 +23,8 @@ beforeEach(() => {
   getUser.mockReset();
   userFindUnique.mockReset();
   providerFindUnique.mockReset();
+  providerMemberFindUnique.mockReset();
+  providerMemberFindUnique.mockResolvedValue(null);
 });
 
 describe("requireOwnProvider", () => {
@@ -53,11 +60,25 @@ describe("requireOwnProvider", () => {
     expect("provider" in result).toBe(true);
     if ("provider" in result) {
       expect(result.provider.id).toBe("prov-1");
+      expect(result.isOwner).toBe(true);
       // Confirms the lookup is keyed by the authenticated user's own id, not
       // anything client-supplied.
       expect(providerFindUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { ownerUserId: "u1" } }),
       );
+    }
+  });
+
+  it("returns the provider for an invited teammate, with isOwner false", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u2", email: "teammate@b.com" } } });
+    userFindUnique.mockResolvedValue({ role: "provider" });
+    providerFindUnique.mockResolvedValue(null);
+    providerMemberFindUnique.mockResolvedValue({ provider: { id: "prov-1", name: "Test Co" } });
+    const result = await requireOwnProvider();
+    expect("provider" in result).toBe(true);
+    if ("provider" in result) {
+      expect(result.provider.id).toBe("prov-1");
+      expect(result.isOwner).toBe(false);
     }
   });
 });

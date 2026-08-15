@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
+import { resolveOwnProvider } from "@/lib/providerAuth";
 import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
 import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -16,7 +17,7 @@ export default async function ProviderInsightsPage() {
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { role: true } });
   if (dbUser?.role !== "provider") redirect("/dashboard");
 
-  const provider = await prisma.provider.findUnique({ where: { ownerUserId: user.id } });
+  const provider = await resolveOwnProvider(user.id);
   if (!provider) redirect("/provider");
 
   const feeComparison = await getProviderFeeComparison(provider.id);
