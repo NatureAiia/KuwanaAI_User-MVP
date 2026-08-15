@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireRegulatorApiUser } from "@/lib/regulatorAuth";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const bodySchema = z.object({
   categoryId: z.string().uuid(),
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
-  const category = await prisma.category.findUnique({ where: { id: parsed.data.categoryId }, select: { id: true } });
+  const category = await prisma.category.findUnique({ where: { id: parsed.data.categoryId }, select: { name: true } });
   if (!category) return privateJson({ error: "Category not found" }, { status: 404 });
 
   const rule = await prisma.priceCapRule.create({
@@ -27,6 +28,16 @@ export async function POST(req: Request) {
       createdByUserId: auth.user.id,
     },
   });
+
+  if (auth.user.email) {
+    await logAdminAction({
+      adminEmail: auth.user.email,
+      action: "price_cap_rule_created",
+      targetType: "price_cap_rule",
+      targetId: rule.id,
+      detail: `${category.name}: capped at ${parsed.data.currency} ${parsed.data.capValue}`,
+    });
+  }
 
   return privateJson({ rule });
 }

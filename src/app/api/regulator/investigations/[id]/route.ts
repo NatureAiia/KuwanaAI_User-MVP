@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireRegulatorApiUser } from "@/lib/regulatorAuth";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const patchSchema = z.object({
   status: z.enum(["open", "in_progress", "resolved", "dismissed"]).optional(),
@@ -21,7 +22,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Any regulator account can act on any case — a regulator's case queue is
   // market-wide oversight, not per-user ownership, unlike corporate's
   // provider-scoped PATCH route.
-  const existing = await prisma.listingInvestigation.findUnique({ where: { id } });
+  const existing = await prisma.listingInvestigation.findUnique({
+    where: { id },
+    include: { listing: { select: { name: true } } },
+  });
   if (!existing) {
     return privateJson({ error: "Not found" }, { status: 404 });
   }
@@ -34,6 +38,20 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       resolvedAt: closing ? new Date() : existing.resolvedAt,
     },
   });
+
+  // Carries the enforcement outcome (warning/fine/suspension) when a
+  // regulator sets one — the durable record of what enforcement action was
+  // actually taken, since ListingInvestigation itself gets overwritten in
+  // place rather than versioned.
+  if (auth.user.email) {
+    await logAdminAction({
+      adminEmail: auth.user.email,
+      action: "investigation_updated",
+      targetType: "investigation",
+      targetId: investigation.id,
+      detail: `${existing.listing.name}: ${JSON.stringify(parsed.data)}`,
+    });
+  }
 
   return privateJson({ investigation });
 }

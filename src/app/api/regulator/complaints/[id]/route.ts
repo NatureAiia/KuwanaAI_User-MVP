@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireRegulatorApiUser } from "@/lib/regulatorAuth";
 import { promoteComplaintToInvestigation } from "@/lib/complaints";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const patchSchema = z.object({
   status: z.enum(["open", "reviewing", "resolved", "dismissed"]).optional(),
@@ -20,6 +21,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (parsed.data.promote) {
     const result = await promoteComplaintToInvestigation(id, auth.user.id);
     if ("error" in result) return privateJson({ error: result.error }, { status: 400 });
+
+    if (auth.user.email) {
+      // Two distinct events worth a durable record: a new case was opened
+      // (investigation_flagged, same action a directly-opened case logs),
+      // and specifically that it originated from this complaint rather than
+      // an outlier scan.
+      await logAdminAction({
+        adminEmail: auth.user.email,
+        action: "investigation_flagged",
+        targetType: "investigation",
+        targetId: result.investigationId,
+        detail: `Promoted from complaint ${id}`,
+      });
+      await logAdminAction({
+        adminEmail: auth.user.email,
+        action: "complaint_promoted",
+        targetType: "complaint",
+        targetId: id,
+        detail: `Promoted to investigation ${result.investigationId}`,
+      });
+    }
+
     return privateJson(result);
   }
 

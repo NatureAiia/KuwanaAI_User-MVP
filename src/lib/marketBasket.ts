@@ -22,7 +22,7 @@ type WeightedPoint = { price: number; recordedAt: Date };
  * every component has at least one recorded price — a partial sum before
  * that point would understate the basket, not just be imprecise.
  */
-function buildCompositeSeries(
+export function buildCompositeSeries(
   componentHistories: { weight: number; history: { price: number; recordedAt: Date }[] }[],
 ): WeightedPoint[] {
   const allDates = [...new Set(componentHistories.flatMap((c) => c.history.map((h) => h.recordedAt.getTime())))].sort(

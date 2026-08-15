@@ -5,6 +5,7 @@ import { emailDomain } from "@/lib/orgVerification";
 import { syncPriceDropNotifications } from "@/lib/notifications";
 import { getAlertRulesWithStatus, syncAlertRuleNotifications } from "@/lib/alerts";
 import { syncBusinessConditionReviewNotifications } from "@/lib/businessConditions";
+import { getPriceCapRulesWithBreaches, syncPriceCapNotifications } from "@/lib/priceCapAlerts";
 
 // Price-drop detection reads every saved listing's full price history and
 // writes upserts — far too expensive to run on the unread-badge request the
@@ -51,6 +52,9 @@ export async function GET() {
     }
   } else if (role === "admin") {
     await syncBusinessConditionReviewNotifications(user.id);
+  } else if (role === "regulator") {
+    const rules = await getPriceCapRulesWithBreaches();
+    await syncPriceCapNotifications(rules);
   }
 
   // One notification per saved listing/alert rule/business condition per
