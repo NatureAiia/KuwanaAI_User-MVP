@@ -20,7 +20,10 @@ type AdminAuditAction =
   | "discount_rule_created"
   | "discount_rule_deleted"
   | "economic_driver_upserted"
-  | "economic_driver_deleted";
+  | "economic_driver_deleted"
+  | "business_condition_created"
+  | "business_condition_updated"
+  | "business_condition_deleted";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -41,7 +44,8 @@ export async function logAdminAction(params: {
     | "scraped_item"
     | "corporate_request"
     | "discount_rule"
-    | "economic_driver";
+    | "economic_driver"
+    | "business_condition";
   targetId: string;
   detail: string;
 }): Promise<void> {

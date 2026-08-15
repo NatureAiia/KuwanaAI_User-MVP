@@ -31,25 +31,25 @@ enum Role {
 }
 
 model User {
-  id              String   @id @default(uuid())
-  email           String   @unique
+  id               String   @id @default(uuid())
+  email            String   @unique
   // The user-facing unique handle captured at signup (replaces the old free-text
   // "full name" field) — doubles as a stable, human-picked identifier alongside `id`.
-  username        String   @unique
-  role            Role     @default(consumer)
-  createdAt       DateTime @default(now()) @map("created_at")
+  username         String   @unique
+  role             Role     @default(consumer)
+  createdAt        DateTime @default(now()) @map("created_at")
   // Grants access to specific gated sub-features regardless of role (e.g.
   // corporate feature keys) — empty means "full access for this role", the
   // same fallback semantics as coarse role checks everywhere else in this
   // file. Feature keys are plain strings defined where they're checked, not
   // as an enum, so a new gated feature never needs a migration.
-  allowedFeatures String[] @default([]) @map("allowed_features")
+  allowedFeatures  String[] @default([]) @map("allowed_features")
   // Spendable wallet balances, credited by a webhook when a WalletTransaction
   // flips to paid (see WalletTransaction below) — one field per supported
   // top-up currency rather than a generic multi-currency Wallet model, since
   // Paynow only ever settles in USD or ZiG for this integration.
-  walletBalanceUsd Decimal @default(0) @db.Decimal(12, 2) @map("wallet_balance_usd")
-  walletBalanceZig Decimal @default(0) @db.Decimal(12, 2) @map("wallet_balance_zig")
+  walletBalanceUsd Decimal  @default(0) @map("wallet_balance_usd") @db.Decimal(12, 2)
+  walletBalanceZig Decimal  @default(0) @map("wallet_balance_zig") @db.Decimal(12, 2)
 
   profile                 UserProfile?
   footprints              SectorFootprint[]
@@ -73,6 +73,7 @@ model User {
   notificationPreferences NotificationPreference[]
   chatFeedback            ChatFeedback[]
   walletTransactions      WalletTransaction[]
+  assignedInvestigations  ListingInvestigation[]
 
   @@map("users")
 }
@@ -221,6 +222,7 @@ model Provider {
   discountRules     DiscountRule[]
   alertRules        AlertRule[]
   apiKeys           ApiKey[]
+  investigations    ListingInvestigation[]
 
   @@map("providers")
 }
@@ -286,6 +288,7 @@ model Listing {
   corporateRequests CorporateRequest[]
   updateLogs        ListingUpdateLog[]
   discountRules     DiscountRule[]
+  investigations    ListingInvestigation[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -463,22 +466,40 @@ enum NotificationType {
   price_drop
   listing_approved
   listing_rejected
+  // Corporate: an AlertRule's provider-scoped metric crossed its threshold.
+  // Not tied to one listing, so this is the first type without a listingId.
+  alert_threshold_crossed
+  // Admin: a BusinessCondition assigned to this admin is past its review cycle.
+  business_condition_review_due
 }
 
 model Notification {
   id            String           @id @default(uuid())
   userId        String           @map("user_id")
   user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listingId     String           @map("listing_id")
-  listing       Listing          @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  // Nullable: alert_threshold_crossed and business_condition_review_due
+  // notifications reference an AlertRule/BusinessCondition instead (below),
+  // not a single listing.
+  listingId     String?          @map("listing_id")
+  listing       Listing?         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  alertRuleId   String?          @map("alert_rule_id")
+  alertRule     AlertRule?       @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  businessConditionId String?    @map("business_condition_id")
+  businessCondition   BusinessCondition? @relation(fields: [businessConditionId], references: [id], onDelete: Cascade)
   type          NotificationType @default(price_drop)
   message       String
-  // Only meaningful for price_drop; null for listing_approved/listing_rejected.
+  // Only meaningful for price_drop; null for every other type.
   changePercent Float?           @map("change_percent")
   read          Boolean          @default(false)
   createdAt     DateTime         @default(now()) @map("created_at")
 
+  // Each unique constraint dedupes one type's re-sync (upsert) against its
+  // own scoping column; the other scoping columns are null on that row, and
+  // Postgres treats NULL as distinct in a unique index, so these three
+  // constraints never conflict with each other.
   @@unique([userId, listingId, type])
+  @@unique([userId, alertRuleId, type])
+  @@unique([userId, businessConditionId, type])
   @@index([listingId])
   @@index([userId, read, createdAt(sort: Desc)])
   @@map("notifications")
@@ -636,21 +657,32 @@ enum SocialPlatform {
   reddit
 }
 
+enum SentimentLabel {
+  positive
+  negative
+  neutral
+}
+
 /// A public social post mentioning a price, found by the free social-media
 /// price scanner (see scripts/social-scan). Read-only intelligence feed —
 /// never shown to end users directly, reviewed by an admin before any
 /// listing/price data is acted on.
 model SocialPriceMention {
-  id              String         @id @default(uuid())
+  id              String          @id @default(uuid())
   platform        SocialPlatform
   channel         String // Telegram channel username, or subreddit name
-  sourceUrl       String         @map("source_url")
-  postedAt        DateTime?      @map("posted_at")
-  discoveredAt    DateTime       @default(now()) @map("discovered_at")
+  sourceUrl       String          @map("source_url")
+  postedAt        DateTime?       @map("posted_at")
+  discoveredAt    DateTime        @default(now()) @map("discovered_at")
   text            String
-  matchedProvider String?        @map("matched_provider")
-  extractedPrices Json           @map("extracted_prices") // ExtractedPrice[]
-  reviewed        Boolean        @default(false)
+  matchedProvider String?         @map("matched_provider")
+  extractedPrices Json            @map("extracted_prices") // ExtractedPrice[]
+  reviewed        Boolean         @default(false)
+  // Null = not yet classified. Computed lazily (see lib/sentiment.ts) rather
+  // than at scan time, so the scanner script stays free of an AI-provider
+  // dependency — the same "compute on read, persist" shape as
+  // syncPriceDropNotifications and friends.
+  sentiment       SentimentLabel? @map("sentiment")
 
   @@unique([platform, sourceUrl])
   @@index([matchedProvider])
@@ -757,6 +789,13 @@ enum AdminAuditAction {
   corporate_request_approved
   corporate_request_rejected
   corporate_domain_linked
+  discount_rule_created
+  discount_rule_deleted
+  economic_driver_upserted
+  economic_driver_deleted
+  business_condition_created
+  business_condition_updated
+  business_condition_deleted
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
@@ -964,6 +1003,7 @@ model BusinessCondition {
   assignedTo       User?                     @relation(fields: [assignedToUserId], references: [id], onDelete: SetNull)
   createdAt        DateTime                  @default(now()) @map("created_at")
   updatedAt        DateTime                  @updatedAt @map("updated_at")
+  notifications    Notification[]
 
   @@index([category])
   @@index([riskLevel])
@@ -998,6 +1038,7 @@ model AlertRule {
   createdByUserId String         @map("created_by_user_id")
   createdBy       User           @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
   createdAt       DateTime       @default(now()) @map("created_at")
+  notifications   Notification[]
 
   @@index([providerId])
   @@map("alert_rules")
@@ -1106,4 +1147,39 @@ model WalletTransaction {
   // The admin transactions view's status filter, newest first.
   @@index([status, createdAt(sort: Desc)])
   @@map("wallet_transactions")
+}
+
+enum InvestigationStatus {
+  open
+  in_progress
+  resolved
+  dismissed
+}
+
+/// A corporate account's own lightweight case-tracking for a flagged
+/// listing — the "investigation queue" reinterpreted onto self-service
+/// pricing-integrity workflow instead of a bank's internal fraud queue.
+/// Anomalies themselves stay computed-on-read (getProviderFeeComparison);
+/// this is only the workflow state layered on top once someone decides a
+/// flagged listing is worth tracking.
+model ListingInvestigation {
+  id               String              @id @default(uuid())
+  listingId        String              @map("listing_id")
+  listing          Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  providerId       String              @map("provider_id")
+  provider         Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  // Snapshot of why this was flagged at creation time (e.g. "z-score 2.4,
+  // 18% below category peer median") — kept even if the underlying price
+  // changes later and the listing stops being an outlier.
+  reason           String
+  status           InvestigationStatus @default(open)
+  assignedToUserId String?             @map("assigned_to_user_id")
+  assignedTo       User?               @relation(fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  notes            String?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  resolvedAt       DateTime?           @map("resolved_at")
+
+  @@index([providerId, status])
+  @@index([listingId])
+  @@map("listing_investigations")
 }

@@ -6,7 +6,10 @@ import { requireAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/Card";
 import { MentionReviewButton } from "@/components/admin/MentionReviewButton";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { ensureSentimentComputed } from "@/lib/sentiment";
 import type { ExtractedPrice } from "@/lib/social-scan/extractPrices";
+
+const SENTIMENT_TONE = { positive: "teal", negative: "coral", neutral: "neutral" } as const;
 
 export default async function SocialMentionsPage({
   searchParams,
@@ -18,6 +21,8 @@ export default async function SocialMentionsPage({
 
   const { reviewed: reviewedParam } = await searchParams;
   const showReviewed = reviewedParam === "true";
+
+  await ensureSentimentComputed({ reviewed: showReviewed });
 
   const mentions = await prisma.socialPriceMention.findMany({
     where: { reviewed: showReviewed },
@@ -80,6 +85,7 @@ export default async function SocialMentionsPage({
                 <Badge tone="neutral">{mention.platform}</Badge>
                 <span className="text-[12px] text-text-muted">{mention.channel}</span>
                 {mention.matchedProvider && <Badge tone="teal">{mention.matchedProvider}</Badge>}
+                {mention.sentiment && <Badge tone={SENTIMENT_TONE[mention.sentiment]}>{mention.sentiment}</Badge>}
                 {prices.map((p, i) => (
                   <Badge key={i} tone="sky">
                     {p.currency} {p.amount}

@@ -5,6 +5,10 @@ import Link from "next/link";
 import { BellOff, CheckCircle2, TrendingDown, XCircle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 
+// price_drop/listing_approved/listing_rejected are the only types this list
+// renders — it's mounted only on the consumer /notifications page. The
+// listing-less types (alert_threshold_crossed, business_condition_review_due)
+// have their own corporate/admin notification pages instead.
 type NotificationType = "price_drop" | "listing_approved" | "listing_rejected";
 
 type NotificationDTO = {

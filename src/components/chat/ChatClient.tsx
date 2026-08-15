@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { clsx } from "clsx";
 import { Link2 } from "lucide-react";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatGreeting } from "@/components/chat/ChatGreeting";
 import { ChatComposer, type ComposerImage } from "@/components/chat/ChatComposer";
+import { ChatThreadBar, type ChatThread } from "@/components/chat/ChatThreadBar";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { DateDivider } from "@/components/chat/DateDivider";
 import { MessageBubble, type ChatMessage } from "@/components/chat/MessageBubble";
@@ -17,7 +19,8 @@ const ERROR_REPLY = "Sorry, I couldn't reach the assistant just now. Please try 
 // Covers a marker split across two chunk reads at the boundary.
 const SAFETY_MARGIN = Math.max(STREAM_META_MARKER.length, STREAM_ERROR_MARKER.length) - 1;
 
-export function ChatClient() {
+export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "corporate" } = {}) {
+  const hasBottomTabBar = variant === "consumer";
   const searchParams = useSearchParams();
   const [activeListingIds] = useState<string[]>(() => {
     const raw = searchParams.get("listingIds");
@@ -27,7 +30,18 @@ export function ChatClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hydrating, setHydrating] = useState(true);
   const [sending, setSending] = useState(false);
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  function loadThreads() {
+    fetch("/api/chat/threads")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.threads) setThreads(data.threads);
+      })
+      .catch(() => {});
+  }
 
   useEffect(() => {
     fetch("/api/chat")
@@ -35,11 +49,34 @@ export function ChatClient() {
       .then((data) => {
         // Guard against a send that happened while this was in flight —
         // never clobber messages the user already added.
-        if (data?.messages) setMessages((prev) => (prev.length === 0 ? data.messages : prev));
+        if (data?.messages) {
+          setMessages((prev) => (prev.length === 0 ? data.messages : prev));
+          setActiveConversationId((prev) => prev ?? data.conversationId ?? null);
+        }
       })
       .catch(() => {})
       .finally(() => setHydrating(false));
+    loadThreads();
   }, []);
+
+  // Switches the visible thread — `null` clears to a fresh "New chat" state;
+  // the next message sent with no conversationId creates a new conversation
+  // server-side, same as it always has.
+  function switchThread(id: string | null) {
+    setActiveConversationId(id);
+    if (id === null) {
+      setMessages([]);
+      return;
+    }
+    setHydrating(true);
+    fetch(`/api/chat?conversationId=${id}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.messages) setMessages(data.messages);
+      })
+      .catch(() => {})
+      .finally(() => setHydrating(false));
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -96,6 +133,7 @@ export function ChatClient() {
         body: JSON.stringify({
           content,
           listingIds: activeListingIds.length > 0 ? activeListingIds : undefined,
+          conversationId: activeConversationId ?? undefined,
           image,
         }),
       });
@@ -122,6 +160,10 @@ export function ChatClient() {
           const id = assistantId;
           if (id) setMessages((prev) => prev.map((m) => (m.id === id ? meta.message : m)));
           notifyGamification(meta.gamification);
+          // Picks up the conversationId a "New chat" send just created, and
+          // refreshes the thread bar so it appears immediately.
+          setActiveConversationId(meta.conversationId);
+          loadThreads();
           break;
         }
         if (done) break;
@@ -152,8 +194,15 @@ export function ChatClient() {
   }
 
   return (
-    <div className="flex flex-1 flex-col pb-40 md:pb-28">
+    <div className={clsx("flex flex-1 flex-col", hasBottomTabBar ? "pb-40 md:pb-28" : "pb-28")}>
       <ChatHeader />
+
+      <ChatThreadBar
+        threads={threads}
+        activeId={activeConversationId}
+        onSelect={switchThread}
+        onNewChat={() => switchThread(null)}
+      />
 
       {activeListingIds.length > 0 && (
         <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-accent-sky/30 bg-accent-sky/5 px-3 py-2 text-[11.5px] font-medium text-accent-sky">
@@ -166,7 +215,7 @@ export function ChatClient() {
         {hydrating ? (
           <p className="py-10 text-center text-[13px] text-text-muted">Loading conversation…</p>
         ) : messages.length === 0 ? (
-          <ChatGreeting onPick={sendMessage} />
+          <ChatGreeting onPick={sendMessage} variant={variant} />
         ) : (
           messages.map((m, i) => {
             const prev = messages[i - 1];
@@ -184,7 +233,12 @@ export function ChatClient() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="fixed bottom-16 left-0 right-0 z-40 border-t border-border bg-bg-surface/95 px-5 py-3 backdrop-blur-sm md:bottom-0 md:px-10">
+      <div
+        className={clsx(
+          "fixed left-0 right-0 z-40 border-t border-border bg-bg-surface/95 px-5 py-3 backdrop-blur-sm md:bottom-0 md:px-10",
+          hasBottomTabBar ? "bottom-16" : "bottom-0",
+        )}
+      >
         <ChatComposer onSend={sendMessage} disabled={sending || hydrating} />
       </div>
     </div>

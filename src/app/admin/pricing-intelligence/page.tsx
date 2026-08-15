@@ -2,13 +2,14 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { Card, Badge } from "@/components/ui/Card";
 import { SearchableSection } from "@/components/admin/SearchableSection";
-import { getSectorPricingSummary, generateSectorNarrative } from "@/lib/pricingIntelligence";
+import { generateSectorNarrative } from "@/lib/pricingIntelligence";
+import { getCombinedPricingView } from "@/lib/combinedPricing";
 
 export default async function AdminPricingIntelligencePage() {
   const admin = await requireAdmin();
   if (!admin) notFound();
 
-  const { bySector, outliers } = await getSectorPricingSummary();
+  const { bySector, outliers, economicDrivers } = await getCombinedPricingView();
 
   // One narrative call per sector that actually has something to explain —
   // a quiet sector with zero outliers doesn't need an AI call to say so.
@@ -27,6 +28,29 @@ export default async function AdminPricingIntelligencePage() {
         sits more than 2 standard deviations from its category peers&apos; distribution. Statistical signal, not a
         margin calculation: there&apos;s no cost data behind these numbers.
       </p>
+
+      {economicDrivers.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-display text-[14px] font-semibold text-text-secondary">Economic indicators</h2>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {economicDrivers.map((driver) => (
+              <Card key={driver.name}>
+                <p className="text-[12px] text-text-muted">
+                  {driver.name} ({driver.region}
+                  {driver.currencyCode ? `, ${driver.currencyCode}` : ""})
+                </p>
+                <p className="mt-1 font-mono text-[18px] font-semibold">{driver.value}</p>
+                {driver.changePercent !== null && (
+                  <p className="text-[11px] text-text-muted">
+                    {driver.changePercent > 0 ? "↑" : driver.changePercent < 0 ? "↓" : "→"}{" "}
+                    {Math.abs(driver.changePercent)}% vs. previous reading
+                  </p>
+                )}
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">By sector</h2>
@@ -79,13 +103,23 @@ export default async function AdminPricingIntelligencePage() {
                     <div className="flex items-center gap-2">
                       <p className="text-[13.5px] font-medium">{o.listingName}</p>
                       <Badge tone={o.belowPeerMedian ? "coral" : "sky"}>z {o.zScore.toFixed(2)}</Badge>
+                      {o.discountPercentOff !== null && <Badge tone="teal">{o.discountPercentOff}% off active</Badge>}
                     </div>
                     <p className="mt-1 text-[12px] text-text-secondary">
                       {o.providerName} · {o.sectorName} / {o.categoryName}
                     </p>
                   </div>
                   <span className="shrink-0 font-mono text-[13px]">
-                    {o.currency} {o.price.toFixed(2)}
+                    {o.effectivePrice !== null ? (
+                      <>
+                        <span className="text-text-muted line-through">{o.currency} {o.price.toFixed(2)}</span>{" "}
+                        {o.currency} {o.effectivePrice.toFixed(2)}
+                      </>
+                    ) : (
+                      <>
+                        {o.currency} {o.price.toFixed(2)}
+                      </>
+                    )}
                   </span>
                 </div>
               ))}

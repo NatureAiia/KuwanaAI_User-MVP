@@ -1,15 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const upsert = vi.fn();
+const findUniquePreference = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { notification: { upsert } },
+  prisma: { notification: { upsert }, notificationPreference: { findUnique: findUniquePreference } },
 }));
 
 const { notifyListingDecision } = await import("@/lib/notifications");
 
 beforeEach(() => {
   upsert.mockReset();
+  findUniquePreference.mockReset();
+  // No row = not yet toggled = on by default (see notificationPreferences.ts).
+  findUniquePreference.mockResolvedValue(null);
 });
 
 describe("notifyListingDecision", () => {

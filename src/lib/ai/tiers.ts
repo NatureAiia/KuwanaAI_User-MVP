@@ -49,6 +49,10 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // decision itself, so a weak-but-free rung is the right default; escalation
   // only kicks in if that rung actually fails to produce usable prose.
   pricing_intelligence_narrative: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  // A closed 3-way classification of a short social post — the cheapest rung
+  // handles this the same way it handles `intake`, and a wrong label costs
+  // nothing worse than a mis-colored badge in an admin triage queue.
+  sentiment_analysis: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */
@@ -68,7 +72,8 @@ export type ComplexitySignals =
       groundedListings: number;
     }
   | { feature: "scrape_extract"; contentLength: number; attributeCount: number }
-  | { feature: "pricing_intelligence_narrative"; outlierCount: number; listingCount: number };
+  | { feature: "pricing_intelligence_narrative"; outlierCount: number; listingCount: number }
+  | { feature: "sentiment_analysis"; batchSize: number };
 
 /** Clamps to 0..1 so every scorer below can add freely without overshooting. */
 function clamp01(value: number): number {
@@ -134,6 +139,12 @@ export function scoreComplexity(signals: ComplexitySignals): number {
       const outliers = clamp01(signals.outlierCount / 10);
       const scale = clamp01((signals.listingCount - 10) / 90);
       return clamp01(outliers * 0.7 + scale * 0.3);
+    }
+
+    case "sentiment_analysis": {
+      // A bigger batch means more posts for a weak model to lose track of
+      // partway through — same shape as recommendations' breadth term.
+      return clamp01((signals.batchSize - 10) / 40);
     }
   }
 }

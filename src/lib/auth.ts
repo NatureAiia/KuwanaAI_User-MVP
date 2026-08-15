@@ -18,12 +18,11 @@ export async function getUserRole(userId: string) {
 }
 
 /**
- * Comparisons, saved listings, footprint, gamification, chat — all
- * consumer-only concepts. The dashboard/corporate/regulator *pages* already
- * redirect non-consumer roles away from these, but the underlying API
- * routes had no equivalent check — a corporate/regulator account could hit
- * them directly. `"response" in result` narrows the union in one line at
- * each call site.
+ * Comparisons, saved listings, footprint, gamification — all consumer-only
+ * concepts. The dashboard/corporate/regulator *pages* already redirect
+ * non-consumer roles away from these, but the underlying API routes had no
+ * equivalent check — a corporate/regulator account could hit them directly.
+ * `"response" in result` narrows the union in one line at each call site.
  */
 export async function requireConsumer(): Promise<
   { user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }
@@ -46,25 +45,26 @@ export async function requireConsumer(): Promise<
 }
 
 /**
- * Notifications now cover two unrelated concepts (a consumer's saved-listing
- * price drops, a provider's listing approval/rejection) that share the same
- * table — so the read/mark-read routes need either role, unlike the
- * consumer-only routes above.
+ * Chat is available to both consumer accounts (grounded in their own saved
+ * listings/wallet) and corporate accounts (grounded in their own provider's
+ * listings/alerts/investigations) — see api/chat/route.ts, which branches
+ * grounding on the returned role.
  */
-export async function requireConsumerOrProvider(): Promise<
-  { user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }
+export async function requireConsumerOrCorporate(): Promise<
+  | { user: NonNullable<Awaited<ReturnType<typeof requireUser>>>; role: "consumer" | "corporate" }
+  | { response: NextResponse }
 > {
   const user = await requireUser();
   if (!user) {
-    return { response: NextResponse.json({ error: "Not authenticated" }, { status: 401 }) };
+    return { response: privateJson({ error: "Not authenticated" }, { status: 401 }) };
   }
   const role = await getUserRole(user.id);
-  if (role !== "consumer" && role !== "provider") {
+  if (role !== "consumer" && role !== "corporate") {
     return {
-      response: NextResponse.json({ error: "This feature is for consumer or provider accounts" }, { status: 403 }),
+      response: privateJson({ error: "This feature is for consumer or corporate accounts" }, { status: 403 }),
     };
   }
-  return { user };
+  return { user, role };
 }
 
 /**

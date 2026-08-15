@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { FormField, Input, TextArea } from "@/components/ui/Field";
 import { ProviderLogo } from "@/components/ProviderLogo";
 
 // Same plain-controlled-input pattern as admin/NewProviderForm.tsx — no
@@ -60,37 +61,23 @@ export function CompanyProfileForm({
           <p className="text-[12.5px] text-text-secondary">Shown to shoppers on every one of your listings.</p>
         </div>
 
-        <label className="block">
-          <span className="text-[12.5px] font-medium text-text-secondary">Company name</span>
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
-          />
-        </label>
+        <FormField label="Company name">
+          <Input required value={name} onChange={(e) => setName(e.target.value)} />
+        </FormField>
 
-        <label className="block">
-          <span className="text-[12.5px] font-medium text-text-secondary">Logo URL</span>
-          <input
-            placeholder="https://…"
-            value={logoUrl}
-            onChange={(e) => setLogoUrl(e.target.value)}
-            className="tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
-          />
-        </label>
+        <FormField label="Logo URL">
+          <Input placeholder="https://…" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} />
+        </FormField>
 
-        <label className="block">
-          <span className="text-[12.5px] font-medium text-text-secondary">Description</span>
-          <textarea
+        <FormField label="Description">
+          <TextArea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
             maxLength={2000}
             placeholder="What CBZ Bank Limited offers, who it's for…"
-            className="tap-target mt-1 w-full resize-none rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
           />
-        </label>
+        </FormField>
 
         {error && <p className="text-[12px] text-accent-coral">{error}</p>}
         {saved && !error && <p className="text-[12px] text-accent-teal">Saved.</p>}

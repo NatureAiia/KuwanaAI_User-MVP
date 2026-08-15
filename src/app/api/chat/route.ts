@@ -1,32 +1,47 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireConsumer } from "@/lib/auth";
+import { requireConsumerOrCorporate } from "@/lib/auth";
+import { emailDomain } from "@/lib/orgVerification";
 import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
+import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
 import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
 
-const SYSTEM_PROMPT =
+const CONSUMER_SYSTEM_PROMPT =
   "You are the Kuwana Assistant — a friendly, concise AI chat assistant for Kuwana, an AI-assisted, " +
   "explainable comparison platform for telecom, banking, insurance, and education in Zimbabwe. Help " +
   "users understand their options, how to compare providers, and how Kuwana's decision score works " +
   "(a transparent price/benefit blend). Never invent specific prices, providers, or statistics — if the " +
   "user asks about specific current listings and none are provided below as grounding data, say so " +
-  "plainly and point them to the Explore tab for live comparisons rather than guessing. If an image is " +
-  "attached, you may describe or reason about it, but still never invent specific prices for a product " +
-  "you recognize unless that price is present in the grounding data. Keep replies short (2-4 sentences " +
-  "unless more detail is clearly needed). Always make clear you're an AI assistant, not a financial advisor.";
+  "plainly and point them to the Explore tab for live comparisons rather than guessing. You may also be " +
+  "given the user's own account snapshot (saved listings, wallet balance, unread notifications) below — " +
+  "you may answer questions about their own account from that data, but never invent figures not present " +
+  "in it. If an image is attached, you may describe or reason about it, but still never invent specific " +
+  "prices for a product you recognize unless that price is present in the grounding data. Keep replies " +
+  "short (2-4 sentences unless more detail is clearly needed). Always make clear you're an AI assistant, " +
+  "not a financial advisor.";
+
+const CORPORATE_SYSTEM_PROMPT =
+  "You are the Kuwana Business Assistant — a concise AI assistant for corporate accounts on Kuwana's " +
+  "'Kuwana for Business' portal. Help the user understand their own catalog's pricing position, " +
+  "triggered alert rules, and open investigations, using only the account snapshot provided below as " +
+  "grounding — never invent listing names, prices, or counts not present in it. If the account isn't yet " +
+  "linked to a provider catalog, say so plainly rather than guessing. Keep replies short (2-4 sentences " +
+  "unless more detail is clearly needed). Always make clear you're an AI assistant, not a financial or " +
+  "legal advisor.";
 
 const IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 
 const postSchema = z.object({
   content: z.string().trim().max(2000),
   listingIds: z.array(z.string()).max(6).optional(),
+  conversationId: z.string().uuid().optional(),
   image: z
     .object({
       mediaType: z.enum(IMAGE_MEDIA_TYPES),
@@ -52,14 +67,24 @@ async function listingSummaries(listingIds: string[]) {
   }));
 }
 
-export async function GET() {
-  const auth = await requireConsumer();
+/** A corporate caller's own provider, resolved the same email-domain-match way every corporate route does. */
+async function resolveCorporateProvider(email: string | undefined) {
+  const domain = email ? emailDomain(email) : null;
+  return domain ? prisma.provider.findFirst({ where: { corporateDomain: domain } }) : null;
+}
+
+export async function GET(req: Request) {
+  const auth = await requireConsumerOrCorporate();
   if ("response" in auth) return auth.response;
   const { user } = auth;
 
+  const requestedId = new URL(req.url).searchParams.get("conversationId");
+
   const conversation = await prisma.conversation.findFirst({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
+    // A requested id must belong to this user — an unowned/unknown id falls
+    // through to "most recent", the same as no id being passed at all.
+    where: requestedId ? { id: requestedId, userId: user.id } : { userId: user.id },
+    orderBy: { lastMessageAt: "desc" },
     include: { messages: { orderBy: { createdAt: "asc" } } },
   });
 
@@ -81,28 +106,47 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await requireConsumer();
+  const auth = await requireConsumerOrCorporate();
   if ("response" in auth) return auth.response;
-  const { user } = auth;
+  const { user, role } = auth;
 
   const parsed = postSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { content, listingIds, image } = parsed.data;
+  const { content, listingIds, image, conversationId } = parsed.data;
   if (!content && !image) {
     return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
   }
 
-  const conversation = await prisma.conversation.findFirst({
-    where: { userId: user.id },
-    orderBy: { createdAt: "asc" },
-    include: { messages: { orderBy: { createdAt: "desc" }, take: CHAT_HISTORY_LIMIT } },
-  });
+  // An explicit conversationId must belong to this user — otherwise this is
+  // a "New chat": always create a fresh conversation rather than silently
+  // resuming whatever the user's most recent thread happened to be.
+  const conversation = conversationId
+    ? await prisma.conversation.findFirst({
+        where: { id: conversationId, userId: user.id },
+        include: { messages: { orderBy: { createdAt: "desc" }, take: CHAT_HISTORY_LIMIT } },
+      })
+    : null;
+  if (conversationId && !conversation) {
+    return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+  }
   const isNewConversation = !conversation;
   const priorMessages = conversation ? [...conversation.messages].reverse() : [];
 
-  let system = SYSTEM_PROMPT;
+  let system = role === "corporate" ? CORPORATE_SYSTEM_PROMPT : CONSUMER_SYSTEM_PROMPT;
+
+  if (role === "corporate") {
+    const provider = await resolveCorporateProvider(user.email);
+    const context = provider ? await getCorporateChatContext(provider.id) : null;
+    system += context
+      ? `\n\nYour account snapshot (${provider!.name}) — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`
+      : "\n\nThis account isn't linked to a provider catalog yet — tell the user to ask an admin to link it before you can answer catalog-specific questions.";
+  } else {
+    const context = await getConsumerChatContext(user.id);
+    system += `\n\nYour account snapshot — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`;
+  }
+
   if (listingIds && listingIds.length > 0) {
     const listings = await prisma.listing.findMany({
       where: { id: { in: listingIds }, status: "published" },
@@ -212,7 +256,7 @@ export async function POST(req: Request) {
       }
 
       try {
-        const { assistantMessage, conversationId, gamification } = await prisma.$transaction(
+        const { assistantMessage, conversationId: convId, gamification } = await prisma.$transaction(
           async (tx) => {
             const conv = conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
 
@@ -224,9 +268,13 @@ export async function POST(req: Request) {
             });
             await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
 
-            const gam = isNewConversation
-              ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
-              : null;
+            // Gamification is a consumer-only concept (see CorporateHeader's
+            // own note on this) — a corporate account's first message never
+            // awards it.
+            const gam =
+              isNewConversation && role === "consumer"
+                ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
+                : null;
 
             return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
           },
@@ -235,7 +283,7 @@ export async function POST(req: Request) {
 
         const listings = await listingSummaries(listingIds ?? []);
         const meta = {
-          conversationId,
+          conversationId: convId,
           gamification,
           message: {
             id: assistantMessage.id,

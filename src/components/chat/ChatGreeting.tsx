@@ -1,13 +1,28 @@
-import { Bot, Compass, HelpCircle, TrendingDown, TrendingUp } from "lucide-react";
+import { Bot, Compass, HelpCircle, TrendingDown, TrendingUp, Radar, ShieldAlert } from "lucide-react";
 
-const SUGGESTED_PROMPTS = [
+const CONSUMER_PROMPTS = [
   { label: "Compare data bundles", icon: Compass },
   { label: "Best savings accounts", icon: TrendingDown },
   { label: "What's trending right now?", icon: TrendingUp },
   { label: "How does the decision score work?", icon: HelpCircle },
 ];
 
-export function ChatGreeting({ onPick }: { onPick: (prompt: string) => void }) {
+const CORPORATE_PROMPTS = [
+  { label: "How's my catalog pricing?", icon: TrendingUp },
+  { label: "Do I have any triggered alerts?", icon: ShieldAlert },
+  { label: "What's open in my investigations?", icon: Radar },
+  { label: "What's my average listing price?", icon: Compass },
+];
+
+export function ChatGreeting({
+  onPick,
+  variant = "consumer",
+}: {
+  onPick: (prompt: string) => void;
+  variant?: "consumer" | "corporate";
+}) {
+  const prompts = variant === "corporate" ? CORPORATE_PROMPTS : CONSUMER_PROMPTS;
+
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
@@ -15,11 +30,13 @@ export function ChatGreeting({ onPick }: { onPick: (prompt: string) => void }) {
       </div>
       <p className="mt-4 font-display text-[17px] font-bold">Hey there!</p>
       <p className="mt-1 max-w-[280px] text-[13px] text-text-secondary">
-        I&apos;m the Kuwana Assistant. Ask me about providers, comparisons, or how to get the best value.
+        {variant === "corporate"
+          ? "I'm the Kuwana Business Assistant. Ask me about your catalog, alerts, or investigations."
+          : "I'm the Kuwana Assistant. Ask me about providers, comparisons, or how to get the best value."}
       </p>
 
       <div className="mt-6 grid w-full grid-cols-2 gap-2.5">
-        {SUGGESTED_PROMPTS.map(({ label, icon: Icon }) => (
+        {prompts.map(({ label, icon: Icon }) => (
           <button
             key={label}
             type="button"

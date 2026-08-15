@@ -12,8 +12,12 @@ export default async function NotificationsPage() {
 
   await syncPriceDropNotifications(user.id);
 
+  // Consumer notifications (price_drop, listing_approved, listing_rejected)
+  // always carry a listing — the listing-less types (alert_threshold_crossed,
+  // business_condition_review_due) only ever get written for corporate/admin
+  // users — so this filter also protects the non-null listing access below.
   const notifications = await prisma.notification.findMany({
-    where: { userId: user.id },
+    where: { userId: user.id, listingId: { not: null } },
     include: { listing: { include: { provider: true } } },
     orderBy: { createdAt: "desc" },
   });
@@ -25,11 +29,17 @@ export default async function NotificationsPage() {
       <NotificationsList
         notifications={notifications.map((n) => ({
           id: n.id,
-          type: n.type,
+          // Cast is safe here for the same reason as the listing assertion
+          // below: the query only ever returns the three listing-backed
+          // types, but Prisma's type is the full (now 5-member) enum.
+          type: n.type as "price_drop" | "listing_approved" | "listing_rejected",
           message: n.message,
           read: n.read,
           createdAt: n.createdAt.toISOString(),
-          listing: { id: n.listing.id, name: n.listing.name, provider: n.listing.provider.name },
+          // Non-null assertion is safe here: the `listingId: { not: null }`
+          // filter above guarantees it at runtime, Prisma's types just can't
+          // express that narrowing.
+          listing: { id: n.listing!.id, name: n.listing!.name, provider: n.listing!.provider.name },
         }))}
       />
       <BottomTabBar />

@@ -18,6 +18,7 @@ export const AI_FEATURES = [
   "intake",
   "scrape_extract",
   "pricing_intelligence_narrative",
+  "sentiment_analysis",
 ] as const;
 export type AiFeature = (typeof AI_FEATURES)[number];
 
@@ -27,6 +28,7 @@ export const AI_FEATURE_LABELS: Record<AiFeature, string> = {
   intake: "Need-intake routing",
   scrape_extract: "Web-scrape extraction",
   pricing_intelligence_narrative: "Pricing intelligence narrative",
+  sentiment_analysis: "Social mention sentiment",
 };
 
 export const AI_FEATURE_BLURBS: Record<AiFeature, string> = {
@@ -36,6 +38,8 @@ export const AI_FEATURE_BLURBS: Record<AiFeature, string> = {
   scrape_extract: "Turns a scraped page into structured listing fields for admin review in /admin/scraper.",
   pricing_intelligence_narrative:
     "Explains outlier/peer pricing signals on /admin/pricing-intelligence and the corporate fee-comparison panel. Never decides which listing is an outlier — the heuristic already did that.",
+  sentiment_analysis:
+    "Classifies positive/negative/neutral sentiment on scraped social mentions for /admin/social-mentions and the corporate sentiment panel. Batched, low-stakes triage — never blocks or edits anything.",
 };
 
 export type ModelSpec = {
@@ -145,6 +149,7 @@ export const DEFAULT_MODELS: Record<AiFeature, string> = {
   intake: "llama-3.2-vision",
   scrape_extract: "llama-3.2-vision",
   pricing_intelligence_narrative: "llama-3.2-vision",
+  sentiment_analysis: "llama-3.2-vision",
 };
 
 /** Cost of one call in USD, from token counts. Used when the provider doesn't report a cost. */

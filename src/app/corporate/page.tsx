@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { clsx } from "clsx";
-import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid, Scale } from "lucide-react";
+import { BarChart3, TrendingDown, TrendingUp, ShieldAlert, Lightbulb, ShieldQuestion, Radar, Building2, LayoutGrid, Scale, Landmark, MessageCircle } from "lucide-react";
 import { requireCorporateUser } from "@/lib/corporateAuth";
 import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
 import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
+import { getActiveDiscountsMap, computeEffectivePrice } from "@/lib/discounts";
+import { getLatestEconomicDrivers } from "@/lib/economicDrivers";
+import { getActiveBusinessConditions } from "@/lib/businessConditions";
+import { ensureSentimentComputed, getSentimentSummary } from "@/lib/sentiment";
 import { emailDomain } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card } from "@/components/ui/Card";
@@ -40,10 +44,24 @@ export default async function CorporateDashboardPage({
   // unlinked account still gets the sector-wide rollups above, just not this.
   const domain = user.email ? emailDomain(user.email) : null;
   const provider = domain
-    ? await prisma.provider.findFirst({ where: { corporateDomain: domain }, select: { id: true } })
+    ? await prisma.provider.findFirst({ where: { corporateDomain: domain }, select: { id: true, name: true } })
     : null;
   const competitorWatch = provider ? await getCompetitorWatch(provider.id) : [];
   const feeComparison = provider ? await getProviderFeeComparison(provider.id) : [];
+  const discountsByListingId = await getActiveDiscountsMap(
+    feeComparison.map((f) => ({ id: f.listingId, categoryId: f.categoryId })),
+  );
+  const economicDrivers = await getLatestEconomicDrivers();
+  const businessConditions = await getActiveBusinessConditions(activeSector);
+
+  // Sentiment is scoped to this provider's own name match, same join
+  // getSocialMentionsForProvider uses — computed lazily here rather than at
+  // scan time (see lib/sentiment.ts).
+  let sentiment = null as Awaited<ReturnType<typeof getSentimentSummary>> | null;
+  if (provider) {
+    await ensureSentimentComputed({ matchedProvider: provider.name });
+    sentiment = await getSentimentSummary({ matchedProvider: provider.name });
+  }
 
   return (
     <div>
@@ -76,6 +94,51 @@ export default async function CorporateDashboardPage({
           </Link>
         ))}
       </div>
+
+      {economicDrivers.length > 0 && (
+        <section className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <Landmark size={13} strokeWidth={2.25} /> Economic context
+          </h2>
+          <div className="mt-2 grid gap-2.5 sm:grid-cols-3">
+            {economicDrivers.map((driver) => (
+              <CorporateStatCard key={driver.name} icon={Landmark} tone="neutral" label={driver.name}>
+                <p className="font-mono text-[18px] font-semibold">
+                  {driver.currencyCode ? `${driver.currencyCode} ` : ""}
+                  {driver.value}
+                </p>
+                {driver.changePercent !== null && (
+                  <p className="text-[11px] text-text-muted">
+                    {driver.changePercent > 0 ? "↑" : driver.changePercent < 0 ? "↓" : "→"}{" "}
+                    {Math.abs(driver.changePercent)}% vs. previous reading
+                  </p>
+                )}
+              </CorporateStatCard>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {businessConditions.length > 0 && (
+        <section className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <ShieldAlert size={13} strokeWidth={2.25} /> Business conditions to watch
+          </h2>
+          <div className="mt-2 flex flex-col gap-2">
+            {businessConditions.map((c) => (
+              <Card key={c.id} className="flex items-center justify-between gap-3 !p-3.5">
+                <div>
+                  <p className="text-[13.5px] font-medium">{c.title}</p>
+                  {c.notes && <p className="mt-0.5 text-[12px] text-text-secondary">{c.notes}</p>}
+                </div>
+                <CorporateTag tone={c.riskLevel === "high" ? "coral" : c.riskLevel === "medium" ? "sky" : "neutral"}>
+                  {c.riskLevel}
+                </CorporateTag>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       {bySector.length > 0 && (
         <>
@@ -172,6 +235,8 @@ export default async function CorporateDashboardPage({
           <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
             {feeComparison.map((f, i) => {
               const belowMedian = f.price < f.peerMedian;
+              const discount = discountsByListingId.get(f.listingId);
+              const percentOff = discount ? Number(discount.percentOff) : null;
               return (
                 <div
                   key={f.listingId}
@@ -182,9 +247,17 @@ export default async function CorporateDashboardPage({
                     <p className="text-[11px] text-text-muted">{f.categoryName}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-[13.5px]">
-                      {f.currency} {f.price.toFixed(2)}
-                    </span>
+                    {percentOff !== null ? (
+                      <span className="font-mono text-[13.5px]">
+                        <span className="text-text-muted line-through">{f.currency} {f.price.toFixed(2)}</span>{" "}
+                        {f.currency} {computeEffectivePrice(f.price, percentOff).toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-[13.5px]">
+                        {f.currency} {f.price.toFixed(2)}
+                      </span>
+                    )}
+                    {percentOff !== null && <CorporateTag tone="teal">{percentOff}% off active</CorporateTag>}
                     {f.sampleSize >= 5 ? (
                       <CorporateTag tone={belowMedian ? "teal" : "coral"}>
                         peer median {f.peerMedian.toFixed(2)}
@@ -198,6 +271,36 @@ export default async function CorporateDashboardPage({
               );
             })}
           </div>
+        </section>
+      )}
+
+      {sentiment && sentiment.total > 0 && (
+        <section className="mt-6">
+          <h2 className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+            <MessageCircle size={13} strokeWidth={2.25} /> Social sentiment
+          </h2>
+          <p className="mt-1 text-[12px] text-text-secondary">
+            Public Reddit/Telegram posts mentioning {provider!.name}, classified by AI — intelligence only, same
+            posts admin reviews at Social mentions.
+          </p>
+          <Card className="mt-2 flex flex-wrap items-center gap-4 !p-3.5">
+            {sentiment.positiveShare !== null ? (
+              <div>
+                <p className="font-mono text-[20px] font-semibold">{Math.round(sentiment.positiveShare * 100)}%</p>
+                <p className="text-[11px] text-text-muted">positive</p>
+              </div>
+            ) : (
+              <p className="text-[13px] text-text-muted">Not yet classified — check back shortly.</p>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              <CorporateTag tone="teal">{sentiment.positive} positive</CorporateTag>
+              <CorporateTag tone="coral">{sentiment.negative} negative</CorporateTag>
+              <CorporateTag tone="neutral">{sentiment.neutral} neutral</CorporateTag>
+              {sentiment.unclassified > 0 && (
+                <CorporateTag tone="neutral">{sentiment.unclassified} pending</CorporateTag>
+              )}
+            </div>
+          </Card>
         </section>
       )}
 

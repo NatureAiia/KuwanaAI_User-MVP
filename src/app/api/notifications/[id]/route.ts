@@ -1,11 +1,10 @@
 import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
-import { requireConsumerOrProvider } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const auth = await requireConsumerOrProvider();
-  if ("response" in auth) return auth.response;
-  const { user } = auth;
+  const user = await requireUser();
+  if (!user) return privateJson({ error: "Not authenticated" }, { status: 401 });
 
   const { id } = await params;
   const result = await prisma.notification.updateMany({

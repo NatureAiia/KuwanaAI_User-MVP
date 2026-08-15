@@ -3,15 +3,22 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LineChart, Package, ClipboardList, Building2, Wallet, ChevronsLeft, ChevronsRight, type LucideIcon } from "lucide-react";
+import { LineChart, Package, ClipboardList, Building2, Wallet, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
 
 const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/corporate", label: "Market Intelligence", icon: LineChart },
+  { href: "/corporate/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/corporate/products", label: "My Products", icon: Package },
   { href: "/corporate/requests", label: "Requests", icon: ClipboardList },
+  { href: "/corporate/investigations", label: "Investigations", icon: Search },
+  { href: "/corporate/live-feed", label: "Live Feed", icon: Activity },
+  { href: "/corporate/alerts", label: "Alerts", icon: Bell },
+  { href: "/corporate/data-import", label: "Data Import", icon: UploadCloud },
+  { href: "/corporate/reports", label: "Reports", icon: FileText },
+  { href: "/corporate/chat", label: "Assistant", icon: MessageCircle },
   { href: "/corporate/profile", label: "Company Profile", icon: Building2 },
   { href: "/wallet", label: "Wallet", icon: Wallet },
 ];

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SwitchAccountButton } from "@/components/LogoutButton";
+import { NotificationPreferenceToggle } from "@/components/NotificationPreferenceToggle";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -107,6 +108,25 @@ export default function SettingsPage() {
       <div className="mt-6 space-y-2.5">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">Display currency</h2>
         <CurrencySwitcher />
+      </div>
+
+      <div className="mt-6 space-y-2.5">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Notification preferences</h2>
+        <NotificationPreferenceToggle
+          type="price_drop"
+          label="Price drop"
+          description="Notify me when a saved listing's price drops."
+        />
+        <NotificationPreferenceToggle
+          type="listing_approved"
+          label="Listing approved"
+          description="Notify me when a listing I submitted as a provider is approved."
+        />
+        <NotificationPreferenceToggle
+          type="listing_rejected"
+          label="Listing rejected"
+          description="Notify me when a listing I submitted as a provider is rejected."
+        />
       </div>
 
       <div className="mt-6 space-y-2.5">

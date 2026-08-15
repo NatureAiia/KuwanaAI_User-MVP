@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends } from "@/lib/catalog";
+import { isNotificationEnabled } from "@/lib/notificationPreferences";
 
 /**
  * How long a user's notification sync result is considered current.
@@ -35,6 +36,8 @@ export async function syncPriceDropNotifications(userId: string, force = false):
   const last = lastSyncedAt.get(userId);
   if (!force && last !== undefined && now - last < SYNC_INTERVAL_MS) return;
   lastSyncedAt.set(userId, now);
+
+  if (!(await isNotificationEnabled(userId, "price_drop"))) return;
 
   const saved = await prisma.savedListing.findMany({ where: { userId }, select: { listingId: true } });
   if (saved.length === 0) return;
@@ -92,6 +95,8 @@ export async function notifyListingDecision(params: {
 }): Promise<void> {
   const { listingId, ownerUserId, listingName, status, rejectionReason } = params;
   const type = status === "published" ? "listing_approved" : "listing_rejected";
+  if (!(await isNotificationEnabled(ownerUserId, type))) return;
+
   const message =
     status === "published"
       ? `"${listingName}" was approved and is now live.`

@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getMarketOverview, getComplianceActivity } from "@/lib/catalog";
+import { getLatestEconomicDrivers } from "@/lib/economicDrivers";
+import { getActiveBusinessConditions } from "@/lib/businessConditions";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
@@ -28,10 +30,13 @@ export default async function RegulatorDashboardPage({
       ? (sectorFilter as SectorSlug)
       : undefined;
 
-  const [{ bySector, anomalies, unverifiedListings }, complianceActivity] = await Promise.all([
-    getMarketOverview(activeSector),
-    getComplianceActivity(activeSector),
-  ]);
+  const [{ bySector, anomalies, unverifiedListings }, complianceActivity, economicDrivers, businessConditions] =
+    await Promise.all([
+      getMarketOverview(activeSector),
+      getComplianceActivity(activeSector),
+      getLatestEconomicDrivers(),
+      getActiveBusinessConditions(activeSector),
+    ]);
 
   // Key Insights: which live sector currently carries the most compliance risk —
   // the one with the most unverified-provider listings — computed from the
@@ -73,6 +78,50 @@ export default async function RegulatorDashboardPage({
           </Link>
         ))}
       </div>
+
+      {economicDrivers.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-display text-[16px] font-semibold">Economic indicators</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {economicDrivers.map((driver) => (
+              <Card key={driver.name}>
+                <p className="text-[12px] text-text-muted">
+                  {driver.name} ({driver.region}
+                  {driver.currencyCode ? `, ${driver.currencyCode}` : ""})
+                </p>
+                <p className="mt-1 font-mono text-[22px] font-semibold">{driver.value}</p>
+                <p className="text-[11px] text-text-muted">
+                  as of {new Date(driver.period).toLocaleDateString("en-ZA", { dateStyle: "medium" })}
+                  {driver.changePercent !== null &&
+                    ` · ${driver.changePercent > 0 ? "↑" : driver.changePercent < 0 ? "↓" : "→"} ${Math.abs(driver.changePercent)}% vs. previous`}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {businessConditions.length > 0 && (
+        <section className="mt-6">
+          <h2 className="font-display text-[16px] font-semibold">Business conditions being tracked</h2>
+          <p className="mt-1 text-[12px] text-text-muted">
+            Regulatory changes, competitor moves, and macro triggers — managed by admin at /admin/business-conditions.
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            {businessConditions.map((c) => (
+              <Card key={c.id} className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-display text-[14px] font-semibold">{c.title}</p>
+                  {c.notes && <p className="mt-0.5 text-[12px] text-text-secondary">{c.notes}</p>}
+                </div>
+                <Badge tone={c.riskLevel === "high" ? "coral" : c.riskLevel === "medium" ? "sky" : "neutral"}>
+                  {c.riskLevel}
+                </Badge>
+              </Card>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-6">
         <h2 className="font-display text-[16px] font-semibold">Key insights</h2>
