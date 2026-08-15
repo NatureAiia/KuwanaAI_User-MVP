@@ -35,17 +35,25 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: { "/**/*": ["./cache-handler.js"] },
 
   images: {
-    remotePatterns: supabaseHostname
-      ? [
-          {
-            protocol: "https",
-            hostname: supabaseHostname,
-            port: "",
-            pathname: "/storage/v1/object/public/**",
-            search: "",
-          },
-        ]
-      : [],
+    remotePatterns: [
+      ...(supabaseHostname
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: supabaseHostname,
+              port: "",
+              pathname: "/storage/v1/object/public/**",
+              search: "",
+            },
+          ]
+        : []),
+      // Seed-data placeholder photos (prisma/seed.ts) for listings without a
+      // real provider-uploaded photo yet — picsum.photos is a stable,
+      // freely-usable placeholder image CDN, deterministic by seed path, so
+      // the same listing always gets the same photo. Remove once every
+      // seeded listing has a real Supabase-hosted image instead.
+      { protocol: "https" as const, hostname: "picsum.photos", port: "", pathname: "/**", search: "" },
+    ],
   },
 
   experimental: {
