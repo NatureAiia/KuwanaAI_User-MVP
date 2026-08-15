@@ -96,7 +96,7 @@ export default async function RegulatorInvestigationsPage({
               headers={["Listing", "Sector", "Provider", "Reason", "Status", "Outcome", "Opened", "Closed"]}
               rows={investigations.map((inv) => [
                 inv.listingName,
-                inv.sectorName,
+                inv.sectorName ?? "—",
                 inv.providerName,
                 inv.reason,
                 STATUS_LABEL[inv.status],
@@ -117,7 +117,7 @@ export default async function RegulatorInvestigationsPage({
                   {inv.outcome !== "none" && <Badge tone="coral">{OUTCOME_LABEL[inv.outcome]}</Badge>}
                 </div>
                 <p className="mt-1 text-[12px] text-text-secondary">
-                  {inv.sectorName} · {inv.providerName}
+                  {inv.sectorName ?? "Listing removed"} · {inv.providerName}
                 </p>
                 <p className="mt-1 text-[12px] text-text-secondary">{inv.reason}</p>
                 {inv.notes && <p className="mt-1 text-[12px] text-text-muted">Note: {inv.notes}</p>}

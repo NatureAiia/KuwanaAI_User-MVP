@@ -30,6 +30,7 @@ export async function POST(req: Request) {
   const investigation = await prisma.listingInvestigation.create({
     data: {
       listingId: parsed.data.listingId,
+      listingName: listing.name,
       providerId: listing.providerId,
       reason: parsed.data.reason,
       assignedToUserId: auth.user.id,

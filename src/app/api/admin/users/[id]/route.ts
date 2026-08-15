@@ -72,6 +72,25 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         });
         revalidateCatalog();
       }
+
+      // A permanent deactivation blocks the app itself via requireUser(),
+      // but a BI API key (src/lib/bi/auth.ts's requireApiKey) is validated
+      // purely against its own revokedAt — untouched by accountStatus — so
+      // without this, a deactivated provider's existing key would keep
+      // pulling data indefinitely after the "permanent" choice was made.
+      const { count: revokedCount } = await prisma.apiKey.updateMany({
+        where: { providerId: provider.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      if (revokedCount > 0) {
+        await logAdminAction({
+          adminEmail: admin.email,
+          action: "api_key_revoked",
+          targetType: "api_key",
+          targetId: provider.id,
+          detail: `Revoked ${revokedCount} API key(s) for ${provider.name} (account deactivated)`,
+        });
+      }
     }
   }
 

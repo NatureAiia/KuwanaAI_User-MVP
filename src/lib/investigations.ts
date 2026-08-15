@@ -3,7 +3,11 @@ import type { InvestigationOutcome } from "@prisma/client";
 
 export type InvestigationSummary = {
   id: string;
-  listingId: string;
+  // Null once the listing has been permanently deleted (e.g. an admin's
+  // "permanent" account deactivation) — listingName is a snapshot taken at
+  // creation time and is always present regardless, so display never breaks,
+  // but any "view listing" link needs to check this before rendering.
+  listingId: string | null;
   listingName: string;
   reason: string;
   status: "open" | "in_progress" | "resolved" | "dismissed";
@@ -16,14 +20,13 @@ export type InvestigationSummary = {
 export async function getInvestigationsForProvider(providerId: string): Promise<InvestigationSummary[]> {
   const rows = await prisma.listingInvestigation.findMany({
     where: { providerId },
-    include: { listing: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
 
   return rows.map((row) => ({
     id: row.id,
     listingId: row.listingId,
-    listingName: row.listing.name,
+    listingName: row.listingName,
     reason: row.reason,
     status: row.status,
     notes: row.notes,
@@ -38,13 +41,16 @@ export async function getActivelyInvestigatedListingIds(providerId: string): Pro
     where: { providerId, status: { in: ["open", "in_progress"] } },
     select: { listingId: true },
   });
-  return new Set(rows.map((r) => r.listingId));
+  return new Set(rows.map((r) => r.listingId).filter((id): id is string => id !== null));
 }
 
 export type RegulatorInvestigationSummary = InvestigationSummary & {
   providerId: string;
   providerName: string;
-  sectorName: string;
+  // Null once the listing (and therefore its category/sector join) is gone
+  // — sector filtering on such a row is a no-op below, since there's nothing
+  // left to filter by, but the case itself still displays via listingName.
+  sectorName: string | null;
   outcome: InvestigationOutcome;
   evidenceUrls: string[];
 };
@@ -65,7 +71,7 @@ export async function getAllInvestigations(filters?: {
       listing: filters?.sectorSlug ? { category: { sector: { slug: filters.sectorSlug } } } : undefined,
     },
     include: {
-      listing: { select: { name: true, category: { select: { sector: { select: { name: true } } } } } },
+      listing: { select: { category: { select: { sector: { select: { name: true } } } } } },
       provider: { select: { name: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -74,10 +80,10 @@ export async function getAllInvestigations(filters?: {
   return rows.map((row) => ({
     id: row.id,
     listingId: row.listingId,
-    listingName: row.listing.name,
+    listingName: row.listingName,
     providerId: row.providerId,
     providerName: row.provider.name,
-    sectorName: row.listing.category.sector.name,
+    sectorName: row.listing?.category.sector.name ?? null,
     reason: row.reason,
     status: row.status,
     notes: row.notes,
@@ -94,5 +100,5 @@ export async function getActivelyInvestigatedListingIdsGlobal(): Promise<Set<str
     where: { status: { in: ["open", "in_progress"] } },
     select: { listingId: true },
   });
-  return new Set(rows.map((r) => r.listingId));
+  return new Set(rows.map((r) => r.listingId).filter((id): id is string => id !== null));
 }

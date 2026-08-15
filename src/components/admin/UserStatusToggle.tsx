@@ -24,7 +24,9 @@ export function UserStatusToggle({
   async function submit(listingAction: ListingAction) {
     if (
       listingAction === "remove" &&
-      !confirm(`This permanently deletes all ${providerListingCount} listing(s) for this provider. This can't be undone. Continue?`)
+      !confirm(
+        `This permanently deletes all ${providerListingCount} listing(s) for this provider and revokes any API keys. This can't be undone. Continue?`,
+      )
     ) {
       return;
     }
@@ -127,7 +129,7 @@ export function UserStatusToggle({
                 >
                   Permanent — deactivate and delete listings
                   <span className="block text-[11.5px] font-normal text-accent-coral/80">
-                    Deletes all {providerListingCount} listing(s). Can&apos;t be undone.
+                    Deletes all {providerListingCount} listing(s) and revokes any API keys. Can&apos;t be undone.
                   </span>
                 </button>
               )}

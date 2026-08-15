@@ -22,10 +22,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Any regulator account can act on any case — a regulator's case queue is
   // market-wide oversight, not per-user ownership, unlike corporate's
   // provider-scoped PATCH route.
-  const existing = await prisma.listingInvestigation.findUnique({
-    where: { id },
-    include: { listing: { select: { name: true } } },
-  });
+  const existing = await prisma.listingInvestigation.findUnique({ where: { id } });
   if (!existing) {
     return privateJson({ error: "Not found" }, { status: 404 });
   }
@@ -49,7 +46,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       action: "investigation_updated",
       targetType: "investigation",
       targetId: investigation.id,
-      detail: `${existing.listing.name}: ${JSON.stringify(parsed.data)}`,
+      detail: `${existing.listingName}: ${JSON.stringify(parsed.data)}`,
     });
   }
 

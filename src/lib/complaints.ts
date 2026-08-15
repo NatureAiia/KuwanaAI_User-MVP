@@ -47,12 +47,13 @@ export async function promoteComplaintToInvestigation(
   if (!complaint) return { error: "Complaint not found" };
   if (!complaint.listingId) return { error: "This complaint isn't tied to a specific listing, so it can't become a case" };
 
-  const listing = await prisma.listing.findUnique({ where: { id: complaint.listingId }, select: { providerId: true } });
+  const listing = await prisma.listing.findUnique({ where: { id: complaint.listingId }, select: { providerId: true, name: true } });
   if (!listing) return { error: "Listing no longer exists" };
 
   const investigation = await prisma.listingInvestigation.create({
     data: {
       listingId: complaint.listingId,
+      listingName: listing.name,
       providerId: listing.providerId,
       reason: `Consumer complaint: ${complaint.description.slice(0, 400)}`,
       assignedToUserId,

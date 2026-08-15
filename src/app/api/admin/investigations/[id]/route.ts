@@ -19,10 +19,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
-  const existing = await prisma.listingInvestigation.findUnique({
-    where: { id },
-    include: { listing: { select: { name: true } } },
-  });
+  const existing = await prisma.listingInvestigation.findUnique({ where: { id } });
   if (!existing) {
     return privateJson({ error: "Not found" }, { status: 404 });
   }
@@ -41,7 +38,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     action: "investigation_updated",
     targetType: "investigation",
     targetId: investigation.id,
-    detail: `${existing.listing.name}: ${JSON.stringify(parsed.data)}`,
+    detail: `${existing.listingName}: ${JSON.stringify(parsed.data)}`,
   });
 
   return privateJson({ investigation });

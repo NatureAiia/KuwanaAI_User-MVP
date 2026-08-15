@@ -1270,8 +1270,17 @@ enum InvestigationOutcome {
 /// flagged listing is worth tracking.
 model ListingInvestigation {
   id               String               @id @default(uuid())
-  listingId        String               @map("listing_id")
-  listing          Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  // Nullable + SetNull (not the original Cascade): an admin's "permanent"
+  // account deactivation hard-deletes a provider's listings (see
+  // api/admin/users/[id]/route.ts), and a case's enforcement outcome
+  // (warning/fine/suspension) must outlive the listing it was about — the
+  // same reasoning AdminAuditLog already documents for its own rows.
+  listingId        String?              @map("listing_id")
+  listing          Listing?             @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  // Snapshot of the listing's name at creation time, so it still displays
+  // sensibly after the listing above is gone — same "kept even if the
+  // underlying thing changes later" reasoning as `reason` below.
+  listingName      String               @map("listing_name")
   providerId       String               @map("provider_id")
   provider         Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
   // Snapshot of why this was flagged at creation time (e.g. "z-score 2.4,
