@@ -201,6 +201,10 @@ export default function SignupPage() {
   // dropdown (REGULATOR_NAMES) since its self-service safety depends on the
   // name mapping to one specific verified domain (see orgVerification.ts).
   const [organizationName, setOrganizationName] = useState("");
+  // Optional — shown alongside the business/organization name on its
+  // profile once created. Not asked for Regulator, which has no free-text
+  // name step to attach it after (its org is a fixed, verified picker).
+  const [organizationDescription, setOrganizationDescription] = useState("");
   const [regulatorName, setRegulatorName] = useState<string>("");
   // Corporate-only — which market this account operates in, so Market
   // Intelligence can default to their own sector instead of an unfiltered
@@ -362,9 +366,20 @@ export default function SignupPage() {
 
       const body =
         role === "corporate"
-          ? { role, organizationName, primarySector, consents }
+          ? {
+              role,
+              organizationName,
+              organizationDescription: organizationDescription.trim() || undefined,
+              primarySector,
+              consents,
+            }
           : role === "provider"
-            ? { role, businessName: organizationName, consents }
+            ? {
+                role,
+                businessName: organizationName,
+                businessDescription: organizationDescription.trim() || undefined,
+                consents,
+              }
             : role === "regulator"
               ? { role, regulatorName, consents }
               : {
@@ -418,6 +433,7 @@ export default function SignupPage() {
     password,
     username,
     organizationName,
+    organizationDescription,
     regulatorName,
     primarySector,
     ageRange,
@@ -655,6 +671,23 @@ export default function SignupPage() {
                     onChange={(e) => setOrganizationName(e.target.value)}
                     placeholder={role === "corporate" ? "e.g. CBZ Bank Limited" : "e.g. Tendai's Airtime Kiosk"}
                     className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Short description <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <textarea
+                    value={organizationDescription}
+                    onChange={(e) => setOrganizationDescription(e.target.value)}
+                    placeholder={
+                      role === "corporate"
+                        ? "e.g. Zimbabwe's largest commercial bank, offering savings, loans, and business banking."
+                        : "e.g. Affordable airtime, data bundles, and mobile money top-ups in Mbare."
+                    }
+                    maxLength={300}
+                    rows={3}
+                    className="mt-1.5 w-full resize-none rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
                   />
                 </label>
                 {role === "provider" && (

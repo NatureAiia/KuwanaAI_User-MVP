@@ -95,6 +95,11 @@ const consumerSchema = z.object({
 const corporateSchema = z.object({
   role: z.literal("corporate"),
   organizationName: z.string().min(1),
+  // Short blurb shown alongside the business name (Provider.description) —
+  // only meaningful the first time a company signs up, since it seeds the
+  // Provider record; a later joiner from the same domain submits one too,
+  // but route.ts only uses it when the Provider doesn't already exist yet.
+  organizationDescription: z.string().trim().max(300).optional(),
   // Which market this account operates in — defaults the Market
   // Intelligence dashboard to their own sector instead of an unfiltered
   // all-sectors view (see src/app/corporate/page.tsx).
@@ -108,6 +113,7 @@ const corporateSchema = z.object({
 const providerSchema = z.object({
   role: z.literal("provider"),
   businessName: z.string().min(1),
+  businessDescription: z.string().trim().max(300).optional(),
   consents: consentsSchema,
 });
 

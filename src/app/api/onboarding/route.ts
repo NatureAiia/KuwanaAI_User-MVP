@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
-import { emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
+import { emailDomain, emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
@@ -127,11 +127,42 @@ export async function POST(req: Request) {
         // apply here since there's no pre-existing record to link to.
         // verified: false until an admin reviews it (see /admin/catalog),
         // same "unvetted until checked" pattern as a submitted listing.
+        // ownerUserId is unique, so only this same user could ever hit the
+        // update branch for their own row — unlike corporate below, letting
+        // a re-submission update name/description here can't let a
+        // different person overwrite someone else's business.
         if (data.role === "provider") {
           await tx.provider.upsert({
             where: { ownerUserId: authUser.id },
-            update: { name: data.businessName },
-            create: { name: data.businessName, ownerUserId: authUser.id, verified: false },
+            update: { name: data.businessName, ...(data.businessDescription ? { description: data.businessDescription } : {}) },
+            create: {
+              name: data.businessName,
+              description: data.businessDescription || null,
+              ownerUserId: authUser.id,
+              verified: false,
+            },
+          });
+        }
+
+        // Corporate is many-users-per-business by email domain (see
+        // corporateAuth.ts) — the first person to sign up from a given
+        // company domain creates that business's Provider record (seeding
+        // name/description from what they entered); everyone else from the
+        // same domain who signs up afterward just joins the existing one via
+        // the unique corporateDomain upsert target, without touching its
+        // name/description. isPersonalEmailDomain already rejected a
+        // missing/personal domain above, so `domain` is never null here.
+        if (data.role === "corporate") {
+          const domain = emailDomain(authUser.email!)!;
+          await tx.provider.upsert({
+            where: { corporateDomain: domain },
+            update: {},
+            create: {
+              name: data.organizationName,
+              description: data.organizationDescription || null,
+              corporateDomain: domain,
+              verified: false,
+            },
           });
         }
 
