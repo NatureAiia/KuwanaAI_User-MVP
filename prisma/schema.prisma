@@ -83,6 +83,7 @@ model User {
   badges                  UserBadge[]
   questProgress           UserQuestProgress[]
   streak                  UserStreak?
+  subscription            Subscription?
   notifications           Notification[]
   conversations           Conversation[]
   ownedProvider           Provider?
@@ -1192,6 +1193,60 @@ model ChatFeedback {
 
   @@unique([messageId, userId])
   @@map("chat_feedback")
+}
+
+// ---------------------------------------------------------------------------
+// Subscription plans & entitlement (per-portal, monthly billing period)
+// ---------------------------------------------------------------------------
+
+/// A per-portal subscription tier (one catalog per Role via `role`, since
+/// consumer/corporate/regulator pricing will diverge — consumer stays
+/// self-service/freemium, corporate and regulator are subscription-only).
+/// Every plan is currently priceCents: 0 with empty `features` (= full
+/// access, same convention as User.allowedFeatures below) while the
+/// business model/packages aren't decided yet — see lib/subscriptions.ts,
+/// which seeds the canonical "<role>_free" plan for each portal on read
+/// rather than requiring a manual data migration.
+model Plan {
+  id                  String        @id @default(uuid())
+  key                 String        @unique
+  role                Role
+  name                String
+  priceCents          Int           @default(0) @map("price_cents")
+  currency            TopUpCurrency @default(USD)
+  billingPeriodMonths Int           @default(1) @map("billing_period_months")
+  features            String[]      @default([])
+  isActive            Boolean       @default(true) @map("is_active")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// One row per user (1:1, like UserXp/UserStreak) tracking their current
+/// plan and billing period. Auto-provisioned onto the free plan for their
+/// role the first time getOrCreateSubscription/ensureAllSubscriptions runs
+/// (see lib/subscriptions.ts) rather than at signup — this app has no
+/// single app-level signup hook (see link_users_to_auth_via_triggers), so
+/// self-healing on read is the same "compute on read, persist" shape as
+/// FxRate/RecommendationCache elsewhere in this file.
+model Subscription {
+  id                 String   @id @default(uuid())
+  userId             String   @unique @map("user_id")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String   @map("plan_id")
+  plan               Plan     @relation(fields: [planId], references: [id])
+  currentPeriodStart DateTime @map("current_period_start")
+  currentPeriodEnd   DateTime @map("current_period_end")
+  autoRenew          Boolean  @default(true) @map("auto_renew")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // The reset cron's "find everything due" query.
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
 }
 
 // ---------------------------------------------------------------------------

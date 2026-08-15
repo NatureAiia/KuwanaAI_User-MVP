@@ -18,6 +18,7 @@ import {
   Flag,
   BellRing,
   Activity,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +53,7 @@ export const ADMIN_LINKS: { href: string; label: string; blurb: string; icon: Lu
   { href: "/admin/market-baskets", label: "Market baskets", blurb: "Curated cost-of-living baskets tracked on the regulator price index.", icon: ShoppingBasket, group: "Market data" },
 
   { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status.", icon: Wallet, group: "Finance" },
+  { href: "/admin/plans", label: "Plans", blurb: "Subscription tiers per portal and who's on which — every account is on Free ($0) until pricing is finalized.", icon: CreditCard, group: "Finance" },
 
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change.", icon: History, group: "System" },
   { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend.", icon: Cpu, group: "System" },
