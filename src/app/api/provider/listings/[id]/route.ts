@@ -39,7 +39,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = providerUpdateListingSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const { attributes, ...rest } = parsed.data;
+  const { attributes, status: requestedStatus, ...rest } = parsed.data;
   const priceChanged = rest.price !== undefined && Number(existing.price) !== rest.price;
 
   const listing = await prisma.listing.update({
@@ -50,11 +50,21 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       // Any edit while rejected clears the now-stale reason, whether or not
       // this request also moves status back to pending_review.
       ...(existing.status === "rejected" ? { rejectionReason: null } : {}),
-      // Only a price change sends a published listing back for review —
-      // never left "published" with an unreviewed price live, but never
-      // pulled for a description/image/spec tweak either. Never whatever
-      // status (if any) the client asked for.
-      ...(existing.status === "published" && priceChanged ? { status: "pending_review" } : {}),
+      // A published listing's status is entirely server-computed — the
+      // wizard's "Send for review" button always sends status:
+      // "pending_review" in its body regardless of what's actually being
+      // edited, so a requested status here is deliberately ignored: only a
+      // price change may move it, and only ever to pending_review, never to
+      // whatever the client asked for. Every other prior status (draft,
+      // pending_review, rejected) is a genuine submit/resubmit, so the
+      // client's requested status applies as-is.
+      ...(existing.status === "published"
+        ? priceChanged
+          ? { status: "pending_review" as const }
+          : {}
+        : requestedStatus
+          ? { status: requestedStatus }
+          : {}),
     },
   });
 
