@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LineChart, Package, ClipboardList, Building2, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, Wallet, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
+import { PortalMobileNav } from "@/components/PortalMobileNav";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
 
@@ -58,7 +59,7 @@ function isActive(pathname: string, href: string) {
   return href === "/corporate" ? pathname === "/corporate" : pathname.startsWith(href);
 }
 
-/** Mobile: pill rows clustered by group. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, grouped under muted section headers, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. */
+/** Mobile: fixed bottom nav (see PortalMobileNav) — a few quick tabs plus a "Menu" sheet listing every group. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, grouped under muted section headers, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. */
 export function CorporatePortalNav({ companyName }: { companyName: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -79,29 +80,7 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
 
   return (
     <>
-      <nav className="flex flex-col gap-2 px-5 py-3 md:hidden">
-        {NAV_GROUPS.map((group) => (
-          <div key={group.label} className="flex flex-wrap items-center gap-2">
-            {group.links.map((link) => {
-              const active = isActive(pathname, link.href);
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={clsx(
-                    "tap-target flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-medium",
-                    active ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary",
-                  )}
-                >
-                  <Icon size={14} strokeWidth={2} />
-                  {link.label}
-                </Link>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+      <PortalMobileNav groups={NAV_GROUPS} />
 
       <nav
         className={clsx(

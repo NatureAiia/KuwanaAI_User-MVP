@@ -28,7 +28,8 @@ export default async function RegulatorLayout({ children }: { children: React.Re
       <RegulatorHeader regulatorName={regulatorName} />
       <div className="flex flex-1 flex-col md:flex-row">
         <RegulatorPortalNav />
-        <main className="flex-1 bg-bg-base px-5 pb-12 pt-4 md:px-8 md:pt-6">{children}</main>
+        {/* pb-24 clears the fixed PortalMobileNav bar on mobile (see RegulatorPortalNav); md drops back to pb-12 since that nav is desktop-sidebar-only above md. */}
+        <main className="flex-1 bg-bg-base px-5 pb-24 pt-4 md:px-8 md:pb-12 md:pt-6">{children}</main>
       </div>
     </div>
   );

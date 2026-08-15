@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { clsx } from "clsx";
-import { ADMIN_LINKS } from "@/lib/adminNav";
+import { getAdminNavGroups } from "@/lib/adminNav";
 
 const COLLAPSE_KEY = "admin-nav-collapsed";
 
@@ -17,8 +17,9 @@ function isActive(pathname: string, href: string) {
 /**
  * Desktop-only left rail (mobile keeps the hub page's "Manage" grid plus the
  * header's back button — see AdminHeader). Mirrors CorporatePortalNav's
- * chip + left-accent-bar active state, and its collapse-to-icon-rail
- * behavior, so the two admin-ish surfaces feel like one system.
+ * chip + left-accent-bar active state, its collapse-to-icon-rail behavior,
+ * and (now that ADMIN_LINKS has grown past ~15 items) its grouped-sections
+ * layout, so the two admin-ish surfaces feel like one system.
  */
 export function AdminSidebar({
   username,
@@ -30,6 +31,7 @@ export function AdminSidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const initial = username.trim().charAt(0).toUpperCase() || "A";
+  const groups = getAdminNavGroups();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a one-time user preference from localStorage, not deriving render output
@@ -79,50 +81,59 @@ export function AdminSidebar({
           {!collapsed && "Overview"}
         </Link>
 
-        {!collapsed && <p className="mt-4 px-3 text-[11px] font-medium uppercase tracking-wide text-text-muted">Manage</p>}
-        <div className={clsx("flex flex-col gap-0.5", collapsed ? "mt-2" : "mt-1")}>
-          {ADMIN_LINKS.map((link) => {
-            const active = isActive(pathname, link.href);
-            const Icon = link.icon;
-            const pending = pendingCounts[link.href] ?? 0;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                title={collapsed ? link.label : undefined}
-                className={clsx(
-                  "group relative flex items-center gap-2.5 overflow-hidden rounded-lg py-2 text-[13px] transition-colors",
-                  collapsed ? "justify-center px-0" : "pl-3 pr-3",
-                  active
-                    ? "font-semibold text-text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent-sky"
-                    : "font-medium text-text-secondary hover:bg-bg-surface-raised",
-                )}
-              >
-                <span
-                  className={clsx(
-                    "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-                    active ? "bg-accent-sky/15 text-accent-sky" : "bg-transparent text-text-muted group-hover:bg-bg-surface",
-                  )}
-                >
-                  <Icon size={15} strokeWidth={2} />
-                  {collapsed && pending > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent-sky" />
-                  )}
-                </span>
-                {!collapsed && (
-                  <>
-                    <span className="min-w-0 flex-1 truncate">{link.label}</span>
-                    {pending > 0 && (
-                      <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-accent-sky/15 px-1 font-mono text-[10.5px] font-semibold text-accent-sky">
-                        {pending}
-                      </span>
+        {groups.map((group, groupIndex) => (
+          <div key={group.label} className={clsx(groupIndex > 0 && "mt-3")}>
+            {!collapsed && (
+              <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
+                {group.label}
+              </p>
+            )}
+            {collapsed && groupIndex > 0 && <div className="mx-2 mb-2 border-t border-border" />}
+            <div className={clsx("flex flex-col gap-0.5", collapsed && groupIndex === 0 && "mt-2")}>
+              {group.links.map((link) => {
+                const active = isActive(pathname, link.href);
+                const Icon = link.icon;
+                const pending = pendingCounts[link.href] ?? 0;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    title={collapsed ? link.label : undefined}
+                    className={clsx(
+                      "group relative flex items-center gap-2.5 overflow-hidden rounded-lg py-2 text-[13px] transition-colors",
+                      collapsed ? "justify-center px-0" : "pl-3 pr-3",
+                      active
+                        ? "font-semibold text-text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent-sky"
+                        : "font-medium text-text-secondary hover:bg-bg-surface-raised",
                     )}
-                  </>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+                  >
+                    <span
+                      className={clsx(
+                        "relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+                        active ? "bg-accent-sky/15 text-accent-sky" : "bg-transparent text-text-muted group-hover:bg-bg-surface",
+                      )}
+                    >
+                      <Icon size={15} strokeWidth={2} />
+                      {collapsed && pending > 0 && (
+                        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent-sky" />
+                      )}
+                    </span>
+                    {!collapsed && (
+                      <>
+                        <span className="min-w-0 flex-1 truncate">{link.label}</span>
+                        {pending > 0 && (
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-accent-sky/15 px-1 font-mono text-[10.5px] font-semibold text-accent-sky">
+                            {pending}
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
         <button
           type="button"

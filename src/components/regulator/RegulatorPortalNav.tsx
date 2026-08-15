@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LineChart, Search, TrendingUp, ClipboardCheck, ShieldAlert, MessageSquareWarning, Wallet, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
+import { PortalMobileNav } from "@/components/PortalMobileNav";
 
 type NavLink = { href: string; label: string; icon: LucideIcon };
 
@@ -23,31 +24,13 @@ function isActive(pathname: string, href: string) {
   return href === "/regulator" ? pathname === "/regulator" : pathname.startsWith(href);
 }
 
-/** Mobile: pill row. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar. */
+/** Mobile: fixed bottom nav (see PortalMobileNav) — a few quick tabs plus a "Menu" sheet listing the rest. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar. */
 export function RegulatorPortalNav() {
   const pathname = usePathname();
 
   return (
     <>
-      <nav className="flex flex-wrap items-center gap-2 px-5 py-3 md:hidden">
-        {NAV_LINKS.map((link) => {
-          const active = isActive(pathname, link.href);
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={clsx(
-                "tap-target flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-medium",
-                active ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary",
-              )}
-            >
-              <Icon size={14} strokeWidth={2} />
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
+      <PortalMobileNav groups={[{ links: NAV_LINKS }]} />
 
       <nav className="hidden w-[220px] shrink-0 flex-col border-r border-border md:flex">
         <div className="flex flex-1 flex-col gap-0.5 px-3 py-5">
