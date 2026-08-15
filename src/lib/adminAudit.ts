@@ -38,7 +38,9 @@ type AdminAuditAction =
   | "price_cap_rule_created"
   | "price_cap_rule_updated"
   | "price_cap_rule_deleted"
-  | "complaint_promoted";
+  | "complaint_promoted"
+  | "user_suspended"
+  | "user_reactivated";
 
 /**
  * Records who did what to which row — despite the field name, not admin-only:

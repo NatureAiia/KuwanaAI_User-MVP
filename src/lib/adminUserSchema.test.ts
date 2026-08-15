@@ -10,7 +10,26 @@ describe("adminUserUpdateSchema", () => {
     expect(adminUserUpdateSchema.safeParse({ role }).success).toBe(false);
   });
 
-  it("rejects a missing role", () => {
+  it("rejects an empty body (neither role nor accountStatus)", () => {
     expect(adminUserUpdateSchema.safeParse({}).success).toBe(false);
+  });
+
+  it.each(["active", "suspended"])("accepts accountStatus: %s", (accountStatus) => {
+    expect(adminUserUpdateSchema.safeParse({ accountStatus }).success).toBe(true);
+  });
+
+  it("rejects an invalid accountStatus", () => {
+    expect(adminUserUpdateSchema.safeParse({ accountStatus: "banned" }).success).toBe(false);
+  });
+
+  it("accepts accountStatus with a suspendedReason", () => {
+    expect(
+      adminUserUpdateSchema.safeParse({ accountStatus: "suspended", suspendedReason: "Repeated fraud reports" })
+        .success,
+    ).toBe(true);
+  });
+
+  it("accepts role and accountStatus together", () => {
+    expect(adminUserUpdateSchema.safeParse({ role: "consumer", accountStatus: "suspended" }).success).toBe(true);
   });
 });

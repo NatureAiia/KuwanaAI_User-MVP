@@ -12,20 +12,43 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const parsed = adminUserUpdateSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const before = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  const before = await prisma.user.findUnique({ where: { id }, select: { role: true, accountStatus: true } });
+  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const suspending = parsed.data.accountStatus === "suspended";
   const user = await prisma.user.update({
     where: { id },
-    data: { role: parsed.data.role },
-    select: { id: true, email: true, role: true },
+    data: {
+      ...(parsed.data.role !== undefined && { role: parsed.data.role }),
+      ...(parsed.data.accountStatus !== undefined && {
+        accountStatus: parsed.data.accountStatus,
+        suspendedAt: suspending ? new Date() : null,
+        suspendedReason: suspending ? (parsed.data.suspendedReason ?? null) : null,
+      }),
+    },
+    select: { id: true, email: true, role: true, accountStatus: true, suspendedReason: true },
   });
 
-  if (before && before.role !== user.role) {
+  if (parsed.data.role !== undefined && before.role !== user.role) {
     await logAdminAction({
       adminEmail: admin.email,
       action: "user_role_changed",
       targetType: "user",
       targetId: user.id,
       detail: `Changed ${user.email}'s role: ${before.role} → ${user.role}`,
+    });
+  }
+
+  if (parsed.data.accountStatus !== undefined && before.accountStatus !== user.accountStatus) {
+    await logAdminAction({
+      adminEmail: admin.email,
+      action: user.accountStatus === "suspended" ? "user_suspended" : "user_reactivated",
+      targetType: "user",
+      targetId: user.id,
+      detail:
+        user.accountStatus === "suspended"
+          ? `Deactivated ${user.email}${user.suspendedReason ? `: ${user.suspendedReason}` : ""}`
+          : `Reactivated ${user.email}`,
     });
   }
 

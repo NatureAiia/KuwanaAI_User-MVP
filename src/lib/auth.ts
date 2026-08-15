@@ -3,11 +3,28 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 
+/**
+ * The single choke point almost every page/API route calls through (directly
+ * or via requireConsumer/requireAdmin/etc. below) — so gating a suspended
+ * account here (see AccountStatus on User) blocks it everywhere at once,
+ * rather than needing every call site updated individually. A suspended
+ * account is treated exactly like "not signed in": callers already handle
+ * null by redirecting to /login or returning 401, which is accurate enough
+ * (they can't do anything either way) even though the underlying reason
+ * differs — see api/auth/account-status/route.ts for the one place that
+ * needs to tell the two apart, to show login a clear message instead of a
+ * silent redirect loop.
+ */
 export async function requireUser() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { accountStatus: true } });
+  if (dbUser?.accountStatus === "suspended") return null;
+
   return user;
 }
 

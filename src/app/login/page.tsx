@@ -28,11 +28,27 @@ function LoginForm() {
     setError(null);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+
+    // requireUser() (lib/auth.ts) treats a suspended account as "not signed
+    // in" everywhere else in the app — without this check, a deactivated
+    // user would sign in here successfully then get silently bounced back to
+    // /login with no explanation the moment the next page's requireUser()
+    // call returns null.
+    const statusRes = await fetch("/api/auth/account-status");
+    const status = await statusRes.json().catch(() => null);
+    if (status?.suspended) {
+      await supabase.auth.signOut();
+      setLoading(false);
+      setError("This account has been deactivated. Contact support if you think this is a mistake.");
+      return;
+    }
+
+    setLoading(false);
     // `next` is attacker-controllable — anyone can send a link with their own
     // value. Passing it to the router unchecked is an open redirect off the
     // back of a successful login. See lib/safeRedirect.ts.

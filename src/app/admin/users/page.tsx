@@ -2,14 +2,16 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UserRoleSelect } from "@/components/admin/UserRoleSelect";
+import { UserStatusToggle } from "@/components/admin/UserStatusToggle";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { Badge } from "@/components/ui/Card";
 
 export default async function AdminUsersPage() {
   const admin = await requireAdmin();
   if (!admin) notFound();
 
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, role: true, createdAt: true },
+    select: { id: true, email: true, role: true, createdAt: true, accountStatus: true, suspendedReason: true },
     orderBy: { createdAt: "desc" },
     take: 500,
   });
@@ -32,21 +34,33 @@ export default async function AdminUsersPage() {
               <th className="p-3 font-medium text-text-muted">Email</th>
               <th className="p-3 font-medium text-text-muted">Joined</th>
               <th className="p-3 font-medium text-text-muted">Role</th>
+              <th className="p-3 font-medium text-text-muted">Status</th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
               <tr key={u.id} data-search-row className="border-b border-border last:border-0">
-                <td className="p-3 font-medium">{u.email}</td>
+                <td className="p-3 font-medium">
+                  {u.email}
+                  {u.accountStatus === "suspended" && u.suspendedReason && (
+                    <p className="mt-0.5 text-[11px] font-normal text-text-muted">{u.suspendedReason}</p>
+                  )}
+                </td>
                 <td className="p-3 text-text-secondary">{u.createdAt.toLocaleDateString()}</td>
                 <td className="p-3">
                   <UserRoleSelect userId={u.id} currentRole={u.role} />
+                </td>
+                <td className="p-3">
+                  <div className="flex items-center gap-2">
+                    {u.accountStatus === "suspended" && <Badge tone="coral">Deactivated</Badge>}
+                    <UserStatusToggle userId={u.id} status={u.accountStatus} />
+                  </div>
                 </td>
               </tr>
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={3} className="p-6 text-center text-text-muted">
+                <td colSpan={4} className="p-6 text-center text-text-muted">
                   No users yet.
                 </td>
               </tr>

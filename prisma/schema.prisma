@@ -30,6 +30,11 @@ enum Role {
   admin
 }
 
+enum AccountStatus {
+  active
+  suspended
+}
+
 model User {
   id                     String    @id @default(uuid())
   email                  String    @unique
@@ -38,6 +43,12 @@ model User {
   username               String    @unique
   role                   Role      @default(consumer)
   createdAt              DateTime  @default(now()) @map("created_at")
+  // Admin-only kill switch (see requireUser() in lib/auth.ts, the single
+  // choke point almost every page/route calls through) — a suspended
+  // account is blocked everywhere immediately, not just re-gated at login.
+  accountStatus          AccountStatus @default(active) @map("account_status")
+  suspendedAt            DateTime? @map("suspended_at")
+  suspendedReason        String?   @map("suspended_reason")
   // Grants access to specific gated sub-features regardless of role (e.g.
   // corporate feature keys) — empty means "full access for this role", the
   // same fallback semantics as coarse role checks everywhere else in this
@@ -833,6 +844,8 @@ enum AdminAuditAction {
   price_cap_rule_updated
   price_cap_rule_deleted
   complaint_promoted
+  user_suspended
+  user_reactivated
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
