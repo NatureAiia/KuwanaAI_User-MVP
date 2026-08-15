@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ShoppingCart } from "lucide-react";
+import { Bell, ShoppingCart, Wallet } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -88,10 +88,18 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
         </nav>
 
         <div className="flex items-center gap-2 justify-self-end">
-          {/* Streak badge sits directly left of the bell so the four
-              chrome buttons (streak, notifications, shopping list, theme)
-              form a single matched row. Hidden when there's no streak yet. */}
+          {/* Streak badge sits directly left of the bell so the chrome
+              buttons (streak, wallet, notifications, shopping list, theme)
+              form a single matched row. Streak badge hidden when there's no
+              streak yet. */}
           <StreakBadge currentStreak={currentStreak} />
+          <Link
+            href="/wallet"
+            aria-label="Wallet"
+            className="tap-target flex items-center justify-center rounded-full border border-border bg-bg-surface text-text-secondary"
+          >
+            <Wallet size={18} />
+          </Link>
           <Link
             href="/notifications"
             aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}

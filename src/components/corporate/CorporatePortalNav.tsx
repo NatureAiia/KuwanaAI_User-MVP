@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LineChart, Package, ClipboardList, Building2, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, type LucideIcon } from "lucide-react";
+import { LineChart, Package, ClipboardList, Building2, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, Wallet, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
@@ -12,8 +12,9 @@ type NavLink = { href: string; label: string; icon: LucideIcon };
 
 // Grouped once the flat list crossed ~10 items and stopped being scannable
 // as a single block. Groups are display-only (no routing implications) —
-// "Wallet" was dropped from here since /wallet isn't a /corporate/* route;
-// it doesn't belong in a list meant to represent this portal's own sections.
+// Wallet links out to /wallet even though it isn't a /corporate/* route,
+// same as every other role's portal nav (Paynow top-up needs to be reachable
+// from everywhere, not just the consumer/provider chrome).
 const NAV_GROUPS: { label: string; links: NavLink[] }[] = [
   {
     label: "Intelligence",
@@ -42,7 +43,10 @@ const NAV_GROUPS: { label: string; links: NavLink[] }[] = [
   },
   {
     label: "Account",
-    links: [{ href: "/corporate/profile", label: "Company Profile", icon: Building2 }],
+    links: [
+      { href: "/corporate/profile", label: "Company Profile", icon: Building2 },
+      { href: "/wallet", label: "Wallet", icon: Wallet },
+    ],
   },
 ];
 

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initiateTransaction, normalizeStatus, verifyPaynowHash } from "@/lib/paynow";
+import { initiateExpressCheckout, initiateTransaction, normalizeStatus, verifyPaynowHash } from "@/lib/paynow";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -153,6 +153,73 @@ describe("initiateTransaction", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503 }));
 
     const result = await initiateTransaction(params);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("initiateExpressCheckout", () => {
+  const params = {
+    reference: "KUWANA-abc123",
+    amount: 10,
+    currency: "USD" as const,
+    additionalInfo: "Kuwana wallet top-up",
+    returnUrl: "https://kuwana.example/wallet/return?ref=KUWANA-abc123",
+    resultUrl: "https://kuwana.example/api/wallet/paynow/webhook",
+    authEmail: "shopper@example.com",
+    phone: "0771234567",
+    method: "ecocash" as const,
+  };
+
+  it("rejects when credentials aren't configured, without making a network call", async () => {
+    delete process.env.PAYNOW_INTEGRATION_ID;
+    delete process.env.PAYNOW_INTEGRATION_KEY;
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(initiateExpressCheckout(params)).rejects.toThrow(/PAYNOW_INTEGRATION_ID/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns ok:true with the poll URL and instructions on a successful response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () =>
+          new URLSearchParams({
+            status: "Ok",
+            pollurl: "https://www.paynow.co.zw/interface/checktransactionstatus?guid=abc",
+            instructions: "Enter your PIN when prompted.",
+            hash: "irrelevant-for-this-test",
+          }).toString(),
+      }),
+    );
+
+    const result = await initiateExpressCheckout(params);
+    expect(result).toEqual({
+      ok: true,
+      pollUrl: "https://www.paynow.co.zw/interface/checktransactionstatus?guid=abc",
+      instructions: "Enter your PIN when prompted.",
+    });
+  });
+
+  it("returns ok:false when Paynow reports an error status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => new URLSearchParams({ status: "Error", error: "Invalid phone number" }).toString(),
+      }),
+    );
+
+    const result = await initiateExpressCheckout(params);
+    expect(result).toEqual({ ok: false, error: "Invalid phone number" });
+  });
+
+  it("returns ok:false on a non-2xx HTTP response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+
+    const result = await initiateExpressCheckout(params);
     expect(result.ok).toBe(false);
   });
 });

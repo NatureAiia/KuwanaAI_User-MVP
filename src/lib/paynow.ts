@@ -1,10 +1,16 @@
 /**
- * Thin client for Paynow's WEB REDIRECT integration (Zimbabwe payment
- * gateway — see .env.example) — the wallet top-up flow at
- * src/app/api/wallet/topup, src/app/api/wallet/paynow/webhook, and
- * src/app/wallet/return. Talks to Paynow's classic form-urlencoded API
- * (https://www.paynow.co.zw/interface/initiatetransaction) as documented at
- * https://developers.paynow.co.zw at the time this was written.
+ * Thin client for Paynow (Zimbabwe payment gateway — see .env.example),
+ * covering both integration tiers:
+ *  - WEB REDIRECT (initiateTransaction) — the wallet top-up flow at
+ *    src/app/api/wallet/topup, src/app/api/wallet/paynow/webhook, and
+ *    src/app/wallet/return. Sends the customer to Paynow's hosted page.
+ *  - ADVANCED INTEGRATION / EXPRESS CHECKOUT (initiateExpressCheckout) — the
+ *    flow at src/app/api/wallet/topup/express. Charges a mobile money number
+ *    directly via Paynow's API, no redirect; the customer authorizes on
+ *    their phone. Shares the webhook/poll/crediting plumbing above.
+ * Talks to Paynow's classic form-urlencoded API
+ * (https://www.paynow.co.zw/interface/{initiatetransaction,remotetransaction})
+ * as documented at https://developers.paynow.co.zw at the time this was written.
  *
  * Paynow issues a separate merchant integration (its own ID + key pair) per
  * settlement currency, so every function here takes a `currency` and picks
@@ -42,6 +48,7 @@ function getCredentials(currency: "USD" | "ZiG"): { id: string; key: string } {
 }
 
 const PAYNOW_INITIATE_URL = "https://www.paynow.co.zw/interface/initiatetransaction";
+const PAYNOW_EXPRESS_URL = "https://www.paynow.co.zw/interface/remotetransaction";
 
 /**
  * UPPERCASE(SHA512(concatenated field VALUES, in the given order, + integration
@@ -81,6 +88,86 @@ export type InitiateParams = {
 };
 
 export type InitiateResult = { ok: true; browserUrl: string; pollUrl: string } | { ok: false; error: string };
+
+// Advanced Integration / Express Checkout's documented field order — same
+// shape as INITIATE_HASH_FIELD_ORDER plus `phone`/`method`, inserted before
+// `status` per Paynow's docs at the time this was written. Verify against a
+// sandbox round-trip before trusting this in production, same caveat as the
+// web-redirect hash order above.
+const EXPRESS_HASH_FIELD_ORDER = [
+  "id",
+  "reference",
+  "amount",
+  "additionalinfo",
+  "returnurl",
+  "resulturl",
+  "authemail",
+  "phone",
+  "method",
+  "status",
+];
+
+export type MobileMoneyMethod = "ecocash" | "onemoney" | "innbucks";
+
+export type ExpressCheckoutParams = {
+  reference: string;
+  amount: number;
+  currency: "USD" | "ZiG";
+  additionalInfo: string;
+  returnUrl: string;
+  resultUrl: string;
+  authEmail: string;
+  phone: string;
+  method: MobileMoneyMethod;
+};
+
+export type ExpressCheckoutResult =
+  | { ok: true; pollUrl: string; instructions?: string }
+  | { ok: false; error: string };
+
+/**
+ * Advanced Integration / Express Checkout — POSTs directly to Paynow with the
+ * customer's mobile money number and network instead of redirecting to
+ * Paynow's hosted page. The customer authorizes on their phone (USSD/PIN
+ * prompt); status still only becomes trustworthy via the webhook/poll, same
+ * as the web-redirect flow.
+ */
+export async function initiateExpressCheckout(params: ExpressCheckoutParams): Promise<ExpressCheckoutResult> {
+  const { id, key } = getCredentials(params.currency);
+
+  const fields: Record<string, string> = {
+    id,
+    reference: params.reference,
+    amount: params.amount.toFixed(2),
+    additionalinfo: params.additionalInfo,
+    returnurl: params.returnUrl,
+    resulturl: params.resultUrl,
+    authemail: params.authEmail,
+    phone: params.phone,
+    method: params.method,
+    status: "Message",
+  };
+  const hash = computeHash(fields, EXPRESS_HASH_FIELD_ORDER, key);
+
+  const body = new URLSearchParams({ ...fields, hash });
+  const res = await fetch(PAYNOW_EXPRESS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!res.ok) return { ok: false, error: `Paynow returned HTTP ${res.status}` };
+
+  const raw = await res.text();
+  const response = Object.fromEntries(new URLSearchParams(raw));
+
+  if ((response.status ?? "").toLowerCase() === "error") {
+    return { ok: false, error: response.error ?? "Paynow rejected the transaction" };
+  }
+  if (!response.pollurl) {
+    return { ok: false, error: "Paynow response missing pollurl" };
+  }
+  return { ok: true, pollUrl: response.pollurl, instructions: response.instructions };
+}
 
 export async function initiateTransaction(params: InitiateParams): Promise<InitiateResult> {
   const { id, key } = getCredentials(params.currency);

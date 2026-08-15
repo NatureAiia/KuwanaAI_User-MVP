@@ -30,6 +30,8 @@ export default async function AdminHubPage() {
     pendingScrapedCount,
     pendingCorporateRequestCount,
     usage,
+    paidTotalsByCurrency,
+    pendingTopUpCount,
   ] = await Promise.all([
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
     prisma.listing.groupBy({ by: ["status"], _count: { _all: true } }),
@@ -39,6 +41,8 @@ export default async function AdminHubPage() {
     prisma.scrapedItem.count({ where: { status: "pending" } }),
     prisma.corporateRequest.count({ where: { status: "pending" } }),
     getUsageReport(30),
+    prisma.walletTransaction.groupBy({ by: ["currency"], where: { status: "paid" }, _sum: { amount: true } }),
+    prisma.walletTransaction.count({ where: { status: { in: ["initiated", "pending"] } } }),
   ]);
   // Shown consistently everywhere else in admin — see admin/layout.tsx.
   const username = admin.email;
@@ -48,6 +52,9 @@ export default async function AdminHubPage() {
 
   const statusCounts: Record<string, number> = { draft: 0, pending_review: 0, published: 0, rejected: 0 };
   for (const row of listingsByStatus) statusCounts[row.status] = row._count._all;
+
+  const paidTotals: Record<"USD" | "ZiG", number> = { USD: 0, ZiG: 0 };
+  for (const row of paidTotalsByCurrency) paidTotals[row.currency] = Number(row._sum.amount ?? 0);
 
   return (
     <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
@@ -92,6 +99,34 @@ export default async function AdminHubPage() {
         <p className="mt-2 text-[12px] text-text-secondary">
           {linkedProviderCount} of {providerCount} provider(s) linked to a self-service account.
         </p>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="font-display text-[14px] font-semibold text-text-secondary">Wallet (Paynow)</h2>
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Card>
+            <p className="text-[11px] text-text-muted">Total paid (USD)</p>
+            <p className="mt-1 font-mono text-[22px] font-semibold text-accent-teal">
+              ${paidTotals.USD.toFixed(2)}
+            </p>
+          </Card>
+          <Card>
+            <p className="text-[11px] text-text-muted">Total paid (ZiG)</p>
+            <p className="mt-1 font-mono text-[22px] font-semibold text-accent-teal">
+              ZiG {paidTotals.ZiG.toFixed(2)}
+            </p>
+          </Card>
+          <Card className={pendingTopUpCount > 0 ? "border-accent-sky/40" : undefined}>
+            <p className="text-[11px] text-text-muted">Awaiting payment</p>
+            <p className="mt-1 font-mono text-[22px] font-semibold text-accent-sky">{pendingTopUpCount}</p>
+          </Card>
+          <Link href="/admin/transactions">
+            <Card className="h-full transition-colors hover:border-accent-sky/50">
+              <p className="text-[11px] text-text-muted">All top-ups</p>
+              <p className="mt-1 text-[13px] font-medium text-accent-sky">View transactions →</p>
+            </Card>
+          </Link>
+        </div>
       </section>
 
       <section className="mt-6">
