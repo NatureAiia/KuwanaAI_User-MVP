@@ -5,6 +5,7 @@ import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
 import { recordPriceChange } from "@/lib/catalog";
+import { recordEvent } from "@/lib/gamification/process-event";
 
 // A plain edit while draft/pending_review (still pre-review) or rejected
 // (fix and resend) just updates the row. Editing a *published* listing is
@@ -70,6 +71,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (priceChanged) {
     await recordPriceChange(id, Number(existing.price));
+  }
+
+  // Only a genuine draft/rejected -> pending_review transition counts as a
+  // submission — not a published listing kicked into pending_review by a
+  // price change (that's an edit, not a new submission), and not resaving
+  // an already pending_review listing (which would let repeatedly opening
+  // the edit wizard on the same unreviewed listing farm XP for free).
+  if ((existing.status === "draft" || existing.status === "rejected") && requestedStatus === "pending_review") {
+    await recordEvent(prisma, { userId: auth.user.id, eventType: "listing_submitted" });
   }
 
   // The catalog read cache is tag-keyed, not TTL-only — without this an

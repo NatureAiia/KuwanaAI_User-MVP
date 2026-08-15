@@ -14,6 +14,8 @@ export const XP_RULES: Record<EventType, number> = {
   daily_visit: 5,
   chat_started: 5,
   advert_opened: 2,
+  listing_submitted: 15,
+  listing_approved: 40,
 };
 
 export const XP_PER_LEVEL = 100;
@@ -46,6 +48,14 @@ export const BADGE_DEFS = [
     name: "7-day streak",
     description: "Visited Kuwana 7 days in a row.",
   },
+  {
+    name: "First listing submitted",
+    description: "Sent your first product to Kuwana for review.",
+  },
+  {
+    name: "First listing live",
+    description: "Had your first product approved and published on Kuwana.",
+  },
 ] as const;
 
 export type BadgeName = (typeof BADGE_DEFS)[number]["name"];
@@ -68,6 +78,8 @@ export const BADGE_TRIGGERS: Partial<Record<EventType, BadgeTrigger[]>> = {
     { badge: "Multi-sector explorer", type: "distinct_sector_count", count: 2 },
   ],
   daily_visit: [{ badge: "7-day streak", type: "streak_count", count: 7 }],
+  listing_submitted: [{ badge: "First listing submitted", type: "always" }],
+  listing_approved: [{ badge: "First listing live", type: "always" }],
 };
 
 /** Event types whose GamificationRule carries `questTrigger: true` at seed time. */

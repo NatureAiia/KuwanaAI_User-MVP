@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerCreateListingSchema } from "@/lib/providerListingSchema";
+import { recordEvent } from "@/lib/gamification/process-event";
 
 export async function GET() {
   const auth = await requireOwnProvider();
@@ -34,6 +35,13 @@ export async function POST(req: Request) {
       freshnessStatus: "unverified", // not yet checked by anyone but the submitting provider
     },
   });
+
+  // Submitting straight to review is a genuine "I want an admin to look at
+  // this" action, same weight as the wizard's submit/resubmit path below —
+  // saving as a draft earns nothing yet, since nothing's been sent anywhere.
+  if (status === "pending_review") {
+    await recordEvent(prisma, { userId: auth.user.id, eventType: "listing_submitted" });
+  }
 
   // The catalog read cache is keyed by tag, not by TTL alone — without
   // this, an edited price keeps serving stale until the 5-minute backstop.

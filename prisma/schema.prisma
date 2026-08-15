@@ -589,6 +589,11 @@ enum EventType {
   daily_visit
   chat_started
   advert_opened
+  // Seller-side (self-service /provider portal) gamification — a provider
+  // account earns XP/badges the same way a consumer account does, off the
+  // same generic UserXp/UserBadge/UserStreak engine.
+  listing_submitted
+  listing_approved
 }
 
 model UserEvent {

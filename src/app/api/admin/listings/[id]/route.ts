@@ -8,6 +8,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { boundedJsonRecord } from "@/lib/zodShared";
+import { recordEvent } from "@/lib/gamification/process-event";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
@@ -85,6 +86,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         status: rest.status,
         rejectionReason: listing.rejectionReason,
       });
+      // Only self-managed providers (a real linked account, not one of the
+      // seeded reference providers) earn XP for their own approval.
+      if (rest.status === "published") {
+        await recordEvent(prisma, { userId: listing.provider.ownerUserId, eventType: "listing_approved" });
+      }
     }
     await logAdminAction({
       adminEmail: admin.email,

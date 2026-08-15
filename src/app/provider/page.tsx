@@ -7,9 +7,11 @@ import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { LogoutButton } from "@/components/LogoutButton";
 import { LinkButton } from "@/components/ui/Button";
+import { DailyVisitPing } from "@/components/DailyVisitPing";
 import { ProviderStatsRow } from "@/components/provider/ProviderStatsRow";
 import { ProviderFilterBar } from "@/components/provider/ProviderFilterBar";
 import { ProviderListingsTable } from "@/components/provider/ProviderListingsTable";
+import { SellerEngagementStrip } from "@/components/provider/SellerEngagementStrip";
 
 const STATUSES = ["draft", "pending_review", "published", "rejected"] as const;
 type Status = (typeof STATUSES)[number];
@@ -53,7 +55,7 @@ export default async function ProviderPortalPage({
   const { status: statusFilter, q, categoryId } = await searchParams;
   const activeStatus = STATUSES.includes(statusFilter as Status) ? (statusFilter as Status) : undefined;
 
-  const [allStatuses, categories, listings] = await Promise.all([
+  const [allStatuses, categories, listings, xp, streak, badges] = await Promise.all([
     prisma.listing.findMany({ where: { providerId: provider.id }, select: { status: true } }),
     prisma.category.findMany({
       where: { sector: { status: "live" } },
@@ -70,6 +72,9 @@ export default async function ProviderPortalPage({
       include: { category: { include: { sector: true } } },
       orderBy: { lastVerifiedAt: "desc" },
     }),
+    prisma.userXp.findUnique({ where: { userId: user.id } }),
+    prisma.userStreak.findUnique({ where: { userId: user.id } }),
+    prisma.userBadge.findMany({ where: { userId: user.id }, include: { badge: true } }),
   ]);
 
   const stats = await getProviderListingStats(listings.map((l) => l.id));
@@ -96,6 +101,7 @@ export default async function ProviderPortalPage({
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
+      <DailyVisitPing />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-[13px] text-text-secondary">Provider account</p>
@@ -108,6 +114,13 @@ export default async function ProviderPortalPage({
           <LogoutButton />
         </div>
       </div>
+
+      <SellerEngagementStrip
+        totalXp={xp?.totalXp ?? 0}
+        level={xp?.level ?? 1}
+        currentStreak={streak?.currentStreak ?? 0}
+        badges={badges.map((b) => ({ name: b.badge.name }))}
+      />
 
       <ProviderStatsRow
         total={counts.total}
