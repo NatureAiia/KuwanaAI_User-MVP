@@ -25,6 +25,21 @@ export async function getActiveBusinessConditions(sectorSlug?: string): Promise<
   return conditions;
 }
 
+function isPastReviewCycle(condition: { updatedAt: Date; reviewCycleDays: number | null }): boolean {
+  if (condition.reviewCycleDays === null) return false;
+  const dueAt = condition.updatedAt.getTime() + condition.reviewCycleDays * 24 * 60 * 60 * 1000;
+  return dueAt <= Date.now();
+}
+
+/** Count only, for the admin sidebar's pending-count badge — same rule syncBusinessConditionReviewNotifications uses. */
+export async function getReviewDueCount(adminUserId: string): Promise<number> {
+  const conditions = await prisma.businessCondition.findMany({
+    where: { assignedToUserId: adminUserId, reviewCycleDays: { not: null } },
+    select: { updatedAt: true, reviewCycleDays: true },
+  });
+  return conditions.filter(isPastReviewCycle).length;
+}
+
 /**
  * Upserts a Notification for each condition assigned to this admin whose
  * review cycle has elapsed since it was last updated — same "compute +
@@ -41,10 +56,8 @@ export async function syncBusinessConditionReviewNotifications(adminUserId: stri
 
   const now = Date.now();
   await Promise.all(
-    conditions.map(async (condition) => {
+    conditions.filter(isPastReviewCycle).map(async (condition) => {
       const dueAt = condition.updatedAt.getTime() + condition.reviewCycleDays! * 24 * 60 * 60 * 1000;
-      if (dueAt > now) return;
-
       const overdueDays = Math.floor((now - dueAt) / (24 * 60 * 60 * 1000));
       const message = `"${condition.title}" is due for review${overdueDays > 0 ? ` (${overdueDays}d overdue)` : ""}.`;
 

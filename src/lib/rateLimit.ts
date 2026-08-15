@@ -206,6 +206,8 @@ export const RATE_LIMITS = {
   authedWrite: { limit: 60, windowSeconds: 60 },
   /** Public read-only catalog endpoints. */
   publicRead: { limit: 120, windowSeconds: 60 },
+  /** /api/bi/v1/* — keyed by ApiKey.id, not IP, so one BI tool's schedule can't starve another key's budget. */
+  biApi: { limit: 60, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /** Test-only: drops all recorded windows so cases cannot leak into each other. */

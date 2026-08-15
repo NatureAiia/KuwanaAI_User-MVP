@@ -23,7 +23,14 @@ type AdminAuditAction =
   | "economic_driver_deleted"
   | "business_condition_created"
   | "business_condition_updated"
-  | "business_condition_deleted";
+  | "business_condition_deleted"
+  | "api_key_created"
+  | "api_key_revoked"
+  | "listing_created"
+  | "provider_created"
+  | "scrape_source_updated"
+  | "scrape_source_deleted"
+  | "social_mention_reviewed";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -45,7 +52,9 @@ export async function logAdminAction(params: {
     | "corporate_request"
     | "discount_rule"
     | "economic_driver"
-    | "business_condition";
+    | "business_condition"
+    | "api_key"
+    | "social_mention";
   targetId: string;
   detail: string;
 }): Promise<void> {

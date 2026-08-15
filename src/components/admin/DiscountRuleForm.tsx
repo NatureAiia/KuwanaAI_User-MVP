@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input, FormField } from "@/components/ui/Field";
 
 type CategoryOption = { id: string; name: string; sector: { name: string } };
 type ListingOption = { id: string; name: string; providerId: string; categoryId: string };
@@ -90,89 +91,92 @@ export function DiscountRuleForm({
     <Card className="space-y-2.5">
       <p className="font-display text-[14px] font-semibold">New discount rule</p>
 
-      <select
-        value={providerId}
-        onChange={(e) => setProviderId(e.target.value)}
-        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-      >
-        {providers.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <FormField label="Provider">
+        <select
+          value={providerId}
+          onChange={(e) => setProviderId(e.target.value)}
+          className="tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </FormField>
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setScope("category")}
-          className={`tap-target flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium ${
-            scope === "category" ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
-          }`}
-        >
-          Whole category
-        </button>
-        <button
-          type="button"
-          onClick={() => setScope("listing")}
-          className={`tap-target flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium ${
-            scope === "listing" ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
-          }`}
-        >
-          Single listing
-        </button>
-      </div>
+      <FormField label="Scope">
+        <div className="mt-1 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setScope("category")}
+            className={`tap-target flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium ${
+              scope === "category" ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
+            }`}
+          >
+            Whole category
+          </button>
+          <button
+            type="button"
+            onClick={() => setScope("listing")}
+            className={`tap-target flex-1 rounded-lg border px-3 py-2 text-[13px] font-medium ${
+              scope === "listing" ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
+            }`}
+          >
+            Single listing
+          </button>
+        </div>
+      </FormField>
 
       {scope === "category" ? (
-        <select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        >
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.sector.name} / {c.name}
-            </option>
-          ))}
-        </select>
+        <FormField label="Category">
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            className="tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.sector.name} / {c.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
       ) : (
-        <select
-          value={listingId}
-          onChange={(e) => setListingId(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        >
-          <option value="">Select a listing…</option>
-          {providerListings.map((l) => (
-            <option key={l.id} value={l.id}>
-              {l.name}
-            </option>
-          ))}
-        </select>
+        <FormField label="Listing">
+          <select
+            value={listingId}
+            onChange={(e) => setListingId(e.target.value)}
+            className="tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px]"
+          >
+            <option value="">Select a listing…</option>
+            {providerListings.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
       )}
 
       <div className="flex gap-2">
-        <input
-          type="number"
-          min="0"
-          max="100"
-          step="0.01"
-          value={percentOff}
-          onChange={(e) => setPercentOff(e.target.value)}
-          placeholder="% off"
-          className="tap-target w-24 rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
-        <input
-          type="date"
-          value={startsAt}
-          onChange={(e) => setStartsAt(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
-        <input
-          type="date"
-          value={endsAt}
-          onChange={(e) => setEndsAt(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
+        <FormField label="% off">
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            value={percentOff}
+            onChange={(e) => setPercentOff(e.target.value)}
+            className="!w-24"
+          />
+        </FormField>
+        <FormField label="Starts">
+          <Input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+        </FormField>
+        <FormField label="Ends">
+          <Input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+        </FormField>
       </div>
 
       {error && <p className="text-[12px] text-accent-coral">{error}</p>}

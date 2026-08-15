@@ -22,7 +22,6 @@ export default async function AdminHubPage() {
   if (!admin) notFound();
 
   const [
-    dbUser,
     usersByRole,
     listingsByStatus,
     providerCount,
@@ -32,7 +31,6 @@ export default async function AdminHubPage() {
     pendingCorporateRequestCount,
     usage,
   ] = await Promise.all([
-    prisma.user.findUnique({ where: { id: admin.id }, select: { username: true } }),
     prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
     prisma.listing.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.provider.count(),
@@ -42,7 +40,8 @@ export default async function AdminHubPage() {
     prisma.corporateRequest.count({ where: { status: "pending" } }),
     getUsageReport(30),
   ]);
-  const username = dbUser?.username ?? admin.email;
+  // Shown consistently everywhere else in admin — see admin/layout.tsx.
+  const username = admin.email;
 
   const roleCounts: Record<string, number> = { consumer: 0, corporate: 0, regulator: 0, provider: 0 };
   for (const row of usersByRole) roleCounts[row.role] = row._count._all;

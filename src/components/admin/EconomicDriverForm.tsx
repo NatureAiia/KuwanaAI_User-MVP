@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input, FormField } from "@/components/ui/Field";
 
 function currentPeriod(): string {
   return `${new Date().toISOString().slice(0, 7)}-01`;
@@ -62,51 +63,33 @@ export function EconomicDriverForm() {
         updates that month&apos;s reading instead of duplicating it.
       </p>
 
-      <input
-        placeholder="Name, e.g. USD_ZIG_RATE, inflation_rate"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-      />
+      <FormField label="Name">
+        <Input
+          placeholder="e.g. USD_ZIG_RATE, inflation_rate"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+      </FormField>
 
       <div className="flex gap-2">
-        <input
-          placeholder="Region"
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          className="tap-target w-24 rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
-        <input
-          type="date"
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
-        <input
-          placeholder="Currency (optional)"
-          value={currencyCode}
-          onChange={(e) => setCurrencyCode(e.target.value)}
-          className="tap-target w-32 rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
+        <FormField label="Region">
+          <Input value={region} onChange={(e) => setRegion(e.target.value)} className="!w-24" />
+        </FormField>
+        <FormField label="Period">
+          <Input type="date" value={period} onChange={(e) => setPeriod(e.target.value)} />
+        </FormField>
+        <FormField label="Currency (optional)">
+          <Input value={currencyCode} onChange={(e) => setCurrencyCode(e.target.value)} className="!w-32" />
+        </FormField>
       </div>
 
       <div className="flex gap-2">
-        <input
-          type="number"
-          step="0.0001"
-          placeholder="Value"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
-        <input
-          type="number"
-          step="0.0001"
-          placeholder="Previous value (optional)"
-          value={previousValue}
-          onChange={(e) => setPreviousValue(e.target.value)}
-          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
-        />
+        <FormField label="Value">
+          <Input type="number" step="0.0001" value={value} onChange={(e) => setValue(e.target.value)} />
+        </FormField>
+        <FormField label="Previous value (optional)">
+          <Input type="number" step="0.0001" value={previousValue} onChange={(e) => setPreviousValue(e.target.value)} />
+        </FormField>
       </div>
 
       {error && <p className="text-[12px] text-accent-coral">{error}</p>}

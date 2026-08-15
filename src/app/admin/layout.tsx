@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { syncBusinessConditionReviewNotifications } from "@/lib/businessConditions";
+import { syncBusinessConditionReviewNotifications, getReviewDueCount } from "@/lib/businessConditions";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -12,11 +12,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   await syncBusinessConditionReviewNotifications(admin.id);
 
-  const [pendingReviewCount, pendingScrapedCount, pendingCorporateRequestCount] = await Promise.all([
-    prisma.listing.count({ where: { status: "pending_review" } }),
-    prisma.scrapedItem.count({ where: { status: "pending" } }),
-    prisma.corporateRequest.count({ where: { status: "pending" } }),
-  ]);
+  const [pendingReviewCount, pendingScrapedCount, pendingCorporateRequestCount, unreviewedMentionCount, reviewDueCount] =
+    await Promise.all([
+      prisma.listing.count({ where: { status: "pending_review" } }),
+      prisma.scrapedItem.count({ where: { status: "pending" } }),
+      prisma.corporateRequest.count({ where: { status: "pending" } }),
+      prisma.socialPriceMention.count({ where: { reviewed: false } }),
+      getReviewDueCount(admin.id),
+    ]);
 
   const username = admin.email;
 
@@ -24,6 +27,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/catalog": pendingReviewCount,
     "/admin/scraper": pendingScrapedCount,
     "/admin/corporate-requests": pendingCorporateRequestCount,
+    "/admin/social-mentions": unreviewedMentionCount,
+    "/admin/business-conditions": reviewDueCount,
   };
 
   return (

@@ -2,6 +2,7 @@ import { privateJson } from "@/lib/apiResponse";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { logAdminAction } from "@/lib/adminAudit";
 
 export async function GET(req: Request) {
   const admin = await requireAdmin();
@@ -27,9 +28,17 @@ export async function PATCH(req: Request) {
   const parsed = patchSchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
-  await prisma.socialPriceMention.update({
+  const mention = await prisma.socialPriceMention.update({
     where: { id: parsed.data.id },
     data: { reviewed: parsed.data.reviewed },
+  });
+
+  await logAdminAction({
+    adminEmail: admin.email,
+    action: "social_mention_reviewed",
+    targetType: "social_mention",
+    targetId: mention.id,
+    detail: `Marked ${mention.platform}/${mention.channel} post ${parsed.data.reviewed ? "reviewed" : "unreviewed"}`,
   });
 
   return privateJson({ ok: true });

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireAdmin } from "@/lib/auth";
 import { boundedJsonRecord } from "@/lib/zodShared";
+import { logAdminAction } from "@/lib/adminAudit";
 
 /**
  * Admin content API — an alternative to hand-editing prisma/seed.ts for
@@ -51,6 +52,14 @@ export async function POST(req: Request) {
       freshnessStatus: "fresh",
       lastVerifiedAt: new Date(),
     },
+  });
+
+  await logAdminAction({
+    adminEmail: admin.email,
+    action: "listing_created",
+    targetType: "listing",
+    targetId: listing.id,
+    detail: `Created "${listing.name}"`,
   });
 
   // The catalog read cache is keyed by tag, not by TTL alone — without

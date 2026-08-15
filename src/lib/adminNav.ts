@@ -12,6 +12,8 @@ import {
   Percent,
   Landmark,
   ShieldAlert,
+  KeyRound,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,4 +36,6 @@ export const ADMIN_LINKS: { href: string; label: string; blurb: string; icon: Lu
   { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status.", icon: Wallet },
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change.", icon: History },
   { href: "/admin/llm", label: "AI models & cost", blurb: "Switch the model behind each AI feature and track calls and spend.", icon: Cpu },
+  { href: "/admin/api-keys", label: "API keys", blurb: "Read-only credentials for external BI tools (Power BI, Tableau, etc.).", icon: KeyRound },
+  { href: "/admin/notifications", label: "Notifications", blurb: "Business conditions assigned to you that are due for review.", icon: Bell },
 ];

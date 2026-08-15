@@ -796,6 +796,13 @@ enum AdminAuditAction {
   business_condition_created
   business_condition_updated
   business_condition_deleted
+  api_key_created
+  api_key_revoked
+  listing_created
+  provider_created
+  scrape_source_updated
+  scrape_source_deleted
+  social_mention_reviewed
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the

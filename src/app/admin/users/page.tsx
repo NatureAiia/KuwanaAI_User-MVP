@@ -25,10 +25,10 @@ export default async function AdminUsersPage() {
 
       <div className="mt-6">
       <SearchableSection placeholder="Search users…">
-      <div className="overflow-x-auto rounded-[var(--radius-card)] border border-border">
+      <div className="max-h-[70vh] overflow-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[560px] border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-border bg-bg-surface-raised text-left">
+            <tr className="sticky top-0 z-[1] border-b border-border bg-bg-surface-raised text-left">
               <th className="p-3 font-medium text-text-muted">Email</th>
               <th className="p-3 font-medium text-text-muted">Joined</th>
               <th className="p-3 font-medium text-text-muted">Role</th>
