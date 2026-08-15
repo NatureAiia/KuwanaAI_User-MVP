@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { LineChart } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getProviderListingStats } from "@/lib/catalog";
@@ -108,6 +109,12 @@ export default async function ProviderPortalPage({
           <h1 className="font-display text-[24px] font-bold">{provider.name}</h1>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/provider/insights"
+            className="tap-target flex items-center gap-1.5 rounded-full border border-border px-3.5 py-2 text-[13px] font-medium text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
+          >
+            <LineChart size={15} /> Insights
+          </Link>
           <LinkButton href="/provider/listings/new" size="md">
             + Add product
           </LinkButton>
