@@ -93,67 +93,76 @@ export async function POST(req: Request) {
       ? data.username
       : `${profileName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20) || data.role}_${authUser.id.slice(0, 8)}`;
 
-  const gamification = await prisma.$transaction(
-    async (tx) => {
-      const primarySector = data.role === "corporate" ? data.primarySector : undefined;
+  let gamification;
+  try {
+    gamification = await prisma.$transaction(
+      async (tx) => {
+        const primarySector = data.role === "corporate" ? data.primarySector : undefined;
 
-      await tx.user.upsert({
-        where: { id: authUser.id },
-        update: { email: authUser.email!, role: data.role, username, primarySector },
-        create: { id: authUser.id, email: authUser.email!, role: data.role, username, primarySector },
-      });
-
-      await tx.userProfile.upsert({
-        where: { userId: authUser.id },
-        update: {
-          fullName: profileName,
-          ...(data.role === "consumer"
-            ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
-            : {}),
-        },
-        create: {
-          userId: authUser.id,
-          fullName: profileName,
-          ...(data.role === "consumer"
-            ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
-            : {}),
-        },
-      });
-
-      // A self-service provider needs its own Provider record to manage —
-      // admin-linking (the only other path, see /admin/catalog) doesn't
-      // apply here since there's no pre-existing record to link to.
-      // verified: false until an admin reviews it (see /admin/catalog),
-      // same "unvetted until checked" pattern as a submitted listing.
-      if (data.role === "provider") {
-        await tx.provider.upsert({
-          where: { ownerUserId: authUser.id },
-          update: { name: data.businessName },
-          create: { name: data.businessName, ownerUserId: authUser.id, verified: false },
+        await tx.user.upsert({
+          where: { id: authUser.id },
+          update: { email: authUser.email!, role: data.role, username, primarySector },
+          create: { id: authUser.id, email: authUser.email!, role: data.role, username, primarySector },
         });
-      }
 
-      for (const [sector, sectorData] of Object.entries(footprintsBySector)) {
-        if (!sectorData) continue;
-        await tx.sectorFootprint.upsert({
-          where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
-          update: { data: sectorData },
-          create: { userId: authUser.id, sector: sector as Sector, data: sectorData },
+        await tx.userProfile.upsert({
+          where: { userId: authUser.id },
+          update: {
+            fullName: profileName,
+            ...(data.role === "consumer"
+              ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
+              : {}),
+          },
+          create: {
+            userId: authUser.id,
+            fullName: profileName,
+            ...(data.role === "consumer"
+              ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
+              : {}),
+          },
         });
-      }
 
-      for (const [consentType, granted] of Object.entries(data.consents)) {
-        await tx.consent.upsert({
-          where: { userId_consentType: { userId: authUser.id, consentType } },
-          update: { granted, grantedAt: new Date() },
-          create: { userId: authUser.id, consentType, granted },
-        });
-      }
+        // A self-service provider needs its own Provider record to manage —
+        // admin-linking (the only other path, see /admin/catalog) doesn't
+        // apply here since there's no pre-existing record to link to.
+        // verified: false until an admin reviews it (see /admin/catalog),
+        // same "unvetted until checked" pattern as a submitted listing.
+        if (data.role === "provider") {
+          await tx.provider.upsert({
+            where: { ownerUserId: authUser.id },
+            update: { name: data.businessName },
+            create: { name: data.businessName, ownerUserId: authUser.id, verified: false },
+          });
+        }
 
-      return recordEvent(tx, { userId: authUser.id, eventType: "profile_completed" });
-    },
-    { timeout: 15_000 },
-  );
+        for (const [sector, sectorData] of Object.entries(footprintsBySector)) {
+          if (!sectorData) continue;
+          await tx.sectorFootprint.upsert({
+            where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
+            update: { data: sectorData },
+            create: { userId: authUser.id, sector: sector as Sector, data: sectorData },
+          });
+        }
+
+        for (const [consentType, granted] of Object.entries(data.consents)) {
+          await tx.consent.upsert({
+            where: { userId_consentType: { userId: authUser.id, consentType } },
+            update: { granted, grantedAt: new Date() },
+            create: { userId: authUser.id, consentType, granted },
+          });
+        }
+
+        return recordEvent(tx, { userId: authUser.id, eventType: "profile_completed" });
+      },
+      { timeout: 15_000 },
+    );
+  } catch (err) {
+    console.error("[onboarding] failed to save profile:", err);
+    return NextResponse.json(
+      { error: "Something went wrong saving your profile. Please try again." },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.json({ gamification });
 }

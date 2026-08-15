@@ -10,10 +10,10 @@ import { syncBusinessConditionReviewNotifications } from "@/lib/businessConditio
 // writes upserts — far too expensive to run on the unread-badge request the
 // header fires on every page load. Gate it behind a short per-user cooldown
 // so the badge reads stay a single fast query and the sync runs at most once
-// per window. In-memory is fine here: this app runs as a single long-lived
-// server process (not serverless), so the map is shared across requests.
+// per window. Persisted on the User row (not an in-memory Map): this app
+// deploys on Vercel (see vercel.json), where a request can land on any warm
+// instance, so process-local state isn't reliably shared across requests.
 const SYNC_COOLDOWN_MS = 15 * 60 * 1000;
-const lastSyncAt = new Map<string, number>();
 
 export async function GET() {
   const user = await requireUser();
@@ -27,10 +27,17 @@ export async function GET() {
   // single user's own rows, cheap enough to run on every bell poll.
   const role = await getUserRole(user.id);
   if (role === "consumer" || role === "provider") {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { lastNotificationSyncAt: true },
+    });
     const now = Date.now();
-    const lastSync = lastSyncAt.get(user.id) ?? 0;
+    const lastSync = dbUser?.lastNotificationSyncAt?.getTime() ?? 0;
     if (now - lastSync > SYNC_COOLDOWN_MS) {
-      lastSyncAt.set(user.id, now);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastNotificationSyncAt: new Date(now) },
+      });
       // No-op for a provider account (they have no SavedListing rows) — cheap
       // enough to call unconditionally rather than branching further.
       await syncPriceDropNotifications(user.id);

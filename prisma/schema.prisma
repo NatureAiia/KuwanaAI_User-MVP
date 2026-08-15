@@ -54,6 +54,11 @@ model User {
   // Market Intelligence/business conditions can default to their own market
   // instead of an unfiltered all-sectors view. Not meaningful for other roles.
   primarySector    Sector?  @map("primary_sector")
+  // Cooldown gate for the price-drop notification sync (see
+  // api/notifications/route.ts) — persisted rather than in-memory because
+  // this app deploys on Vercel (see vercel.json), where a request can land
+  // on any warm instance and an in-process Map isn't reliably shared.
+  lastNotificationSyncAt DateTime? @map("last_notification_sync_at")
 
   profile                 UserProfile?
   footprints              SectorFootprint[]
