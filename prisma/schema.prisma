@@ -31,29 +31,29 @@ enum Role {
 }
 
 model User {
-  id               String   @id @default(uuid())
-  email            String   @unique
+  id                     String    @id @default(uuid())
+  email                  String    @unique
   // The user-facing unique handle captured at signup (replaces the old free-text
   // "full name" field) — doubles as a stable, human-picked identifier alongside `id`.
-  username         String   @unique
-  role             Role     @default(consumer)
-  createdAt        DateTime @default(now()) @map("created_at")
+  username               String    @unique
+  role                   Role      @default(consumer)
+  createdAt              DateTime  @default(now()) @map("created_at")
   // Grants access to specific gated sub-features regardless of role (e.g.
   // corporate feature keys) — empty means "full access for this role", the
   // same fallback semantics as coarse role checks everywhere else in this
   // file. Feature keys are plain strings defined where they're checked, not
   // as an enum, so a new gated feature never needs a migration.
-  allowedFeatures  String[] @default([]) @map("allowed_features")
+  allowedFeatures        String[]  @default([]) @map("allowed_features")
   // Spendable wallet balances, credited by a webhook when a WalletTransaction
   // flips to paid (see WalletTransaction below) — one field per supported
   // top-up currency rather than a generic multi-currency Wallet model, since
   // Paynow only ever settles in USD or ZiG for this integration.
-  walletBalanceUsd Decimal  @default(0) @map("wallet_balance_usd") @db.Decimal(12, 2)
-  walletBalanceZig Decimal  @default(0) @map("wallet_balance_zig") @db.Decimal(12, 2)
+  walletBalanceUsd       Decimal   @default(0) @map("wallet_balance_usd") @db.Decimal(12, 2)
+  walletBalanceZig       Decimal   @default(0) @map("wallet_balance_zig") @db.Decimal(12, 2)
   // Set at signup for corporate accounts — which industry they operate in, so
   // Market Intelligence/business conditions can default to their own market
   // instead of an unfiltered all-sectors view. Not meaningful for other roles.
-  primarySector    Sector?  @map("primary_sector")
+  primarySector          Sector?   @map("primary_sector")
   // Cooldown gate for the price-drop notification sync (see
   // api/notifications/route.ts) — persisted rather than in-memory because
   // this app deploys on Vercel (see vercel.json), where a request can land
@@ -83,6 +83,8 @@ model User {
   chatFeedback            ChatFeedback[]
   walletTransactions      WalletTransaction[]
   assignedInvestigations  ListingInvestigation[]
+  priceCapRulesCreated    PriceCapRule[]
+  complaints              ConsumerComplaint[]
 
   @@map("users")
 }
@@ -175,6 +177,7 @@ model Category {
   scrapedItems      ScrapedItem[]
   corporateRequests CorporateRequest[]
   discountRules     DiscountRule[]
+  priceCapRules     PriceCapRule[]
 
   @@unique([sectorId, slug])
   @@map("categories")
@@ -298,6 +301,8 @@ model Listing {
   updateLogs        ListingUpdateLog[]
   discountRules     DiscountRule[]
   investigations    ListingInvestigation[]
+  marketBasketItems MarketBasketItem[]
+  complaints        ConsumerComplaint[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -480,35 +485,42 @@ enum NotificationType {
   alert_threshold_crossed
   // Admin: a BusinessCondition assigned to this admin is past its review cycle.
   business_condition_review_due
+  // Regulator: a PriceCapRule's gazetted ceiling is breached by at least one
+  // published listing in its category — one summary notification per rule,
+  // same "compute + upsert on read" shape as alert_threshold_crossed.
+  price_cap_breached
 }
 
 model Notification {
-  id            String           @id @default(uuid())
-  userId        String           @map("user_id")
-  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Nullable: alert_threshold_crossed and business_condition_review_due
-  // notifications reference an AlertRule/BusinessCondition instead (below),
-  // not a single listing.
-  listingId     String?          @map("listing_id")
-  listing       Listing?         @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  alertRuleId   String?          @map("alert_rule_id")
-  alertRule     AlertRule?       @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
-  businessConditionId String?    @map("business_condition_id")
+  id                  String             @id @default(uuid())
+  userId              String             @map("user_id")
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Nullable: alert_threshold_crossed, business_condition_review_due, and
+  // price_cap_breached notifications reference an AlertRule/
+  // BusinessCondition/PriceCapRule instead (below), not a single listing.
+  listingId           String?            @map("listing_id")
+  listing             Listing?           @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  alertRuleId         String?            @map("alert_rule_id")
+  alertRule           AlertRule?         @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+  businessConditionId String?            @map("business_condition_id")
   businessCondition   BusinessCondition? @relation(fields: [businessConditionId], references: [id], onDelete: Cascade)
-  type          NotificationType @default(price_drop)
-  message       String
+  priceCapRuleId      String?            @map("price_cap_rule_id")
+  priceCapRule        PriceCapRule?      @relation(fields: [priceCapRuleId], references: [id], onDelete: Cascade)
+  type                NotificationType   @default(price_drop)
+  message             String
   // Only meaningful for price_drop; null for every other type.
-  changePercent Float?           @map("change_percent")
-  read          Boolean          @default(false)
-  createdAt     DateTime         @default(now()) @map("created_at")
+  changePercent       Float?             @map("change_percent")
+  read                Boolean            @default(false)
+  createdAt           DateTime           @default(now()) @map("created_at")
 
   // Each unique constraint dedupes one type's re-sync (upsert) against its
   // own scoping column; the other scoping columns are null on that row, and
-  // Postgres treats NULL as distinct in a unique index, so these three
+  // Postgres treats NULL as distinct in a unique index, so these four
   // constraints never conflict with each other.
   @@unique([userId, listingId, type])
   @@unique([userId, alertRuleId, type])
   @@unique([userId, businessConditionId, type])
+  @@unique([userId, priceCapRuleId, type])
   @@index([listingId])
   @@index([userId, read, createdAt(sort: Desc)])
   @@map("notifications")
@@ -812,6 +824,8 @@ enum AdminAuditAction {
   scrape_source_updated
   scrape_source_deleted
   social_mention_reviewed
+  market_basket_item_created
+  market_basket_item_deleted
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
@@ -989,6 +1003,27 @@ model EconomicDriver {
   @@map("economic_drivers")
 }
 
+/// One representative good/service tracked as part of a named cost-of-living
+/// basket (e.g. "Consumer Price Basket" -> 10kg mealie-meal, diesel, data
+/// bundle...) — admin-curated, same "reference data an admin maintains"
+/// pattern as EconomicDriver/BusinessCondition. The basket's index value
+/// itself stays computed-on-read from each component's ListingPriceHistory
+/// (see getBasketIndexTrend in lib/marketBasket.ts) rather than a separate
+/// stored index table, matching how every other trend in this app works.
+model MarketBasketItem {
+  id         String   @id @default(uuid())
+  basketName String   @map("basket_name")
+  label      String
+  listingId  String   @map("listing_id")
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  weight     Decimal  @default(1) @db.Decimal(6, 3)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([basketName, listingId])
+  @@index([basketName])
+  @@map("market_basket_items")
+}
+
 enum BusinessConditionCategory {
   regulatory
   competitor
@@ -1058,6 +1093,28 @@ model AlertRule {
 
   @@index([providerId])
   @@map("alert_rules")
+}
+
+/// A gazetted price ceiling for a category — sector/category-wide, unlike
+/// AlertRule (which is always scoped to one provider's own metrics). A
+/// regulator sets this once per category; getPriceCapBreaches() flags every
+/// currently-published listing in that category priced above it, in the
+/// rule's own currency (no FX conversion — a cap only ever compares like for
+/// like).
+model PriceCapRule {
+  id              String         @id @default(uuid())
+  categoryId      String         @map("category_id")
+  category        Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  capValue        Decimal        @map("cap_value") @db.Decimal(12, 2)
+  currency        String         @default("USD")
+  enabled         Boolean        @default(true)
+  createdByUserId String         @map("created_by_user_id")
+  createdBy       User           @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  notifications   Notification[]
+
+  @@index([categoryId])
+  @@map("price_cap_rules")
 }
 
 // Per-user, per-notification-type delivery preference. `channel` is always
@@ -1172,30 +1229,87 @@ enum InvestigationStatus {
   dismissed
 }
 
-/// A corporate account's own lightweight case-tracking for a flagged
-/// listing — the "investigation queue" reinterpreted onto self-service
-/// pricing-integrity workflow instead of a bank's internal fraud queue.
-/// Anomalies themselves stay computed-on-read (getProviderFeeComparison);
+// The enforcement action a regulator recorded on closing a case — distinct
+// from InvestigationStatus (which just tracks workflow state) because a
+// corporate-initiated self-flag never has one; it stays "none" until a
+// regulator account resolves it with a real action taken.
+enum InvestigationOutcome {
+  none
+  warning
+  fine
+  suspension
+}
+
+/// Case-tracking for a flagged listing, opened either by a corporate account
+/// self-flagging its own listing (self-service pricing-integrity workflow)
+/// or by a regulator account investigating any provider (enforcement
+/// workflow — see /regulator/investigations). Anomalies themselves stay
+/// computed-on-read (getProviderFeeComparison / getSectorPricingSummary);
 /// this is only the workflow state layered on top once someone decides a
 /// flagged listing is worth tracking.
 model ListingInvestigation {
-  id               String              @id @default(uuid())
-  listingId        String              @map("listing_id")
-  listing          Listing             @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  providerId       String              @map("provider_id")
-  provider         Provider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  id               String               @id @default(uuid())
+  listingId        String               @map("listing_id")
+  listing          Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  providerId       String               @map("provider_id")
+  provider         Provider             @relation(fields: [providerId], references: [id], onDelete: Cascade)
   // Snapshot of why this was flagged at creation time (e.g. "z-score 2.4,
   // 18% below category peer median") — kept even if the underlying price
   // changes later and the listing stops being an outlier.
   reason           String
-  status           InvestigationStatus @default(open)
-  assignedToUserId String?             @map("assigned_to_user_id")
-  assignedTo       User?               @relation(fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  status           InvestigationStatus  @default(open)
+  assignedToUserId String?              @map("assigned_to_user_id")
+  assignedTo       User?                @relation(fields: [assignedToUserId], references: [id], onDelete: SetNull)
   notes            String?
-  createdAt        DateTime            @default(now()) @map("created_at")
-  resolvedAt       DateTime?           @map("resolved_at")
+  // Only ever set by a regulator closing a case with a real enforcement
+  // action; stays "none" for corporate self-flagged investigations.
+  outcome          InvestigationOutcome @default(none)
+  // Supporting documents/screenshots a regulator attaches to a case — a
+  // plain URL list rather than a separate documents table/model, matching
+  // BusinessCondition.documentUrls (no file-upload infra exists yet).
+  evidenceUrls     String[]             @default([]) @map("evidence_urls")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  resolvedAt       DateTime?            @map("resolved_at")
+
+  originatingComplaints ConsumerComplaint[]
 
   @@index([providerId, status])
   @@index([listingId])
   @@map("listing_investigations")
+}
+
+enum ComplaintStatus {
+  open
+  reviewing
+  resolved
+  dismissed
+}
+
+/// A consumer-reported price/service issue — the "report a price" hotline a
+/// real price regulator relies on for most of its leads, distinct from
+/// ListingInvestigation (which is a regulator/corporate-opened case, not a
+/// public submission). Requires a logged-in consumer account: no anonymous
+/// submission, so a complaint always ties back to a real user and gets
+/// spam/abuse protection for free from the existing auth system rather than
+/// needing its own (no CAPTCHA/rate-limit infra exists in this app yet).
+model ConsumerComplaint {
+  id                    String                @id @default(uuid())
+  userId                String                @map("user_id")
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Nullable: a complaint can be general ("this shop is overcharging") rather
+  // than tied to one specific listing.
+  listingId             String?               @map("listing_id")
+  listing               Listing?              @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  description           String
+  status                ComplaintStatus       @default(open)
+  // Set once a regulator promotes this complaint into a real case — SetNull
+  // (not Cascade) so deleting the investigation doesn't also delete the
+  // complaint that led to it.
+  linkedInvestigationId String?               @map("linked_investigation_id")
+  linkedInvestigation   ListingInvestigation? @relation(fields: [linkedInvestigationId], references: [id], onDelete: SetNull)
+  createdAt             DateTime              @default(now()) @map("created_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([listingId])
+  @@map("consumer_complaints")
 }

@@ -30,7 +30,9 @@ type AdminAuditAction =
   | "provider_created"
   | "scrape_source_updated"
   | "scrape_source_deleted"
-  | "social_mention_reviewed";
+  | "social_mention_reviewed"
+  | "market_basket_item_created"
+  | "market_basket_item_deleted";
 
 /**
  * Records who (an admin email, not a userId — the whole point is a record
@@ -54,7 +56,8 @@ export async function logAdminAction(params: {
     | "economic_driver"
     | "business_condition"
     | "api_key"
-    | "social_mention";
+    | "social_mention"
+    | "market_basket_item";
   targetId: string;
   detail: string;
 }): Promise<void> {

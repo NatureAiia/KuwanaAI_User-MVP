@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   KeyRound,
   Bell,
+  ShoppingBasket,
   type LucideIcon,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ export const ADMIN_LINKS: { href: string; label: string; blurb: string; icon: Lu
   { href: "/admin/pricing-intelligence", label: "Pricing intelligence", blurb: "Outlier pricing and sector-wide fee comparison across every category.", icon: LineChart },
   { href: "/admin/discounts", label: "Discounts", blurb: "Provider discount rules, scoped to a category or a single listing.", icon: Percent },
   { href: "/admin/economic-drivers", label: "Economic drivers", blurb: "FX rate, inflation and other macro indicators shown as pricing context.", icon: Landmark },
+  { href: "/admin/market-baskets", label: "Market baskets", blurb: "Curated cost-of-living baskets tracked on the regulator price index.", icon: ShoppingBasket },
   { href: "/admin/business-conditions", label: "Business conditions", blurb: "Regulatory changes, competitor moves, and macro triggers worth watching.", icon: ShieldAlert },
   { href: "/admin/transactions", label: "Transactions", blurb: "Every Paynow wallet top-up and its current status.", icon: Wallet },
   { href: "/admin/audit", label: "Audit log", blurb: "Who approved/rejected/deleted what, and every role change.", icon: History },

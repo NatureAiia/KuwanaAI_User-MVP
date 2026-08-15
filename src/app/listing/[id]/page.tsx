@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { RatingStars } from "@/components/RatingStars";
 import { ListingActions } from "@/components/ListingActions";
+import { ReportPriceButton } from "@/components/ReportPriceButton";
 import { CompareToggleButton } from "@/components/explore/CompareToggleButton";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { PriceSparkline } from "@/components/PriceSparkline";
@@ -268,6 +269,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
               providerName={listing.provider.name}
               initialSaved={initialSaved}
             />
+            <ReportPriceButton listingId={listing.id} />
             <div className="mt-3">
               <CompareToggleButton
                 listingId={listing.id}
