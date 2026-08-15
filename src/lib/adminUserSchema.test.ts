@@ -32,4 +32,14 @@ describe("adminUserUpdateSchema", () => {
   it("accepts role and accountStatus together", () => {
     expect(adminUserUpdateSchema.safeParse({ role: "consumer", accountStatus: "suspended" }).success).toBe(true);
   });
+
+  it.each(["keep", "remove"])("accepts listingAction: %s", (listingAction) => {
+    expect(adminUserUpdateSchema.safeParse({ accountStatus: "suspended", listingAction }).success).toBe(true);
+  });
+
+  it("rejects an invalid listingAction", () => {
+    expect(adminUserUpdateSchema.safeParse({ accountStatus: "suspended", listingAction: "archive" }).success).toBe(
+      false,
+    );
+  });
 });

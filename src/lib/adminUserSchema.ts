@@ -13,6 +13,12 @@ export const adminUserUpdateSchema = z
     role: z.enum(["consumer", "corporate", "regulator", "provider"]).optional(),
     accountStatus: z.enum(["active", "suspended"]).optional(),
     suspendedReason: z.string().trim().max(500).optional(),
+    // Only meaningful when accountStatus is "suspended" and the account owns
+    // a Provider — "remove" hard-deletes every one of that provider's
+    // listings alongside the deactivation (the "permanent" choice in
+    // UserStatusToggle's popup); omitted/"keep" leaves listings untouched
+    // (the "temporary" choice). Ignored otherwise.
+    listingAction: z.enum(["keep", "remove"]).optional(),
   })
   .refine((data) => data.role !== undefined || data.accountStatus !== undefined, {
     message: "Provide at least a role or an accountStatus",

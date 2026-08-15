@@ -16,6 +16,15 @@ export default async function AdminUsersPage() {
     take: 500,
   });
 
+  // One grouped query for every self-service provider's listing count,
+  // rather than an N+1 per row — UserStatusToggle needs this to decide
+  // whether deactivating an account should also offer to remove its listings.
+  const providers = await prisma.provider.findMany({
+    where: { ownerUserId: { in: users.map((u) => u.id) } },
+    select: { ownerUserId: true, _count: { select: { listings: true } } },
+  });
+  const listingCountByUserId = new Map(providers.map((p) => [p.ownerUserId as string, p._count.listings]));
+
   return (
     <div className="mx-auto max-w-[900px] px-5 py-8 md:px-10">
       <h1 className="font-display text-[24px] font-bold">Users</h1>
@@ -53,7 +62,11 @@ export default async function AdminUsersPage() {
                 <td className="p-3">
                   <div className="flex items-center gap-2">
                     {u.accountStatus === "suspended" && <Badge tone="coral">Deactivated</Badge>}
-                    <UserStatusToggle userId={u.id} status={u.accountStatus} />
+                    <UserStatusToggle
+                      userId={u.id}
+                      status={u.accountStatus}
+                      providerListingCount={listingCountByUserId.get(u.id) ?? 0}
+                    />
                   </div>
                 </td>
               </tr>

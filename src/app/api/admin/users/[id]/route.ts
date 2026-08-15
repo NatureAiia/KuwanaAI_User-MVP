@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { adminUserUpdateSchema } from "@/lib/adminUserSchema";
 import { logAdminAction } from "@/lib/adminAudit";
+import { revalidateCatalog } from "@/lib/cacheTags";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
@@ -50,6 +51,28 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
           ? `Deactivated ${user.email}${user.suspendedReason ? `: ${user.suspendedReason}` : ""}`
           : `Reactivated ${user.email}`,
     });
+  }
+
+  // "Permanent" deactivation (see UserStatusToggle's popup) — the account's
+  // provider, if any, has every one of its listings hard-deleted alongside
+  // the suspension. Same prisma.listing.delete() semantics admin/catalog's
+  // own DELETE route already uses, just batched — no soft-delete/"archived"
+  // status exists in this schema to fall back to instead.
+  if (suspending && parsed.data.listingAction === "remove") {
+    const provider = await prisma.provider.findUnique({ where: { ownerUserId: user.id }, select: { id: true, name: true } });
+    if (provider) {
+      const { count } = await prisma.listing.deleteMany({ where: { providerId: provider.id } });
+      if (count > 0) {
+        await logAdminAction({
+          adminEmail: admin.email,
+          action: "provider_listings_removed",
+          targetType: "provider",
+          targetId: provider.id,
+          detail: `Removed ${count} listing(s) for ${provider.name} (account deactivated)`,
+        });
+        revalidateCatalog();
+      }
+    }
   }
 
   return NextResponse.json({ user });

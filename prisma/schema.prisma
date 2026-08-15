@@ -846,6 +846,7 @@ enum AdminAuditAction {
   complaint_promoted
   user_suspended
   user_reactivated
+  provider_listings_removed
 }
 
 // No FK relations to the acted-on row — an audit log needs to survive the
