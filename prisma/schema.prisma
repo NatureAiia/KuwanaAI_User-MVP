@@ -50,6 +50,10 @@ model User {
   // Paynow only ever settles in USD or ZiG for this integration.
   walletBalanceUsd Decimal  @default(0) @map("wallet_balance_usd") @db.Decimal(12, 2)
   walletBalanceZig Decimal  @default(0) @map("wallet_balance_zig") @db.Decimal(12, 2)
+  // Set at signup for corporate accounts — which industry they operate in, so
+  // Market Intelligence/business conditions can default to their own market
+  // instead of an unfiltered all-sectors view. Not meaningful for other roles.
+  primarySector    Sector?  @map("primary_sector")
 
   profile                 UserProfile?
   footprints              SectorFootprint[]

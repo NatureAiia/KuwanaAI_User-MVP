@@ -29,6 +29,7 @@ import {
   MEDICAL_AIDS,
 } from "@/lib/onboarding-options";
 import { REGULATORS } from "@/lib/orgVerification";
+import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { clsx } from "clsx";
 
 type Role = "consumer" | "corporate" | "provider" | "regulator";
@@ -93,7 +94,7 @@ const CONSUMER_STEPS = [
   "consent",
 ] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | ConsumerStep | "orgDetails" | "processing";
+type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "processing";
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -201,6 +202,10 @@ export default function SignupPage() {
   // name mapping to one specific verified domain (see orgVerification.ts).
   const [organizationName, setOrganizationName] = useState("");
   const [regulatorName, setRegulatorName] = useState<string>("");
+  // Corporate-only — which market this account operates in, so Market
+  // Intelligence can default to their own sector instead of an unfiltered
+  // all-sectors view (see src/app/corporate/page.tsx).
+  const [primarySector, setPrimarySector] = useState<SectorSlug | "">("");
 
   const [ageRange, setAgeRange] = useState("");
   const [occupation, setOccupation] = useState("");
@@ -357,7 +362,7 @@ export default function SignupPage() {
 
       const body =
         role === "corporate"
-          ? { role, organizationName, consents }
+          ? { role, organizationName, primarySector, consents }
           : role === "provider"
             ? { role, businessName: organizationName, consents }
             : role === "regulator"
@@ -414,6 +419,7 @@ export default function SignupPage() {
     username,
     organizationName,
     regulatorName,
+    primarySector,
     ageRange,
     occupation,
     socialPlatforms,
@@ -434,7 +440,7 @@ export default function SignupPage() {
     router,
   ]);
 
-  function canContinue(s: ConsumerStep | "orgDetails") {
+  function canContinue(s: ConsumerStep | "orgDetails" | "industry") {
     switch (s) {
       case "account":
         return !!(/^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) && email.trim() && password.length >= 6);
@@ -455,6 +461,8 @@ export default function SignupPage() {
         return medicalAids.length > 0 && termsAccepted;
       case "orgDetails":
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
+      case "industry":
+        return !!primarySector;
       case "consent":
         return true;
     }
@@ -663,10 +671,62 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go("consent")}
+                onClick={() => go(role === "corporate" ? "industry" : "consent")}
                 disabled={!canContinue("orgDetails")}
                 className="flex-1"
               >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "industry" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Which industry are you in?</h1>
+            <p className="text-[13px] text-text-secondary">
+              We&apos;ll default your Market Intelligence dashboard to this sector — you can still
+              switch to any other sector any time.
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              {LIVE_SECTORS.map((slug) => {
+                const sector = SECTORS[slug];
+                const selected = primarySector === slug;
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => setPrimarySector(slug)}
+                    aria-pressed={selected}
+                    className={clsx(
+                      "tap-target flex items-center gap-3 rounded-xl border p-4 text-left transition-all",
+                      selected
+                        ? "border-accent-teal bg-accent-teal/[0.08] ring-1 ring-accent-teal/30"
+                        : "border-border bg-bg-surface hover:border-accent-teal/40",
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                        selected ? "bg-accent-teal/15 text-accent-teal" : "bg-bg-surface-raised text-text-secondary",
+                      )}
+                    >
+                      <sector.icon size={17} strokeWidth={1.75} />
+                    </span>
+                    <div>
+                      <div className="text-[14px] font-semibold">{sector.name}</div>
+                      <p className="text-[11.5px] text-text-secondary">{sector.blurb}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button onClick={() => go("consent")} disabled={!canContinue("industry")} className="flex-1">
                 Continue
               </Button>
             </div>
@@ -994,6 +1054,9 @@ export default function SignupPage() {
                   <p className="mt-1 font-semibold">
                     {role === "regulator" ? regulatorName : organizationName}
                   </p>
+                  {role === "corporate" && primarySector && (
+                    <p className="mt-1 text-text-secondary">{SECTORS[primarySector].name}</p>
+                  )}
                 </div>
                 <p className="text-[12px] text-text-muted">
                   {role === "provider"

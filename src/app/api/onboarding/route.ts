@@ -95,10 +95,12 @@ export async function POST(req: Request) {
 
   const gamification = await prisma.$transaction(
     async (tx) => {
+      const primarySector = data.role === "corporate" ? data.primarySector : undefined;
+
       await tx.user.upsert({
         where: { id: authUser.id },
-        update: { email: authUser.email!, role: data.role, username },
-        create: { id: authUser.id, email: authUser.email!, role: data.role, username },
+        update: { email: authUser.email!, role: data.role, username, primarySector },
+        create: { id: authUser.id, email: authUser.email!, role: data.role, username, primarySector },
       });
 
       await tx.userProfile.upsert({

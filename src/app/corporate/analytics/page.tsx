@@ -9,6 +9,8 @@ import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { CorporateStatCard } from "@/components/corporate/CorporateStatCard";
 import { SectorTrendBar } from "@/components/corporate/SectorTrendBar";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
+import { DividedList } from "@/components/corporate/DividedList";
+import { favorabilityTone } from "@/lib/tone";
 
 /**
  * Cross-module rollup: change-request throughput, discount activity, and
@@ -106,12 +108,13 @@ export default async function CorporateAnalyticsPage() {
             A linear projection from each listing&apos;s own price history — what continues if the current trend
             holds, not a prediction.
           </p>
-          <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
-            {forecasts.map(({ listing, trend, forecast }, i) => (
-              <div
-                key={listing.id}
-                className={`flex flex-wrap items-center justify-between gap-2 bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
-              >
+          <DividedList
+            className="mt-2"
+            items={forecasts}
+            keyFor={({ listing }) => listing.id}
+            itemClassName="flex flex-wrap items-center justify-between gap-2"
+            renderItem={({ listing, trend, forecast }) => (
+              <>
                 <p className="text-[13.5px] font-medium">{listing.name}</p>
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[13.5px]">
@@ -121,13 +124,17 @@ export default async function CorporateAnalyticsPage() {
                   <span className="font-mono text-[13.5px]">
                     {listing.currency} {forecast.projectedPrice.toFixed(2)}
                   </span>
-                  <CorporateTag tone={trend.direction === "down" ? "teal" : trend.direction === "up" ? "coral" : "neutral"}>
+                  <CorporateTag
+                    tone={favorabilityTone(
+                      trend.direction === "down" ? "favorable" : trend.direction === "up" ? "unfavorable" : "neutral",
+                    )}
+                  >
                     in {forecast.projectionDays}d
                   </CorporateTag>
                 </div>
-              </div>
-            ))}
-          </div>
+              </>
+            )}
+          />
         </section>
       )}
 

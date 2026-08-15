@@ -23,13 +23,23 @@ describe("onboardingBodySchema role", () => {
   // security boundary — route.ts additionally verifies each against the
   // *authenticated* email's domain before ever writing the role. See
   // HANDOFF.md and src/lib/orgVerification.ts.
-  it("accepts role: corporate with an organizationName", () => {
+  it("accepts role: corporate with an organizationName and primarySector", () => {
+    const result = onboardingBodySchema.safeParse({
+      role: "corporate",
+      organizationName: "CBZ Bank",
+      primarySector: "banking",
+      consents: CONSENTS,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects role: corporate missing primarySector", () => {
     const result = onboardingBodySchema.safeParse({
       role: "corporate",
       organizationName: "CBZ Bank",
       consents: CONSENTS,
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it("accepts role: provider with a businessName", () => {

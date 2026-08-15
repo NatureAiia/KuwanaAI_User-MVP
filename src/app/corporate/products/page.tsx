@@ -4,6 +4,7 @@ import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { LinkButton } from "@/components/ui/Button";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
+import { DividedList } from "@/components/corporate/DividedList";
 import { PROVENANCE_LABEL } from "@/lib/listingDisplay";
 import { formatDate } from "@/lib/format";
 
@@ -27,14 +28,14 @@ export default async function CorporateProductsPage() {
         </LinkButton>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-border">
-        {listings.map((l, i) => (
-          <div
-            key={l.id}
-            className={`flex flex-wrap items-center justify-between gap-3 bg-bg-surface p-3.5 ${
-              i > 0 ? "border-t border-border" : ""
-            }`}
-          >
+      <DividedList
+        className="mt-4"
+        items={listings}
+        keyFor={(l) => l.id}
+        itemClassName="flex flex-wrap items-center justify-between gap-3"
+        emptyMessage="No products yet — request your first one above."
+        renderItem={(l) => (
+          <>
             <div>
               <p className="text-[13.5px] font-medium">{l.name}</p>
               <p className="text-[11px] text-text-muted">
@@ -59,14 +60,9 @@ export default async function CorporateProductsPage() {
                 Edit
               </Link>
             </div>
-          </div>
-        ))}
-        {listings.length === 0 && (
-          <p className="bg-bg-surface p-6 text-center text-[13px] text-text-muted">
-            No products yet — request your first one above.
-          </p>
+          </>
         )}
-      </div>
+      />
     </div>
   );
 }

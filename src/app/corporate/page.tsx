@@ -7,6 +7,7 @@ import { getMarketOverview, getCompetitorWatch } from "@/lib/catalog";
 import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
 import { getActiveDiscountsMap, computeEffectivePrice } from "@/lib/discounts";
 import { getLatestEconomicDrivers } from "@/lib/economicDrivers";
+import { favorabilityTone, RISK_LEVEL_TONE } from "@/lib/tone";
 import { getActiveBusinessConditions } from "@/lib/businessConditions";
 import { ensureSentimentComputed, getSentimentSummary } from "@/lib/sentiment";
 import { emailDomain } from "@/lib/orgVerification";
@@ -16,6 +17,7 @@ import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
 import { CorporateStatCard } from "@/components/corporate/CorporateStatCard";
 import { SectorTrendBar } from "@/components/corporate/SectorTrendBar";
+import { DividedList } from "@/components/corporate/DividedList";
 
 export default async function CorporateDashboardPage({
   searchParams,
@@ -23,12 +25,23 @@ export default async function CorporateDashboardPage({
   searchParams: Promise<{ sector?: string }>;
 }) {
   const user = await requireCorporateUser();
+  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { primarySector: true } });
+  const mySector = dbUser?.primarySector as SectorSlug | null | undefined;
 
   const { sector: sectorFilter } = await searchParams;
-  const activeSector =
-    sectorFilter && (LIVE_SECTORS as readonly string[]).includes(sectorFilter)
-      ? (sectorFilter as SectorSlug)
-      : undefined;
+  // No ?sector= at all → default to the account's own industry (set at
+  // corporate signup) rather than an unfiltered view. `?sector=all` is the
+  // explicit "clear the default" escape hatch — otherwise every fresh visit
+  // would just re-apply the default and the "All sectors" pill could never
+  // actually show all sectors.
+  const activeSector: SectorSlug | undefined =
+    sectorFilter === "all"
+      ? undefined
+      : sectorFilter && (LIVE_SECTORS as readonly string[]).includes(sectorFilter)
+        ? (sectorFilter as SectorSlug)
+        : sectorFilter === undefined && mySector && (LIVE_SECTORS as readonly string[]).includes(mySector)
+          ? mySector
+          : undefined;
 
   const { bySector } = await getMarketOverview(activeSector);
 
@@ -73,13 +86,25 @@ export default async function CorporateDashboardPage({
 
       <div className="mt-4 flex flex-wrap gap-2">
         <Link
-          href="/corporate"
+          href="/corporate?sector=all"
           className={`tap-target rounded-full border px-4 py-2 text-[13px] font-medium ${
             !activeSector ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary"
           }`}
         >
           All sectors
         </Link>
+        {mySector && (
+          <Link
+            href={`/corporate?sector=${mySector}`}
+            className={`tap-target rounded-full border px-4 py-2 text-[13px] font-medium ${
+              activeSector === mySector
+                ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
+                : "border-border text-text-secondary"
+            }`}
+          >
+            My sector · {SECTORS[mySector].name}
+          </Link>
+        )}
         {LIVE_SECTORS.map((slug) => (
           <Link
             key={slug}
@@ -131,9 +156,7 @@ export default async function CorporateDashboardPage({
                   <p className="text-[13.5px] font-medium">{c.title}</p>
                   {c.notes && <p className="mt-0.5 text-[12px] text-text-secondary">{c.notes}</p>}
                 </div>
-                <CorporateTag tone={c.riskLevel === "high" ? "coral" : c.riskLevel === "medium" ? "sky" : "neutral"}>
-                  {c.riskLevel}
-                </CorporateTag>
+                <CorporateTag tone={RISK_LEVEL_TONE[c.riskLevel]}>{c.riskLevel}</CorporateTag>
               </Card>
             ))}
           </div>
@@ -232,16 +255,17 @@ export default async function CorporateDashboardPage({
             Your listed price against the category peer median. A flagged listing sits far enough from its peers
             to be worth a second look — not a claim that it&apos;s wrong.
           </p>
-          <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
-            {feeComparison.map((f, i) => {
+          <DividedList
+            className="mt-2"
+            items={feeComparison}
+            keyFor={(f) => f.listingId}
+            itemClassName="flex flex-wrap items-center justify-between gap-2"
+            renderItem={(f) => {
               const belowMedian = f.price < f.peerMedian;
               const discount = discountsByListingId.get(f.listingId);
               const percentOff = discount ? Number(discount.percentOff) : null;
               return (
-                <div
-                  key={f.listingId}
-                  className={`flex flex-wrap items-center justify-between gap-2 bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
-                >
+                <>
                   <div>
                     <p className="text-[13.5px] font-medium">{f.listingName}</p>
                     <p className="text-[11px] text-text-muted">{f.categoryName}</p>
@@ -259,7 +283,7 @@ export default async function CorporateDashboardPage({
                     )}
                     {percentOff !== null && <CorporateTag tone="teal">{percentOff}% off active</CorporateTag>}
                     {f.sampleSize >= 5 ? (
-                      <CorporateTag tone={belowMedian ? "teal" : "coral"}>
+                      <CorporateTag tone={favorabilityTone(belowMedian ? "favorable" : "unfavorable")}>
                         peer median {f.peerMedian.toFixed(2)}
                       </CorporateTag>
                     ) : (
@@ -267,10 +291,10 @@ export default async function CorporateDashboardPage({
                     )}
                     {f.isOutlier && <CorporateTag tone="coral">worth a look (z {f.zScore.toFixed(2)})</CorporateTag>}
                   </div>
-                </div>
+                </>
               );
-            })}
-          </div>
+            }}
+          />
         </section>
       )}
 
@@ -316,16 +340,16 @@ export default async function CorporateDashboardPage({
             </Link>{" "}
             to request a price change.
           </p>
-          <div className="mt-2 overflow-hidden rounded-[var(--radius-card)] border border-border">
-            {competitorWatch.map((entry, i) => {
+          <DividedList
+            className="mt-2"
+            items={competitorWatch}
+            keyFor={(entry) => entry.myListing.id}
+            renderItem={(entry) => {
               const cheapestCompetitor = entry.competitors[0];
               const delta = entry.myListing.price - cheapestCompetitor.price;
               const cheaper = delta < 0;
               return (
-                <div
-                  key={entry.myListing.id}
-                  className={`bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}
-                >
+                <>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <span
@@ -347,7 +371,7 @@ export default async function CorporateDashboardPage({
                       <span className="font-mono text-[13.5px]">
                         {entry.myListing.currency} {entry.myListing.price.toFixed(2)}
                       </span>
-                      <CorporateTag tone={cheaper ? "teal" : "coral"}>
+                      <CorporateTag tone={favorabilityTone(cheaper ? "favorable" : "unfavorable")}>
                         {cheaper ? "↓" : "↑"} {Math.abs(delta).toFixed(2)} vs. {cheapestCompetitor.provider.name}
                       </CorporateTag>
                     </div>
@@ -359,10 +383,10 @@ export default async function CorporateDashboardPage({
                       </CorporateTag>
                     ))}
                   </div>
-                </div>
+                </>
               );
-            })}
-          </div>
+            }}
+          />
         </section>
       )}
 

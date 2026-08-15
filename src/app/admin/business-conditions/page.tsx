@@ -6,8 +6,8 @@ import { BusinessConditionForm } from "@/components/admin/BusinessConditionForm"
 import { BusinessConditionRowActions } from "@/components/admin/BusinessConditionRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { SECTORS, type SectorSlug } from "@/lib/sectors";
+import { RISK_LEVEL_TONE } from "@/lib/tone";
 
-const RISK_TONE = { low: "neutral", medium: "sky", high: "coral" } as const;
 const CATEGORY_LABEL = { regulatory: "Regulatory", competitor: "Competitor", macro: "Macro" } as const;
 
 export default async function AdminBusinessConditionsPage() {
@@ -62,7 +62,7 @@ export default async function AdminBusinessConditionsPage() {
                     <td className="p-3 text-text-secondary">{c.reviewCycleDays ? `${c.reviewCycleDays}d` : "—"}</td>
                     <td className="p-3 text-text-secondary">{c.assignedTo?.email ?? "Unassigned"}</td>
                     <td className="p-3">
-                      <Badge tone={RISK_TONE[c.riskLevel]}>{c.riskLevel}</Badge>
+                      <Badge tone={RISK_LEVEL_TONE[c.riskLevel]}>{c.riskLevel}</Badge>
                     </td>
                     <td className="p-3">
                       <BusinessConditionRowActions

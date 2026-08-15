@@ -1,5 +1,8 @@
 import { z } from "zod";
 import { REGULATOR_NAMES } from "@/lib/orgVerification";
+import { SECTORS, type SectorSlug } from "@/lib/sectors";
+
+const SECTOR_SLUGS = Object.keys(SECTORS) as [SectorSlug, ...SectorSlug[]];
 
 // The public self-service signup endpoint's request schema. Corporate and
 // Regulator used to be hardcoded out of this schema entirely (see
@@ -92,6 +95,10 @@ const consumerSchema = z.object({
 const corporateSchema = z.object({
   role: z.literal("corporate"),
   organizationName: z.string().min(1),
+  // Which market this account operates in — defaults the Market
+  // Intelligence dashboard to their own sector instead of an unfiltered
+  // all-sectors view (see src/app/corporate/page.tsx).
+  primarySector: z.enum(SECTOR_SLUGS),
   consents: consentsSchema,
 });
 

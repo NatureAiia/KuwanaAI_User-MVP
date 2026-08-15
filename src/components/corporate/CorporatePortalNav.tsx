@@ -3,24 +3,47 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LineChart, Package, ClipboardList, Building2, Wallet, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, type LucideIcon } from "lucide-react";
+import { LineChart, Package, ClipboardList, Building2, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
 
-const LINKS: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: "/corporate", label: "Market Intelligence", icon: LineChart },
-  { href: "/corporate/analytics", label: "Analytics", icon: BarChart2 },
-  { href: "/corporate/products", label: "My Products", icon: Package },
-  { href: "/corporate/requests", label: "Requests", icon: ClipboardList },
-  { href: "/corporate/investigations", label: "Investigations", icon: Search },
-  { href: "/corporate/live-feed", label: "Live Feed", icon: Activity },
-  { href: "/corporate/alerts", label: "Alerts", icon: Bell },
-  { href: "/corporate/data-import", label: "Data Import", icon: UploadCloud },
-  { href: "/corporate/reports", label: "Reports", icon: FileText },
-  { href: "/corporate/chat", label: "Assistant", icon: MessageCircle },
-  { href: "/corporate/profile", label: "Company Profile", icon: Building2 },
-  { href: "/wallet", label: "Wallet", icon: Wallet },
+type NavLink = { href: string; label: string; icon: LucideIcon };
+
+// Grouped once the flat list crossed ~10 items and stopped being scannable
+// as a single block. Groups are display-only (no routing implications) —
+// "Wallet" was dropped from here since /wallet isn't a /corporate/* route;
+// it doesn't belong in a list meant to represent this portal's own sections.
+const NAV_GROUPS: { label: string; links: NavLink[] }[] = [
+  {
+    label: "Intelligence",
+    links: [
+      { href: "/corporate", label: "Market Intelligence", icon: LineChart },
+      { href: "/corporate/analytics", label: "Analytics", icon: BarChart2 },
+    ],
+  },
+  {
+    label: "Operations",
+    links: [
+      { href: "/corporate/products", label: "My Products", icon: Package },
+      { href: "/corporate/requests", label: "Requests", icon: ClipboardList },
+      { href: "/corporate/investigations", label: "Investigations", icon: Search },
+      { href: "/corporate/live-feed", label: "Live Feed", icon: Activity },
+      { href: "/corporate/alerts", label: "Alerts", icon: Bell },
+      { href: "/corporate/data-import", label: "Data Import", icon: UploadCloud },
+    ],
+  },
+  {
+    label: "Reports",
+    links: [
+      { href: "/corporate/reports", label: "Reports", icon: FileText },
+      { href: "/corporate/chat", label: "Assistant", icon: MessageCircle },
+    ],
+  },
+  {
+    label: "Account",
+    links: [{ href: "/corporate/profile", label: "Company Profile", icon: Building2 }],
+  },
 ];
 
 // Resolves the active section from the URL itself (usePathname) rather than
@@ -31,7 +54,7 @@ function isActive(pathname: string, href: string) {
   return href === "/corporate" ? pathname === "/corporate" : pathname.startsWith(href);
 }
 
-/** Mobile: pill row with icons. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. */
+/** Mobile: pill rows clustered by group. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, grouped under muted section headers, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. */
 export function CorporatePortalNav({ companyName }: { companyName: string }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -52,24 +75,28 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
 
   return (
     <>
-      <nav className="flex flex-wrap gap-2 px-5 py-3 md:hidden">
-        {LINKS.map((link) => {
-          const active = isActive(pathname, link.href);
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={clsx(
-                "tap-target flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-medium",
-                active ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary",
-              )}
-            >
-              <Icon size={14} strokeWidth={2} />
-              {link.label}
-            </Link>
-          );
-        })}
+      <nav className="flex flex-col gap-2 px-5 py-3 md:hidden">
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-wrap items-center gap-2">
+            {group.links.map((link) => {
+              const active = isActive(pathname, link.href);
+              const Icon = link.icon;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={clsx(
+                    "tap-target flex items-center gap-1.5 rounded-full border px-4 py-2 text-[13px] font-medium",
+                    active ? "border-accent-sky bg-accent-sky/15 text-accent-sky" : "border-border text-text-secondary",
+                  )}
+                >
+                  <Icon size={14} strokeWidth={2} />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <nav
@@ -78,42 +105,57 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
           collapsed ? "w-[64px]" : "w-[240px]",
         )}
       >
-        <div className={clsx("flex flex-1 flex-col gap-0.5 py-5", collapsed ? "items-center px-2" : "px-3")}>
-          {LINKS.map((link) => {
-            const active = isActive(pathname, link.href);
-            const Icon = link.icon;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                title={collapsed ? link.label : undefined}
-                className={clsx(
-                  "group relative flex items-center gap-2.5 overflow-hidden rounded-lg py-2 text-[13px] transition-colors",
-                  collapsed ? "justify-center px-0" : "pl-3 pr-3",
-                  active
-                    ? "font-semibold text-text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent-sky"
-                    : "font-medium text-text-secondary hover:bg-bg-surface-raised",
-                )}
-              >
-                <span
-                  className={clsx(
-                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
-                    active ? "bg-accent-sky/15 text-accent-sky" : "bg-transparent text-text-muted group-hover:bg-bg-surface",
-                  )}
-                >
-                  <Icon size={15} strokeWidth={2} />
-                </span>
-                {!collapsed && link.label}
-              </Link>
-            );
-          })}
+        <div
+          className={clsx(
+            "flex flex-1 flex-col gap-0.5 overflow-y-auto py-5",
+            collapsed ? "items-center px-2" : "px-3",
+          )}
+        >
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <div key={group.label} className={clsx(groupIndex > 0 && "mt-3")}>
+              {!collapsed && (
+                <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">
+                  {group.label}
+                </p>
+              )}
+              {collapsed && groupIndex > 0 && <div className="mx-2 mb-2 border-t border-border" />}
+              {group.links.map((link) => {
+                const active = isActive(pathname, link.href);
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    title={collapsed ? link.label : undefined}
+                    className={clsx(
+                      "group relative flex items-center gap-2.5 overflow-hidden rounded-lg py-2 text-[13px] transition-colors",
+                      collapsed ? "justify-center px-0" : "pl-3 pr-3",
+                      active
+                        ? "font-semibold text-text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-r-full before:bg-accent-sky"
+                        : "font-medium text-text-secondary hover:bg-bg-surface-raised",
+                    )}
+                  >
+                    <span
+                      className={clsx(
+                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+                        active ? "bg-accent-sky/15 text-accent-sky" : "bg-transparent text-text-muted group-hover:bg-bg-surface",
+                      )}
+                    >
+                      <Icon size={15} strokeWidth={2} />
+                    </span>
+                    {!collapsed && link.label}
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
 
           <button
             type="button"
             onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             className={clsx(
-              "tap-target mt-2 flex items-center gap-2.5 rounded-lg py-2 text-[12.5px] font-medium text-text-muted hover:bg-bg-surface-raised hover:text-text-secondary",
+              "tap-target mt-3 flex items-center gap-2.5 rounded-lg py-2 text-[12.5px] font-medium text-text-muted hover:bg-bg-surface-raised hover:text-text-secondary",
               collapsed ? "justify-center px-0" : "pl-3 pr-3",
             )}
           >
@@ -124,7 +166,7 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
           </button>
         </div>
 
-        <div className={clsx("border-t border-border", collapsed ? "p-2" : "p-3")}>
+        <div className={clsx("shrink-0 border-t border-border", collapsed ? "p-2" : "p-3")}>
           {collapsed ? (
             <div
               title={companyName}

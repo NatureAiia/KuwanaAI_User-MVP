@@ -4,6 +4,7 @@ import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { getRecentListingActivity, type ListingActivityEntry } from "@/lib/liveFeed";
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { LiveFeedRefresher } from "@/components/corporate/LiveFeedRefresher";
+import { DividedList } from "@/components/corporate/DividedList";
 import { formatDateTime } from "@/lib/format";
 
 const SOURCE_ICON: Record<ListingActivityEntry["source"], LucideIcon> = {
@@ -38,11 +39,16 @@ export default async function CorporateLiveFeedPage() {
         Every recent change to your listings — refreshes automatically every 20 seconds.
       </p>
 
-      <div className="mt-6 overflow-hidden rounded-[var(--radius-card)] border border-border">
-        {activity.map((entry, i) => {
+      <DividedList
+        className="mt-6"
+        items={activity}
+        keyFor={(entry) => entry.id}
+        itemClassName="flex items-start gap-2.5"
+        emptyMessage="No activity on your listings yet."
+        renderItem={(entry) => {
           const Icon = SOURCE_ICON[entry.source];
           return (
-            <div key={entry.id} className={`flex items-start gap-2.5 bg-bg-surface p-3.5 ${i > 0 ? "border-t border-border" : ""}`}>
+            <>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-bg-surface-raised text-text-secondary">
                 <Icon size={15} strokeWidth={2} />
               </span>
@@ -55,13 +61,10 @@ export default async function CorporateLiveFeedPage() {
                   {SOURCE_LABEL[entry.source]} · {formatDateTime(entry.createdAt)}
                 </p>
               </div>
-            </div>
+            </>
           );
-        })}
-        {activity.length === 0 && (
-          <p className="p-6 text-center text-[13px] text-text-muted">No activity on your listings yet.</p>
-        )}
-      </div>
+        }}
+      />
     </div>
   );
 }

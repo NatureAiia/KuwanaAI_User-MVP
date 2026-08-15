@@ -5,5 +5,5 @@ import { z } from "zod";
 // module for the same reason as onboardingSchema.ts: route files only
 // permit specific recognized exports, and this way it's unit-testable.
 export const adminUserUpdateSchema = z.object({
-  role: z.enum(["consumer", "corporate", "regulator", "provider", "admin"]),
+  role: z.enum(["consumer", "corporate", "regulator", "provider"]),
 });
