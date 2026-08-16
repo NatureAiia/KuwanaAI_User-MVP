@@ -64,6 +64,18 @@ BELOW_MEDIAN_FACTOR = 0.9
 BAR = "=" * 60
 
 
+def speak(reasons: list[str]) -> str:
+    """Joins reason phrases into one plain sentence: "A", "A and B", or
+    "A, B, and C" — read-aloud-friendly instead of a semicolon-delimited log."""
+    if not reasons:
+        return ""
+    if len(reasons) == 1:
+        return reasons[0]
+    if len(reasons) == 2:
+        return f"{reasons[0]} and {reasons[1]}"
+    return ", ".join(reasons[:-1]) + f", and {reasons[-1]}"
+
+
 def _num(value):
     try:
         return float(value)
@@ -168,32 +180,37 @@ def run(payload: dict) -> dict:
     for listing in listings:
         value_score, blend = compute_value_score(listing, category_slug, schema, prices, listings)
 
+        # Plain, spoken-out-loud phrasing on purpose — this is the sentence
+        # shown directly to the user as "Why", so it needs to read like an
+        # explanation a ten-year-old would follow, not a scoring log. The
+        # actual math (weights, bonuses) still lives in the full text dump
+        # below for anyone who wants the audit trail.
         reasons: list[str] = []
         special = False
         trend = _num(listing.get("trend_percent"))
         if trend is not None and trend <= TREND_DROP_THRESHOLD:
             special = True
-            reasons.append(f"price down {abs(trend):.1f}% recently")
+            reasons.append(f"its price just dropped {abs(trend):.0f}%, so it's cheaper than it was recently")
         price = _num(listing.get("price"))
         if price is not None and median_price > 0 and price <= median_price * BELOW_MEDIAN_FACTOR:
             special = True
-            reasons.append("priced below the compared set's median")
+            reasons.append("it costs less than most of the other options here")
 
         freshness = listing.get("freshness_status") or "unverified"
         freshness_bonus = FRESHNESS_BONUS.get(freshness, 0)
         if freshness_bonus > 0:
-            reasons.append(f"fresh data (+{freshness_bonus})")
-        elif freshness_bonus < 0:
-            reasons.append(f"{freshness} data ({freshness_bonus})")
+            reasons.append("the price we have for it is fresh and up to date")
+        elif freshness == "stale":
+            reasons.append("the price we have for it is a bit old, so it may have changed")
+        elif freshness == "unverified":
+            reasons.append("we haven't double-checked this price recently")
 
         verified = bool(listing.get("provider_verified"))
         trust_bonus = TRUST_BONUS if verified else 0
         if not verified:
-            reasons.append("unverified provider")
+            reasons.append("its provider hasn't been verified yet, so it's worth double-checking")
 
         bonus = SPECIAL_BONUS if special else 0
-        if special:
-            reasons.append("special (+20)")
 
         final = max(0.0, min(100.0, round(value_score + bonus + freshness_bonus + trust_bonus, 1)))
 
@@ -238,12 +255,12 @@ def run(payload: dict) -> dict:
         lines.append(detail)
         lines.append(f"   FINAL: {entry['final']}/100")
         if entry["reasons"]:
-            lines.append("   Because: " + "; ".join(entry["reasons"]))
+            lines.append("   Because: " + speak(entry["reasons"]))
 
     lines.append("")
     lines.append(BAR)
     winner = scored[0]
-    winner_why = "; ".join(winner["reasons"]) if winner["reasons"] else "highest transparent value score"
+    winner_why = speak(winner["reasons"]) if winner["reasons"] else "it scored best overall once we weighed price and features fairly"
     lines.append(f"WINNER: {winner['listing'].get('name')} — {winner['final']}/100")
     lines.append(f"Why: {winner_why}.")
 
