@@ -1,14 +1,71 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Trophy } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 
+const QUEST_FAB_POSITION_KEY = "kuwana:quest-fab-position";
+const QUEST_FAB_SIZE = 56;
+const DRAG_THRESHOLD = 4;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
 export function BottomTabBar() {
   const pathname = usePathname();
   const questsActive = isNavItemActive(pathname, "/profile/quests");
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragState = useRef({ dragging: false, moved: false, startX: 0, startY: 0, posX: 0, posY: 0 });
+
+  useEffect(() => {
+    const saved = localStorage.getItem(QUEST_FAB_POSITION_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as { x: number; y: number };
+      setPos({
+        x: clamp(parsed.x, 4, window.innerWidth - QUEST_FAB_SIZE - 4),
+        y: clamp(parsed.y, 4, window.innerHeight - QUEST_FAB_SIZE - 4),
+      });
+    } catch {
+      // ignore malformed saved position
+    }
+  }, []);
+
+  function handlePointerDown(e: React.PointerEvent<HTMLAnchorElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragState.current = { dragging: true, moved: false, startX: e.clientX, startY: e.clientY, posX: rect.left, posY: rect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLAnchorElement>) {
+    if (!dragState.current.dragging) return;
+    const dx = e.clientX - dragState.current.startX;
+    const dy = e.clientY - dragState.current.startY;
+    if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragState.current.moved = true;
+    if (!dragState.current.moved) return;
+    setPos({
+      x: clamp(dragState.current.posX + dx, 4, window.innerWidth - QUEST_FAB_SIZE - 4),
+      y: clamp(dragState.current.posY + dy, 4, window.innerHeight - QUEST_FAB_SIZE - 4),
+    });
+  }
+
+  function handlePointerUp() {
+    dragState.current.dragging = false;
+    if (dragState.current.moved) {
+      setPos((current) => {
+        if (current) localStorage.setItem(QUEST_FAB_POSITION_KEY, JSON.stringify(current));
+        return current;
+      });
+    }
+  }
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (dragState.current.moved) e.preventDefault();
+  }
 
   return (
     <>
@@ -46,16 +103,23 @@ export function BottomTabBar() {
       </nav>
 
       {/* Quests moved out of the primary nav (see nav.ts) to make room for
-          Shorts — reached here instead as a floating action button. Sits
+          Shorts — reached here instead as a floating action button. Defaults
           above the tab bar on mobile (bottom-20, clear of its ~64px height)
-          and drops to a plain bottom-right corner on desktop, where there's
-          no tab bar to clear. */}
+          and to a plain bottom-right corner on desktop. Draggable — users can
+          reposition it anywhere on screen and the spot is remembered in
+          localStorage across visits. */}
       <Link
         href="/profile/quests"
         aria-label="Quests"
         aria-current={questsActive ? "page" : undefined}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onClick={handleClick}
+        style={pos ? { left: pos.x, top: pos.y } : undefined}
         className={clsx(
-          "tap-target fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full border border-border shadow-[0_10px_30px_-12px_rgba(2,6,23,0.55)] backdrop-blur-sm transition-colors md:bottom-6 md:right-6",
+          "tap-target fixed z-40 flex h-14 w-14 touch-none items-center justify-center rounded-full border border-border shadow-[0_10px_30px_-12px_rgba(2,6,23,0.55)] backdrop-blur-sm transition-colors",
+          !pos && "bottom-20 right-4 md:bottom-6 md:right-6",
           questsActive ? "bg-accent-sky text-white" : "bg-bg-surface/95 text-accent-sky",
         )}
       >

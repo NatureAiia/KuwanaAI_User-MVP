@@ -263,7 +263,9 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
           hasBottomTabBar ? "bottom-16" : "bottom-0",
         )}
       >
-        <ChatComposer onSend={sendMessage} disabled={sending || hydrating} />
+        <div className="mx-auto w-4/5">
+          <ChatComposer onSend={sendMessage} disabled={sending || hydrating} />
+        </div>
       </div>
     </div>
   );
