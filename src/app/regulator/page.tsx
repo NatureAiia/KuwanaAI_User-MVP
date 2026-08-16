@@ -7,6 +7,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card, Badge } from "@/components/ui/Card";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function RegulatorDashboardPage({
   searchParams,
@@ -123,7 +124,7 @@ export default async function RegulatorDashboardPage({
                 <p className="text-[11px] text-text-muted">{riskiestSector.unverifiedCount} unverified listing(s)</p>
               </>
             ) : (
-              <p className="mt-1 text-[13px] text-text-muted">No unverified listings in view.</p>
+              <EmptyState variant="inline" className="mt-1 !text-left" title="No unverified listings in view" />
             )}
           </Card>
         </div>
@@ -174,7 +175,12 @@ export default async function RegulatorDashboardPage({
       <section className="mt-8">
         <h2 className="font-display text-[16px] font-semibold">Largest recent price swings</h2>
         <div className="mt-3 flex flex-col gap-2">
-          {anomalies.length === 0 && <p className="text-[13px] text-text-muted">No notable price movement yet.</p>}
+          {anomalies.length === 0 && (
+            <EmptyState
+              title="No notable price movement yet"
+              description="Significant recent price swings across live listings will surface here."
+            />
+          )}
           {anomalies.map(({ listing, sectorName, categoryName, trend }) => (
             <Card key={listing.id} className="flex items-center justify-between gap-3">
               <div>
@@ -250,7 +256,10 @@ export default async function RegulatorDashboardPage({
         </p>
         <div className="mt-3 flex flex-col gap-2">
           {complianceActivity.length === 0 && (
-            <p className="text-[13px] text-text-muted">No rejected listings in this view.</p>
+            <EmptyState
+              title="No rejected listings in this view"
+              description="Listings an admin rejects on review will show up here with the reason."
+            />
           )}
           {complianceActivity.map(({ listing, sectorName, categoryName, rejectionReason, rejectedAt }) => (
             <Card key={listing.id} className="flex items-start justify-between gap-3">

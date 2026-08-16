@@ -52,7 +52,7 @@ export function ChatComposer({
       {image && (
         <div className="mb-2 flex items-center gap-2 rounded-xl border border-border bg-bg-surface-raised p-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- ephemeral client-side data-URL preview, not an optimizable asset */}
-          <img src={image.previewUrl} alt="Attached" className="h-10 w-10 rounded-lg object-cover" />
+          <img src={image.previewUrl} alt="Attached" loading="lazy" className="h-10 w-10 rounded-lg object-cover" />
           <p className="flex-1 text-[12px] text-text-secondary">Image attached</p>
           <button
             type="button"

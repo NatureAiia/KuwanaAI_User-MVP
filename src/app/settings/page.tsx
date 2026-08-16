@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SwitchAccountButton } from "@/components/LogoutButton";
 import { NotificationPreferenceToggle } from "@/components/NotificationPreferenceToggle";
+import { BackButton } from "@/components/ui/BackButton";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -56,7 +57,10 @@ export default function SettingsPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[24px] font-bold">Settings</h1>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton />
+        <h1 className="font-display text-[24px] font-bold">Settings</h1>
+      </div>
 
       <div className="mt-6 space-y-2.5">
         <Link

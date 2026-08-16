@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AdvertLightbox } from "@/components/explore/AdvertLightbox";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Clapperboard } from "lucide-react";
 import type { ShortsCard } from "@/lib/shorts";
 
 const AUTOPLAY_MS = 4000;
@@ -36,9 +38,13 @@ export function ShortsFeed({ cards }: { cards: ShortsCard[] }) {
 
   if (cards.length === 0) {
     return (
-      <p className="flex h-[calc(100dvh-8rem)] items-center justify-center px-6 text-center text-[13px] text-text-muted">
-        No shorts yet — check back soon.
-      </p>
+      <div className="flex h-[calc(100dvh-8rem)] items-center justify-center px-6">
+        <EmptyState
+          icon={Clapperboard}
+          title="No shorts yet"
+          description="Providers haven't posted any short clips or adverts yet — check back soon."
+        />
+      </div>
     );
   }
 
@@ -66,7 +72,7 @@ export function ShortsFeed({ cards }: { cards: ShortsCard[] }) {
               className="relative flex h-[calc(100dvh-8rem)] w-full snap-start items-end justify-center overflow-hidden text-left"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- same arbitrary-origin convention as the listing branch below */}
-              <img src={card.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={card.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
               <span className="absolute left-4 top-4 z-10 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                 Sponsored
               </span>
@@ -82,7 +88,7 @@ export function ShortsFeed({ cards }: { cards: ShortsCard[] }) {
               className="relative flex h-[calc(100dvh-8rem)] w-full snap-start items-end justify-center overflow-hidden"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary provider/scraper origins, same convention as listing/[id] */}
-              <img src={card.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={card.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
               <div className="relative z-10 w-full bg-gradient-to-t from-black/85 via-black/20 to-transparent p-5 pb-6 text-white">
                 <p className="text-[11px] uppercase tracking-wide text-white/70">{card.providerName}</p>
                 <p className="font-display text-[18px] font-bold leading-tight">{card.name}</p>

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Card";
 import { ApiKeyForm } from "@/components/admin/ApiKeyForm";
 import { ApiKeyRowActions } from "@/components/admin/ApiKeyRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminApiKeysPage() {
   const admin = await requireAdmin();
@@ -63,8 +64,12 @@ export default async function AdminApiKeysPage() {
                 ))}
                 {keys.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-text-muted">
-                      No keys yet.
+                    <td colSpan={5} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No API keys yet."
+                        description="Generate one using the form above to give an external BI tool read-only access."
+                      />
                     </td>
                   </tr>
                 )}

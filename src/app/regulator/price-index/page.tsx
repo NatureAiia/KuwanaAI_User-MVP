@@ -6,6 +6,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card, Badge } from "@/components/ui/Card";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 // A listing only counts as "FX/inflation-driven" rather than a genuine
 // real-terms move when its nominal swing is at least this many points larger
@@ -64,15 +65,12 @@ export default async function RegulatorPriceIndexPage({
 
       {!hasDriverCoverage && (
         <Card className="mt-6">
-          <p className="text-[13px] font-medium">No &ldquo;{DEFAULT_FX_DRIVER_NAME}&rdquo; readings yet</p>
-          <p className="mt-1 text-[12px] text-text-secondary">
-            This view needs period-by-period FX/CPI readings entered at{" "}
-            <Link href="/admin/economic-drivers" className="text-accent-sky hover:underline">
-              /admin/economic-drivers
-            </Link>{" "}
-            under the name &ldquo;{DEFAULT_FX_DRIVER_NAME}&rdquo; before nominal price moves can be adjusted to real
-            terms. Nominal-only trends are shown below in the meantime.
-          </p>
+          <EmptyState
+            variant="inline"
+            title={`No "${DEFAULT_FX_DRIVER_NAME}" readings yet`}
+            description={`This view needs period-by-period FX/CPI readings under the name "${DEFAULT_FX_DRIVER_NAME}" before nominal price moves can be adjusted to real terms. Nominal-only trends are shown below in the meantime.`}
+            action={{ label: "Add economic driver readings", href: "/admin/economic-drivers" }}
+          />
         </Card>
       )}
 
@@ -100,14 +98,12 @@ export default async function RegulatorPriceIndexPage({
 
         {!basketTrend ? (
           <Card className="mt-2">
-            <p className="text-[13px] font-medium">No basket curated yet</p>
-            <p className="mt-1 text-[12px] text-text-secondary">
-              Curate a named cost-of-living basket (e.g. staple foods, fuel, data bundles) at{" "}
-              <Link href="/admin/market-baskets" className="text-accent-sky hover:underline">
-                /admin/market-baskets
-              </Link>{" "}
-              to track a composite index here.
-            </p>
+            <EmptyState
+              variant="inline"
+              title="No basket curated yet"
+              description="Curate a named cost-of-living basket (e.g. staple foods, fuel, data bundles) to track a composite index here."
+              action={{ label: "Curate a basket", href: "/admin/market-baskets" }}
+            />
           </Card>
         ) : (
           <Card className="mt-2 flex flex-wrap items-center justify-between gap-3">
@@ -133,7 +129,7 @@ export default async function RegulatorPriceIndexPage({
                       {TREND_ARROW[basketTrend.real.direction]} {Math.abs(basketTrend.real.changePercent)}%
                     </Badge>
                   ) : (
-                    <Badge tone="neutral">No data</Badge>
+                    <EmptyState variant="inline" className="!text-right" title="No data" />
                   )}
                 </div>
               </div>
@@ -164,7 +160,12 @@ export default async function RegulatorPriceIndexPage({
         </div>
 
         <div className="mt-2 flex flex-col gap-2">
-          {movers.length === 0 && <p className="text-[13px] text-text-muted">No price history to compare yet.</p>}
+          {movers.length === 0 && (
+            <EmptyState
+              title="No price history to compare yet"
+              description="Movers show up once a listing has at least two recorded price points to compare."
+            />
+          )}
           {movers.map((m) => {
             const divergent =
               m.real !== null &&
@@ -196,7 +197,7 @@ export default async function RegulatorPriceIndexPage({
                         {TREND_ARROW[m.real.direction]} {Math.abs(m.real.changePercent)}%
                       </Badge>
                     ) : (
-                      <Badge tone="neutral">No data</Badge>
+                      <EmptyState variant="inline" className="!text-right" title="No data" />
                     )}
                   </div>
                 </div>

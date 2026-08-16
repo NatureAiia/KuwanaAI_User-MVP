@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input, FormField } from "@/components/ui/Field";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type CategoryOption = { id: string; name: string; sector: { name: string } };
 
@@ -13,16 +14,26 @@ export function PriceCapRuleForm({ categories }: { categories: CategoryOption[] 
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
   const [capValue, setCapValue] = useState("");
   const [currency, setCurrency] = useState("USD");
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [capValueError, setCapValueError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     setError(null);
+    setCategoryError(null);
+    setCapValueError(null);
     const value = Number(capValue);
-    if (!categoryId || !(value > 0)) {
-      setError("Pick a category and a positive cap value");
-      return;
+    let hasError = false;
+    if (!categoryId) {
+      setCategoryError("Pick a category");
+      hasError = true;
     }
+    if (!(value > 0)) {
+      setCapValueError("Cap value must be greater than 0");
+      hasError = true;
+    }
+    if (hasError) return;
     setSaving(true);
     try {
       const res = await fetch("/api/regulator/price-cap-rules", {
@@ -46,7 +57,12 @@ export function PriceCapRuleForm({ categories }: { categories: CategoryOption[] 
     return (
       <Card>
         <p className="font-display text-[14px] font-semibold">New price cap</p>
-        <p className="mt-2 text-[12.5px] text-text-muted">No categories available yet.</p>
+        <EmptyState
+          variant="inline"
+          className="mt-2 !text-left"
+          title="No categories available yet"
+          description="Categories are set up elsewhere — once at least one exists, it'll be selectable here."
+        />
       </Card>
     );
   }
@@ -59,7 +75,7 @@ export function PriceCapRuleForm({ categories }: { categories: CategoryOption[] 
       </p>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <FormField label="Category">
+        <FormField label="Category" error={categoryError}>
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
@@ -72,7 +88,7 @@ export function PriceCapRuleForm({ categories }: { categories: CategoryOption[] 
             ))}
           </select>
         </FormField>
-        <FormField label="Cap value">
+        <FormField label="Cap value" error={capValueError}>
           <Input type="number" min={0} step="0.01" placeholder="e.g. 15" value={capValue} onChange={(e) => setCapValue(e.target.value)} />
         </FormField>
         <FormField label="Currency">

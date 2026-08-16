@@ -6,6 +6,7 @@ import { getRecentlyViewedDetailed } from "@/lib/catalog";
 import { Header } from "@/components/Header";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { FormattedPrice } from "@/components/FormattedPrice";
+import { BackButton } from "@/components/ui/BackButton";
 
 export const metadata: Metadata = {
   title: "Your history — Kuwana",
@@ -21,6 +22,7 @@ export default async function HistoryPage() {
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
       <div className="mt-4 flex items-center gap-2">
+        <BackButton />
         <Clock size={20} className="text-accent-teal" />
         <h1 className="font-display text-[24px] font-bold">Your history</h1>
       </div>

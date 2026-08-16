@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Card";
 import { DiscountRuleForm } from "@/components/admin/DiscountRuleForm";
 import { DiscountRuleRowActions } from "@/components/admin/DiscountRuleRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminDiscountsPage() {
   const admin = await requireAdmin();
@@ -78,8 +79,12 @@ export default async function AdminDiscountsPage() {
                 })}
                 {discountRules.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-text-muted">
-                      No discount rules yet.
+                    <td colSpan={6} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No discount rules yet."
+                        description="Add one using the form above to discount a category or a single listing."
+                      />
                     </td>
                   </tr>
                 )}

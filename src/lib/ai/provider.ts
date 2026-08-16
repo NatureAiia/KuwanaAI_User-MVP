@@ -21,6 +21,7 @@ import { resolveLadder } from "./modelConfig";
 import { estimateCostUsd, type AiFeature, type ModelSpec } from "./models";
 import { planTiers, scoreComplexity, type ComplexitySignals } from "./tiers";
 import { recordUsage } from "./usage";
+import { STREAM_STATUS_MARKER } from "@/lib/chatStream";
 import type { NormalizedMessage } from "./types";
 
 /** Anthropic's effort levels; OpenRouter has no equivalent and ignores it. */
@@ -323,6 +324,9 @@ export async function* streamAiText(params: {
       console.warn(
         `[ai] ${params.feature}: ${model.id} failed before output (${errorMessage}), escalating to ${next.id}`,
       );
+      // Surfaced to the client as a status update ("Trying a smarter
+      // model…") rather than leaving it guessing during the retry.
+      yield `${STREAM_STATUS_MARKER}escalating${STREAM_STATUS_MARKER}`;
     }
   }
 

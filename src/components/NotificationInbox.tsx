@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Bell, BellOff } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 
@@ -21,7 +21,7 @@ export function NotificationInbox({
   emptyMessage,
 }: {
   notifications: InboxNotificationDTO[];
-  emptyMessage: string;
+  emptyMessage: ReactNode;
 }) {
   const [items, setItems] = useState(notifications);
 
@@ -34,7 +34,7 @@ export function NotificationInbox({
     return (
       <div className="mt-6 flex flex-col items-center text-center text-text-muted">
         <BellOff size={32} />
-        <p className="mt-3 text-[13px]">{emptyMessage}</p>
+        <div className="mt-3 text-[13px]">{emptyMessage}</div>
       </div>
     );
   }

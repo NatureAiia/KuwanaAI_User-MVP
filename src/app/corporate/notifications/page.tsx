@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { NotificationInbox } from "@/components/NotificationInbox";
 import { NotificationPreferenceToggle } from "@/components/NotificationPreferenceToggle";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function CorporateNotificationsPage() {
   const result = await requireCorporateProvider();
@@ -41,7 +42,13 @@ export default async function CorporateNotificationsPage() {
           read: n.read,
           createdAt: n.createdAt.toISOString(),
         }))}
-        emptyMessage="No alerts triggered yet."
+        emptyMessage={
+          <EmptyState
+            variant="inline"
+            title="No alerts triggered"
+            description="You'll be notified here when one of your alert rules is triggered."
+          />
+        }
       />
     </div>
   );

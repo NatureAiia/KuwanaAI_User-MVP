@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { NotificationsList } from "@/components/NotificationsList";
+import { BackButton } from "@/components/ui/BackButton";
 
 export default async function NotificationsPage() {
   const user = await requireUser();
@@ -25,7 +26,10 @@ export default async function NotificationsPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[22px] font-bold">Notifications</h1>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton />
+        <h1 className="font-display text-[22px] font-bold">Notifications</h1>
+      </div>
       <NotificationsList
         notifications={notifications.map((n) => ({
           id: n.id,

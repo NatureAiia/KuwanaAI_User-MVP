@@ -4,6 +4,8 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { ExploreClient } from "@/components/explore/ExploreClient";
 import { TrendingRow } from "@/components/explore/TrendingRow";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LayoutGrid } from "lucide-react";
 import { getSectorCategories, getTrendingListings } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 
@@ -47,7 +49,12 @@ export default async function ExploreSectorPage({
       <TrendingRow items={trending} />
 
       {categories.length === 0 ? (
-        <p className="mt-8 text-text-muted">No categories seeded for this sector yet.</p>
+        <EmptyState
+          className="mt-8"
+          icon={LayoutGrid}
+          title="No categories yet"
+          description={`We haven't seeded any categories for ${meta.name.toLowerCase()} yet — check back soon.`}
+        />
       ) : (
         <div className="mt-4">
           <ExploreClient sectorSlug={sector} categories={categories} />

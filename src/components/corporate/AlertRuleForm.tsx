@@ -21,14 +21,16 @@ export function AlertRuleForm() {
   const [metric, setMetric] = useState<Metric>("avg_price");
   const [direction, setDirection] = useState<Direction>("below");
   const [threshold, setThreshold] = useState("");
+  const [thresholdError, setThresholdError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     setError(null);
+    setThresholdError(null);
     const value = Number(threshold);
     if (!threshold.trim() || !(value > 0)) {
-      setError("Enter a positive threshold");
+      setThresholdError("Threshold must be a positive number");
       return;
     }
     setSaving(true);
@@ -81,7 +83,7 @@ export function AlertRuleForm() {
             <option value="above">Rises above</option>
           </select>
         </FormField>
-        <FormField label="Threshold">
+        <FormField label="Threshold" error={thresholdError}>
           <Input type="number" min={0} step="0.01" placeholder="e.g. 25" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
         </FormField>
       </div>

@@ -18,13 +18,15 @@ export function BusinessConditionForm() {
   const [sectorSlug, setSectorSlug] = useState("");
   const [reviewCycleDays, setReviewCycleDays] = useState("");
   const [notes, setNotes] = useState("");
+  const [titleError, setTitleError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     setError(null);
+    setTitleError(null);
     if (!title.trim()) {
-      setError("Title is required");
+      setTitleError("Title is required");
       return;
     }
     setSaving(true);
@@ -63,7 +65,7 @@ export function BusinessConditionForm() {
         regulator and corporate dashboards.
       </p>
 
-      <FormField label="Title">
+      <FormField label="Title" error={titleError}>
         <Input placeholder="e.g. RBZ mandatory FX disclosure rule" value={title} onChange={(e) => setTitle(e.target.value)} />
       </FormField>
 

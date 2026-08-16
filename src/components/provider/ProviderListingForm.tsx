@@ -63,8 +63,16 @@ export function ProviderListingForm({
   }
 
   async function submit(status: "draft" | "pending_review") {
-    if (!categoryId || !name.trim() || !(Number(price) > 0)) {
-      setError("Please fill in every step before submitting.");
+    if (!categoryId) {
+      setError("Select a category before submitting.");
+      return;
+    }
+    if (!name.trim()) {
+      setError("Add a name for this listing before submitting.");
+      return;
+    }
+    if (!(Number(price) > 0)) {
+      setError("Enter a price greater than 0 before submitting.");
       return;
     }
     setError(null);
@@ -103,7 +111,9 @@ export function ProviderListingForm({
       );
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(typeof data?.error === "string" ? data.error : "Something went wrong — please try again.");
+        setError(
+          typeof data?.error === "string" ? data.error : `Couldn't save this listing (server returned ${res.status}) — try again.`,
+        );
         return;
       }
       router.push("/provider");

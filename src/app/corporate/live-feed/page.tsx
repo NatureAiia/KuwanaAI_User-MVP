@@ -5,6 +5,7 @@ import { getRecentListingActivity, type ListingActivityEntry } from "@/lib/liveF
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { LiveFeedRefresher } from "@/components/corporate/LiveFeedRefresher";
 import { DividedList } from "@/components/corporate/DividedList";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/format";
 
 const SOURCE_ICON: Record<ListingActivityEntry["source"], LucideIcon> = {
@@ -44,7 +45,14 @@ export default async function CorporateLiveFeedPage() {
         items={activity}
         keyFor={(entry) => entry.id}
         itemClassName="flex items-start gap-2.5"
-        emptyMessage="No activity on your listings yet."
+        emptyMessage={
+          <EmptyState
+            variant="inline"
+            icon={Activity}
+            title="No activity on your listings yet"
+            description="Edits, price changes, and new products will show up here as soon as they go live."
+          />
+        }
         renderItem={(entry) => {
           const Icon = SOURCE_ICON[entry.source];
           return (

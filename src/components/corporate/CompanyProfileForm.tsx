@@ -22,6 +22,7 @@ export function CompanyProfileForm({
   const [name, setName] = useState(initialName);
   const [logoUrl, setLogoUrl] = useState(initialLogoUrl ?? "");
   const [description, setDescription] = useState(initialDescription ?? "");
+  const [nameError, setNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,12 @@ export function CompanyProfileForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNameError(null);
     setSaved(false);
+    if (!name.trim()) {
+      setNameError("Company name is required");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/corporate/profile", {
@@ -61,7 +67,7 @@ export function CompanyProfileForm({
           <p className="text-[12.5px] text-text-secondary">Shown to shoppers on every one of your listings.</p>
         </div>
 
-        <FormField label="Company name">
+        <FormField label="Company name" error={nameError}>
           <Input required value={name} onChange={(e) => setName(e.target.value)} />
         </FormField>
 

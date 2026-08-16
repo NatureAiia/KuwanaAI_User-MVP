@@ -10,6 +10,7 @@ import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibilit
 import { describeMarketPosition } from "@/lib/attributeDirection";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
+import { BackButton } from "@/components/ui/BackButton";
 import { ListingCoverArt } from "@/components/ListingCoverArt";
 import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
@@ -90,9 +91,12 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
 
-      <p className="mt-4 text-[12px] uppercase tracking-widest text-text-muted">
-        {listing.category.sector.name} · {listing.category.name}
-      </p>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton fallbackHref="/explore" />
+        <p className="text-[12px] uppercase tracking-widest text-text-muted">
+          {listing.category.sector.name} · {listing.category.name}
+        </p>
+      </div>
 
       <div className="mt-4 grid gap-6 md:grid-cols-[1fr_360px] md:items-start md:gap-8">
         {/* Main column */}
@@ -100,7 +104,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
           <div className="relative aspect-[16/9] w-full overflow-hidden rounded-[var(--radius-card)] border border-border sm:aspect-[21/9]">
             {listing.images[0] ? (
               // eslint-disable-next-line @next/next/no-img-element -- provider-uploaded, arbitrary aspect ratios not worth next/image's fixed-size ceremony here
-              <img src={listing.images[0]} alt="" className="h-full w-full object-cover" />
+              <img src={listing.images[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
             ) : (
               <ListingCoverArt seed={listing.id} className="h-full w-full" />
             )}

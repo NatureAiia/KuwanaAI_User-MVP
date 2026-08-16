@@ -8,7 +8,7 @@ import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
 import { recordEvent } from "@/lib/gamification/process-event";
-import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
+import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
 import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
@@ -238,6 +238,12 @@ export async function POST(req: Request) {
           messages: modelMessages,
           maxTokens: 700,
         })) {
+          // Status events (e.g. tier escalation) are forwarded to the client
+          // but must never be persisted as part of the assistant's reply.
+          if (delta.startsWith(STREAM_STATUS_MARKER)) {
+            controller.enqueue(encoder.encode(delta));
+            continue;
+          }
           fullText += delta;
           controller.enqueue(encoder.encode(delta));
         }

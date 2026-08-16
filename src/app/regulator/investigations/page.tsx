@@ -9,6 +9,7 @@ import { FlagForInvestigationButton } from "@/components/regulator/FlagForInvest
 import { InvestigationRowActions } from "@/components/regulator/InvestigationRowActions";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { formatDateTime } from "@/lib/format";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const STATUS_TONE = { open: "coral", in_progress: "sky", resolved: "teal", dismissed: "neutral" } as const;
 const STATUS_LABEL = { open: "Open", in_progress: "In progress", resolved: "Resolved", dismissed: "Dismissed" } as const;
@@ -135,7 +136,16 @@ export default async function RegulatorInvestigationsPage({
               />
             </Card>
           ))}
-          {investigations.length === 0 && <p className="text-[13px] text-text-muted">No cases yet.</p>}
+          {investigations.length === 0 && (
+            <EmptyState
+              title="No cases yet"
+              description={
+                activeSector
+                  ? "No enforcement cases opened in this sector — flag a listing above, or clear the sector filter."
+                  : "No enforcement cases have been opened against any provider yet."
+              }
+            />
+          )}
         </div>
       </section>
     </div>

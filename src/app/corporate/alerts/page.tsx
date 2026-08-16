@@ -5,6 +5,7 @@ import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { Card, Badge } from "@/components/ui/Card";
 import { AlertRuleForm } from "@/components/corporate/AlertRuleForm";
 import { AlertRuleRowActions } from "@/components/corporate/AlertRuleRowActions";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function CorporateAlertsPage() {
   const result = await requireCorporateProvider();
@@ -52,7 +53,13 @@ export default async function CorporateAlertsPage() {
             </div>
           </Card>
         ))}
-        {rules.length === 0 && <p className="text-[13px] text-text-muted">No alerts set up yet.</p>}
+        {rules.length === 0 && (
+          <EmptyState
+            icon={Bell}
+            title="No alerts set up yet"
+            description="Use the form above to get notified when one of your metrics rises above or drops below a threshold you set."
+          />
+        )}
       </div>
     </div>
   );

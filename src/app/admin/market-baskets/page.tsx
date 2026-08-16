@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { MarketBasketItemForm } from "@/components/admin/MarketBasketItemForm";
 import { MarketBasketItemRowActions } from "@/components/admin/MarketBasketItemRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminMarketBasketsPage() {
   const admin = await requireAdmin();
@@ -66,8 +67,12 @@ export default async function AdminMarketBasketsPage() {
                 ))}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-text-muted">
-                      No basket components yet.
+                    <td colSpan={5} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No basket components yet."
+                        description="Add one using the form above to include it in a cost-of-living basket."
+                      />
                     </td>
                   </tr>
                 )}

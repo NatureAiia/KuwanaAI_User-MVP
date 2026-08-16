@@ -1,7 +1,9 @@
+import { FileSpreadsheet } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { BulkPriceUpdateForm } from "@/components/corporate/BulkPriceUpdateForm";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function CorporateDataImportPage() {
   const result = await requireCorporateProvider();
@@ -26,7 +28,13 @@ export default async function CorporateDataImportPage() {
       </div>
 
       {listings.length === 0 && (
-        <p className="mt-4 text-[13px] text-text-muted">You have no published listings to update yet.</p>
+        <EmptyState
+          className="mt-4"
+          icon={FileSpreadsheet}
+          title="Nothing to bulk-update yet"
+          description="This tool updates prices on listings that are already published. Request your first product, then come back here once it's live."
+          action={{ label: "Request a new product", href: "/corporate/products/new" }}
+        />
       )}
     </div>
   );

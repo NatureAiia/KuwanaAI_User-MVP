@@ -31,6 +31,8 @@ export function DiscountRuleForm({
   const [percentOff, setPercentOff] = useState("10");
   const [startsAt, setStartsAt] = useState(todayIsoDate());
   const [endsAt, setEndsAt] = useState("");
+  const [listingError, setListingError] = useState<string | null>(null);
+  const [endsAtError, setEndsAtError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -41,14 +43,18 @@ export function DiscountRuleForm({
 
   async function submit() {
     setError(null);
+    setListingError(null);
+    setEndsAtError(null);
+    let hasError = false;
     if (scope === "listing" && !listingId) {
-      setError("Pick a listing for a listing-scoped discount");
-      return;
+      setListingError("Pick a listing for a listing-scoped discount");
+      hasError = true;
     }
     if (!endsAt) {
-      setError("Pick an end date");
-      return;
+      setEndsAtError("Pick an end date");
+      hasError = true;
     }
+    if (hasError) return;
 
     setSaving(true);
     try {
@@ -143,7 +149,7 @@ export function DiscountRuleForm({
           </select>
         </FormField>
       ) : (
-        <FormField label="Listing">
+        <FormField label="Listing" error={listingError}>
           <select
             value={listingId}
             onChange={(e) => setListingId(e.target.value)}
@@ -174,7 +180,7 @@ export function DiscountRuleForm({
         <FormField label="Starts">
           <Input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
         </FormField>
-        <FormField label="Ends">
+        <FormField label="Ends" error={endsAtError}>
           <Input type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
         </FormField>
       </div>

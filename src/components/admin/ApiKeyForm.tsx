@@ -15,6 +15,9 @@ export function ApiKeyForm({ providers }: { providers: ProviderOption[] }) {
   const [label, setLabel] = useState("");
   const [providerId, setProviderId] = useState("");
   const [scopes, setScopes] = useState<BiScope[]>([]);
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [scopesError, setScopesError] = useState<string | null>(null);
+  const [providerError, setProviderError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
@@ -26,10 +29,20 @@ export function ApiKeyForm({ providers }: { providers: ProviderOption[] }) {
 
   async function submit() {
     setError(null);
-    if (!label.trim()) return setError("Label is required");
-    if (scopes.length === 0) return setError("Pick at least one scope");
+    setLabelError(null);
+    setScopesError(null);
+    setProviderError(null);
+    if (!label.trim()) {
+      setLabelError("API key name is required");
+      return;
+    }
+    if (scopes.length === 0) {
+      setScopesError("Pick at least one scope");
+      return;
+    }
     if (scopes.includes("read:account") && !providerId) {
-      return setError("read:account requires linking this key to a provider");
+      setProviderError("read:account requires linking this key to a provider");
+      return;
     }
 
     setSaving(true);
@@ -98,11 +111,11 @@ export function ApiKeyForm({ providers }: { providers: ProviderOption[] }) {
         Read-only access for external BI tools (Power BI, Tableau, etc.) — see /api/bi/v1/*.
       </p>
 
-      <FormField label="Label">
+      <FormField label="Label" error={labelError}>
         <Input placeholder="e.g. Econet BI dashboard" value={label} onChange={(e) => setLabel(e.target.value)} />
       </FormField>
 
-      <FormField label="Linked provider (optional — leave blank for a platform-wide key)">
+      <FormField label="Linked provider (optional — leave blank for a platform-wide key)" error={providerError}>
         <select
           value={providerId}
           onChange={(e) => setProviderId(e.target.value)}
@@ -117,7 +130,7 @@ export function ApiKeyForm({ providers }: { providers: ProviderOption[] }) {
         </select>
       </FormField>
 
-      <FormField label="Scopes">
+      <FormField label="Scopes" error={scopesError}>
         <div className="mt-1 flex flex-col gap-1.5">
           {BI_SCOPES.map((scope) => (
             <label key={scope} className="flex items-start gap-2 text-[12.5px]">

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Card";
 import { AdvertForm } from "@/components/admin/AdvertForm";
 import { AdvertRowActions } from "@/components/admin/AdvertRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminAdvertsPage() {
   const admin = await requireAdmin();
@@ -57,8 +58,12 @@ export default async function AdminAdvertsPage() {
             ))}
             {adverts.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-text-muted">
-                  No adverts yet.
+                <td colSpan={5} className="p-6">
+                  <EmptyState
+                    variant="inline"
+                    title="No adverts yet."
+                    description="Add one using the form above to rotate it through the explore page's ad slot."
+                  />
                 </td>
               </tr>
             )}

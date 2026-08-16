@@ -225,7 +225,7 @@ export function ScrapedItemReview({
           />
           <div className="flex gap-1.5">
             <Button variant="danger" size="md" onClick={reject} disabled={loading}>
-              Confirm reject
+              {loading ? "Rejecting…" : "Confirm reject"}
             </Button>
             <Button variant="ghost" size="md" onClick={() => setRejecting(false)} disabled={loading}>
               Cancel

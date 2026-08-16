@@ -5,6 +5,7 @@ import { getAdminAlertRulesWithStatus, ADMIN_METRIC_LABEL } from "@/lib/adminAle
 import { Card, Badge } from "@/components/ui/Card";
 import { AdminAlertRuleForm } from "@/components/admin/AdminAlertRuleForm";
 import { AdminAlertRuleRowActions } from "@/components/admin/AdminAlertRuleRowActions";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminAlertsPage() {
   const admin = await requireAdmin();
@@ -51,7 +52,12 @@ export default async function AdminAlertsPage() {
             </div>
           </Card>
         ))}
-        {rules.length === 0 && <p className="text-[13px] text-text-muted">No alerts set up yet.</p>}
+        {rules.length === 0 && (
+          <EmptyState
+            title="No alert rules yet."
+            description="Add one using the form above to get notified when a platform metric crosses a threshold."
+          />
+        )}
       </div>
     </div>
   );

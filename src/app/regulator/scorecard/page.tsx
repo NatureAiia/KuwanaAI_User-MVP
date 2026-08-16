@@ -5,6 +5,7 @@ import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Badge } from "@/components/ui/Card";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function RegulatorScorecardPage({
   searchParams,
@@ -148,8 +149,16 @@ export default async function RegulatorScorecardPage({
                 ))}
                 {scorecards.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-text-muted">
-                      No providers with listings in this view.
+                    <td colSpan={6} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No providers with listings in this view"
+                        description={
+                          activeSector
+                            ? "Try a different sector, or clear the filter to see the full market."
+                            : "No providers currently have published listings."
+                        }
+                      />
                     </td>
                   </tr>
                 )}

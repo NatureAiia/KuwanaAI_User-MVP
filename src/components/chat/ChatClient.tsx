@@ -12,12 +12,17 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { DateDivider } from "@/components/chat/DateDivider";
 import { MessageBubble, type ChatMessage } from "@/components/chat/MessageBubble";
 import { notifyGamification } from "@/lib/gamification/client";
-import { STREAM_META_MARKER, STREAM_ERROR_MARKER } from "@/lib/chatStream";
+import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
 import { takePendingChatImage } from "@/lib/chatHandoff";
 
 const ERROR_REPLY = "Sorry, I couldn't reach the assistant just now. Please try again.";
 // Covers a marker split across two chunk reads at the boundary.
-const SAFETY_MARGIN = Math.max(STREAM_META_MARKER.length, STREAM_ERROR_MARKER.length) - 1;
+const SAFETY_MARGIN =
+  Math.max(STREAM_META_MARKER.length, STREAM_ERROR_MARKER.length, STREAM_STATUS_MARKER.length) - 1;
+
+const STATUS_LABELS: Record<string, string> = {
+  escalating: "Trying a smarter model…",
+};
 
 export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "corporate" } = {}) {
   const hasBottomTabBar = variant === "consumer";
@@ -30,6 +35,7 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hydrating, setHydrating] = useState(true);
   const [sending, setSending] = useState(false);
+  const [thinkingLabel, setThinkingLabel] = useState<string | null>(null);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -107,6 +113,7 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
       },
     ]);
     setSending(true);
+    setThinkingLabel(null);
 
     let assistantId: string | null = null;
     let shown = 0;
@@ -146,6 +153,20 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
       for (;;) {
         const { value, done } = await reader.read();
         if (value) buffer += decoder.decode(value, { stream: true });
+
+        // Status events (e.g. tier escalation) are self-delimited and can
+        // land mid-stream — drain every complete one before anything else.
+        for (;;) {
+          const statusStart = buffer.indexOf(STREAM_STATUS_MARKER, shown);
+          if (statusStart === -1) break;
+          const statusEnd = buffer.indexOf(STREAM_STATUS_MARKER, statusStart + STREAM_STATUS_MARKER.length);
+          if (statusEnd === -1) break; // not fully arrived yet
+          appendDelta(buffer.slice(shown, statusStart));
+          const statusKey = buffer.slice(statusStart + STREAM_STATUS_MARKER.length, statusEnd);
+          setThinkingLabel(STATUS_LABELS[statusKey] ?? null);
+          buffer = buffer.slice(0, statusStart) + buffer.slice(statusEnd + STREAM_STATUS_MARKER.length);
+          shown = statusStart;
+        }
 
         const errIdx = buffer.indexOf(STREAM_ERROR_MARKER);
         const metaIdx = buffer.indexOf(STREAM_META_MARKER);
@@ -190,6 +211,7 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
       });
     } finally {
       setSending(false);
+      setThinkingLabel(null);
     }
   }
 
@@ -229,7 +251,9 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
             );
           })
         )}
-        {sending && !messages.some((m) => m.id.startsWith("stream-")) && <TypingIndicator />}
+        {sending && !messages.some((m) => m.id.startsWith("stream-")) && (
+          <TypingIndicator label={thinkingLabel ?? undefined} />
+        )}
         <div ref={bottomRef} />
       </div>
 

@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
+import { BackButton } from "@/components/ui/BackButton";
 import { Card, Badge } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Receipt } from "lucide-react";
 
 type Currency = "USD" | "ZiG";
 
@@ -139,7 +142,10 @@ export default function WalletPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[24px] font-bold">Wallet</h1>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton />
+        <h1 className="font-display text-[24px] font-bold">Wallet</h1>
+      </div>
       <p className="mt-1 text-[13px] text-text-secondary">Top up via Paynow — card, EcoCash, OneMoney and more.</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
@@ -243,7 +249,14 @@ export default function WalletPage() {
 
       <div className="mt-6 space-y-2.5">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">Recent top-ups</h2>
-        {transactions.length === 0 && <p className="text-[13px] text-text-muted">No top-ups yet.</p>}
+        {transactions.length === 0 && (
+          <EmptyState
+            variant="inline"
+            icon={Receipt}
+            title="No top-ups yet"
+            description="Your wallet top-up history will show up here once you make your first one above."
+          />
+        )}
         <div className="flex flex-col gap-2">
           {transactions.map((tx) => (
             <div

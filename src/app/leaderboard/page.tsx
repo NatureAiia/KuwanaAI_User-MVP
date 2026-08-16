@@ -5,6 +5,7 @@ import { Trophy } from "lucide-react";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/Button";
+import { BackButton } from "@/components/ui/BackButton";
 
 type Entry = { rank: number; nickname: string; totalXp: number; level: number; isYou: boolean };
 
@@ -33,7 +34,10 @@ export default function LeaderboardPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[24px] font-bold">Leaderboard</h1>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton fallbackHref="/profile" />
+        <h1 className="font-display text-[24px] font-bold">Leaderboard</h1>
+      </div>
       <p className="mt-1 text-[13px] text-text-secondary">
         Opt-in only. Shown under a nickname — never your real name.
       </p>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { EconomicDriverForm } from "@/components/admin/EconomicDriverForm";
 import { EconomicDriverRowActions } from "@/components/admin/EconomicDriverRowActions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminEconomicDriversPage() {
   const admin = await requireAdmin();
@@ -60,8 +61,12 @@ export default async function AdminEconomicDriversPage() {
                 ))}
                 {economicDrivers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-text-muted">
-                      No economic driver readings yet.
+                    <td colSpan={7} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No economic driver readings yet."
+                        description="Add one using the form above to surface it as pricing context on the corporate and regulator dashboards."
+                      />
                     </td>
                   </tr>
                 )}

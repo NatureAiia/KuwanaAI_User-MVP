@@ -31,16 +31,17 @@ export function ImageGalleryField({
       const res = await fetch("/api/provider/listings/images", { method: "POST", body });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        const message = typeof data?.error === "string" ? data.error : "Upload failed";
+        const message =
+          typeof data?.error === "string" ? data.error : `Upload failed — server returned ${res.status}`;
         setPending((p) => p.map((t) => (t.file === file ? { file, status: "error", message } : t)));
         return;
       }
       onChange([...images, data.url]);
       setPending((p) => p.filter((t) => t.file !== file));
-    } catch {
-      setPending((p) =>
-        p.map((t) => (t.file === file ? { file, status: "error", message: "Upload failed — check your connection" } : t)),
-      );
+    } catch (err) {
+      const message =
+        err instanceof TypeError ? "Upload failed — check your connection" : "Upload failed — please try again";
+      setPending((p) => p.map((t) => (t.file === file ? { file, status: "error", message } : t)));
     }
   }
 

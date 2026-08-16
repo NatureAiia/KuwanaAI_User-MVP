@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { NotificationInbox } from "@/components/NotificationInbox";
 import { NotificationPreferenceToggle } from "@/components/NotificationPreferenceToggle";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminNotificationsPage() {
   const admin = await requireAdmin();
@@ -42,7 +43,13 @@ export default async function AdminNotificationsPage() {
           read: n.read,
           createdAt: n.createdAt.toISOString(),
         }))}
-        emptyMessage="Nothing due for review right now."
+        emptyMessage={
+          <EmptyState
+            variant="inline"
+            title="Nothing due for review"
+            description="You'll see business conditions here once their review cycle elapses."
+          />
+        }
       />
     </div>
   );

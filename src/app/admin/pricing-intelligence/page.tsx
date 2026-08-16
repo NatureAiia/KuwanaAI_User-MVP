@@ -5,6 +5,7 @@ import { SearchableSection } from "@/components/admin/SearchableSection";
 import { generateSectorNarrative } from "@/lib/pricingIntelligence";
 import { getCombinedPricingView } from "@/lib/combinedPricing";
 import { DownloadPricingIntelligenceReportButton } from "@/components/admin/DownloadReportButton";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminPricingIntelligencePage() {
   const admin = await requireAdmin();
@@ -78,7 +79,14 @@ export default async function AdminPricingIntelligencePage() {
 
       <section className="mt-6">
         <h2 className="font-display text-[14px] font-semibold text-text-secondary">By sector</h2>
-        {bySector.length === 0 && <p className="mt-2 text-[13px] text-text-muted">No live listings yet.</p>}
+        {bySector.length === 0 && (
+          <div className="mt-2">
+            <EmptyState
+              title="No live listings yet."
+              description="Sector comparisons will appear once providers publish listings."
+            />
+          </div>
+        )}
         <div className="mt-2 grid gap-3 sm:grid-cols-2">
           {bySector.map((s) => {
             const narrative = narrativesBySector.get(s.sectorSlug);
@@ -115,7 +123,10 @@ export default async function AdminPricingIntelligencePage() {
           <SearchableSection placeholder="Search outliers…">
             <div className="flex flex-col gap-2">
               {outliers.length === 0 && (
-                <p className="text-[13px] text-text-muted">No outlier pricing detected right now.</p>
+                <EmptyState
+                  title="No outlier pricing detected right now."
+                  description="Every published listing's price is within 2 standard deviations of its category peers."
+                />
               )}
               {outliers.map((o) => (
                 <div

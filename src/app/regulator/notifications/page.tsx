@@ -4,6 +4,7 @@ import { requireRegulatorUser } from "@/lib/regulatorAuth";
 import { getPriceCapRulesWithBreaches, syncPriceCapNotifications } from "@/lib/priceCapAlerts";
 import { NotificationInbox } from "@/components/NotificationInbox";
 import { NotificationPreferenceToggle } from "@/components/NotificationPreferenceToggle";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function RegulatorNotificationsPage() {
   const user = await requireRegulatorUser();
@@ -38,7 +39,13 @@ export default async function RegulatorNotificationsPage() {
           read: n.read,
           createdAt: n.createdAt.toISOString(),
         }))}
-        emptyMessage="No price cap breaches yet."
+        emptyMessage={
+          <EmptyState
+            variant="inline"
+            title="No price cap breaches"
+            description="You'll be notified here when a published listing crosses one of your price caps."
+          />
+        }
       />
     </div>
   );

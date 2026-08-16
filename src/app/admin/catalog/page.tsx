@@ -9,6 +9,7 @@ import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
 import { CorporateDomainLink } from "@/components/admin/CorporateDomainLink";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const STATUS_TONE = {
   draft: "neutral",
@@ -45,6 +46,13 @@ export default async function AdminCatalogPage({
     }),
     prisma.provider.findMany({ orderBy: { name: "asc" }, include: { owner: { select: { email: true } } } }),
   ]);
+
+  const listingsEmptyTitle = activeStatus
+    ? `No ${activeStatus.replace("_", " ")} listings.`
+    : "No listings yet.";
+  const listingsEmptyDescription = activeStatus
+    ? "Try a different filter, or check back after providers submit more listings."
+    : "Add one using the form above, or wait for a provider to submit one.";
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-8 md:px-10">
@@ -132,8 +140,13 @@ export default async function AdminCatalogPage({
             ))}
             {listings.length === 0 && (
               <tr>
-                <td colSpan={7} className="p-6 text-center text-text-muted">
-                  No listings yet.
+                <td colSpan={7} className="p-6">
+                  <EmptyState
+                    variant="inline"
+                    title={listingsEmptyTitle}
+                    description={listingsEmptyDescription}
+                    action={activeStatus ? { label: "Clear filter", href: "/admin/catalog" } : undefined}
+                  />
                 </td>
               </tr>
             )}
@@ -180,8 +193,12 @@ export default async function AdminCatalogPage({
               ))}
               {providers.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-6 text-center text-text-muted">
-                    No providers yet.
+                  <td colSpan={4} className="p-6">
+                    <EmptyState
+                      variant="inline"
+                      title="No providers yet."
+                      description="Add one using the form above to onboard a provider."
+                    />
                   </td>
                 </tr>
               )}

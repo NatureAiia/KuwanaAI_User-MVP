@@ -5,6 +5,7 @@ import { getPriceCapRulesWithBreaches, syncPriceCapNotifications } from "@/lib/p
 import { Card, Badge } from "@/components/ui/Card";
 import { PriceCapRuleForm } from "@/components/regulator/PriceCapRuleForm";
 import { PriceCapRuleRowActions } from "@/components/regulator/PriceCapRuleRowActions";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function RegulatorAlertsPage() {
   await requireRegulatorUser();
@@ -65,7 +66,12 @@ export default async function RegulatorAlertsPage() {
             </div>
           </Card>
         ))}
-        {rules.length === 0 && <p className="text-[13px] text-text-muted">No price caps set up yet.</p>}
+        {rules.length === 0 && (
+          <EmptyState
+            title="No price caps set up yet"
+            description="Add a gazetted price cap above to start flagging listings priced over the ceiling."
+          />
+        )}
       </div>
     </div>
   );

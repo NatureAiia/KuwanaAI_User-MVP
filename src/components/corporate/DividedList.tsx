@@ -20,7 +20,7 @@ export function DividedList<T>({
   keyFor: (item: T, index: number) => string;
   renderItem: (item: T, index: number) => ReactNode;
   itemClassName?: string;
-  emptyMessage?: string;
+  emptyMessage?: ReactNode;
   className?: string;
 }) {
   return (
@@ -34,7 +34,7 @@ export function DividedList<T>({
         </div>
       ))}
       {items.length === 0 && emptyMessage && (
-        <p className="bg-bg-surface p-6 text-center text-[13px] text-text-muted">{emptyMessage}</p>
+        <div className="bg-bg-surface p-6 text-center text-[13px] text-text-muted">{emptyMessage}</div>
       )}
     </div>
   );

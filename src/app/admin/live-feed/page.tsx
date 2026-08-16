@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/auth";
 import { getRecentListingActivityGlobal, type GlobalListingActivityEntry } from "@/lib/liveFeed";
 import { LiveFeedRefresher } from "@/components/corporate/LiveFeedRefresher";
 import { DividedList } from "@/components/corporate/DividedList";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/format";
 
 const SOURCE_ICON: Record<GlobalListingActivityEntry["source"], LucideIcon> = {
@@ -44,7 +45,14 @@ export default async function AdminLiveFeedPage() {
         items={activity}
         keyFor={(entry) => entry.id}
         itemClassName="flex items-start gap-2.5"
-        emptyMessage="No listing activity yet."
+        emptyMessage={
+          <EmptyState
+            variant="inline"
+            icon={Activity}
+            title="No listing activity yet"
+            description="Listing creates, edits, and price changes from every provider, scraper run, and admin action will appear here as they happen."
+          />
+        }
         renderItem={(entry) => {
           const Icon = SOURCE_ICON[entry.source];
           return (

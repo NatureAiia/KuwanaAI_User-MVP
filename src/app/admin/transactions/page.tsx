@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/Card";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const STATUS_TONE: Record<string, "neutral" | "sky" | "teal" | "coral"> = {
   initiated: "sky",
@@ -63,8 +64,12 @@ export default async function AdminTransactionsPage() {
                 ))}
                 {transactions.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-text-muted">
-                      No transactions yet.
+                    <td colSpan={6} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No transactions yet."
+                        description="Wallet top-up attempts will appear here once someone tops up via Paynow."
+                      />
                     </td>
                   </tr>
                 )}

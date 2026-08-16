@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { Badge } from "@/components/ui/Card";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const ACTION_TONE: Record<string, "neutral" | "sky" | "teal" | "coral"> = {
   listing_approved: "teal",
@@ -30,7 +31,12 @@ export default async function AdminAuditPage() {
       <div className="mt-5">
       <SearchableSection placeholder="Search audit log…">
       <div className="flex flex-col gap-2">
-        {entries.length === 0 && <p className="text-[13px] text-text-muted">No admin actions recorded yet.</p>}
+        {entries.length === 0 && (
+          <EmptyState
+            title="No admin actions recorded yet."
+            description="Tracking started 2026-08-05 — approvals, rejections, provider links, and role changes will appear here as they happen."
+          />
+        )}
         {entries.map((entry) => (
           <div
             key={entry.id}

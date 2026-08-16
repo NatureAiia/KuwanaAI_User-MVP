@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Search, ShieldQuestion } from "lucide-react";
 import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { getProviderFeeComparison } from "@/lib/pricingIntelligence";
 import { getInvestigationsForProvider, getActivelyInvestigatedListingIds } from "@/lib/investigations";
@@ -6,6 +6,7 @@ import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { Card, Badge } from "@/components/ui/Card";
 import { FlagForInvestigationButton } from "@/components/corporate/FlagForInvestigationButton";
 import { InvestigationRowActions } from "@/components/corporate/InvestigationRowActions";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/format";
 
 const STATUS_TONE = { open: "coral", in_progress: "sky", resolved: "teal", dismissed: "neutral" } as const;
@@ -76,7 +77,15 @@ export default async function CorporateInvestigationsPage() {
             </Card>
           ))}
           {investigations.length === 0 && (
-            <p className="text-[13px] text-text-muted">No investigations yet.</p>
+            <EmptyState
+              icon={ShieldQuestion}
+              title="No investigations yet"
+              description={
+                unflaggedOutliers.length > 0
+                  ? "Flag a listing from “Worth a look” above to start tracking it here through resolution."
+                  : "Flag a pricing issue on any of your listings from here, and it's tracked through resolution."
+              }
+            />
           )}
         </div>
       </section>

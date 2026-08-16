@@ -14,25 +14,28 @@ export function AdvertForm() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   async function handleFile(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
     setUploading(true);
-    setError(null);
+    setUploadError(null);
     try {
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/admin/adverts/images", { method: "POST", body });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Upload failed");
+        setUploadError(
+          typeof data?.error === "string" ? data.error : `Upload failed — server returned ${res.status}`,
+        );
         return;
       }
       setImageUrl(data.url);
     } catch {
-      setError("Upload failed — check your connection");
+      setUploadError("Upload failed — check your connection");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -41,11 +44,11 @@ export function AdvertForm() {
 
   async function submit() {
     if (!imageUrl) {
-      setError("Upload an image first");
+      setUploadError("Upload an image before creating this advert");
       return;
     }
     setSaving(true);
-    setError(null);
+    setFormError(null);
     try {
       const res = await fetch("/api/admin/adverts", {
         method: "POST",
@@ -54,7 +57,9 @@ export function AdvertForm() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(typeof data?.error === "string" ? data.error : "Could not create advert");
+        setFormError(
+          typeof data?.error === "string" ? data.error : `Could not create advert — server returned ${res.status}`,
+        );
         return;
       }
       setSponsorName("");
@@ -113,8 +118,9 @@ export function AdvertForm() {
           />
         </div>
       </div>
+      {uploadError && <p className="mt-2 text-[12px] text-accent-coral">{uploadError}</p>}
 
-      {error && <p className="mt-2 text-[12px] text-accent-coral">{error}</p>}
+      {formError && <p className="mt-2 text-[12px] text-accent-coral">{formError}</p>}
 
       <Button
         size="md"

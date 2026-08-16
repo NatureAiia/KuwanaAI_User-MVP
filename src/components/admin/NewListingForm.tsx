@@ -55,7 +55,7 @@ export function NewListingForm({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        setError(data?.error ? JSON.stringify(data.error) : "Failed to create listing");
+        setError(data?.error ? JSON.stringify(data.error) : `Failed to create listing — server returned ${res.status}`);
         return;
       }
       setName("");

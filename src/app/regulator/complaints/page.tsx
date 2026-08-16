@@ -3,6 +3,7 @@ import { getComplaintQueue } from "@/lib/complaints";
 import { Card, Badge } from "@/components/ui/Card";
 import { ComplaintRowActions } from "@/components/regulator/ComplaintRowActions";
 import { formatDateTime } from "@/lib/format";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const STATUS_TONE = { open: "coral", reviewing: "sky", resolved: "teal", dismissed: "neutral" } as const;
 const STATUS_LABEL = { open: "Open", reviewing: "Reviewing", resolved: "Resolved", dismissed: "Dismissed" } as const;
@@ -43,7 +44,12 @@ export default async function RegulatorComplaintsPage() {
             />
           </Card>
         ))}
-        {complaints.length === 0 && <p className="text-[13px] text-text-muted">No complaints reported yet.</p>}
+        {complaints.length === 0 && (
+          <EmptyState
+            title="No complaints reported yet"
+            description="Consumer-submitted price/service complaints will show up here as a queue to review."
+          />
+        )}
       </div>
     </div>
   );

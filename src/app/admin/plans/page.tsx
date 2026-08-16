@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ensureAllSubscriptions } from "@/lib/subscriptions";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { Badge } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 function formatPrice(priceCents: number, currency: string) {
   return `${currency} ${(priceCents / 100).toFixed(2)}`;
@@ -97,8 +98,12 @@ export default async function AdminPlansPage() {
                 ))}
                 {subscriptions.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-6 text-center text-text-muted">
-                      No subscriptions yet.
+                    <td colSpan={6} className="p-6">
+                      <EmptyState
+                        variant="inline"
+                        title="No subscriptions yet."
+                        description="Every account gets one automatically based on its role, the next time it loads a page."
+                      />
                     </td>
                   </tr>
                 )}

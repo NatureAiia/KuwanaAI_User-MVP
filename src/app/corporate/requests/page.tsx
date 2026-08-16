@@ -1,3 +1,4 @@
+import { FileEdit } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireCorporateProvider } from "@/lib/corporateAuth";
 import { Card } from "@/components/ui/Card";
@@ -5,6 +6,7 @@ import { CorporateTag } from "@/components/corporate/CorporateTag";
 import { NotLinkedCard } from "@/components/corporate/NotLinkedCard";
 import { SlaBadge } from "@/components/corporate/SlaBadge";
 import { DownloadRequestPdfButton } from "@/components/corporate/DownloadRequestPdfButton";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDateTime } from "@/lib/format";
 
 const STATUS_TONE = {
@@ -78,7 +80,12 @@ export default async function CorporateRequestsPage() {
           );
         })}
         {requests.length === 0 && (
-          <p className="text-[13px] text-text-muted">No requests yet.</p>
+          <EmptyState
+            icon={FileEdit}
+            title="No requests yet"
+            description="Edits and new-product submissions you send from My Products show up here, along with their review status."
+            action={{ label: "Request a new product", href: "/corporate/products/new" }}
+          />
         )}
       </div>
     </div>

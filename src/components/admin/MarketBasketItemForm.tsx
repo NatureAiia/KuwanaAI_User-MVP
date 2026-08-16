@@ -20,15 +20,31 @@ export function MarketBasketItemForm({
   const [label, setLabel] = useState("");
   const [listingId, setListingId] = useState("");
   const [weight, setWeight] = useState("1");
+  const [basketNameError, setBasketNameError] = useState<string | null>(null);
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [listingError, setListingError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     setError(null);
-    if (!basketName.trim() || !label.trim() || !listingId) {
-      setError("Basket name, label, and a listing are all required");
-      return;
+    setBasketNameError(null);
+    setLabelError(null);
+    setListingError(null);
+    let hasError = false;
+    if (!basketName.trim()) {
+      setBasketNameError("Basket name is required");
+      hasError = true;
     }
+    if (!label.trim()) {
+      setLabelError("Component label is required");
+      hasError = true;
+    }
+    if (!listingId) {
+      setListingError("Pick a listing");
+      hasError = true;
+    }
+    if (hasError) return;
 
     setSaving(true);
     try {
@@ -64,7 +80,7 @@ export function MarketBasketItemForm({
         a new basket. Tracked over time on /regulator/price-index.
       </p>
 
-      <FormField label="Basket name">
+      <FormField label="Basket name" error={basketNameError}>
         <Input
           list="existing-basket-names"
           placeholder="e.g. Consumer Price Basket"
@@ -78,11 +94,11 @@ export function MarketBasketItemForm({
         </datalist>
       </FormField>
 
-      <FormField label="Component label">
+      <FormField label="Component label" error={labelError}>
         <Input placeholder="e.g. 10kg mealie-meal" value={label} onChange={(e) => setLabel(e.target.value)} />
       </FormField>
 
-      <FormField label="Listing">
+      <FormField label="Listing" error={listingError}>
         <select
           value={listingId}
           onChange={(e) => setListingId(e.target.value)}

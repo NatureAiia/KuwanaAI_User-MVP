@@ -5,6 +5,7 @@ import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { FormattedPrice } from "@/components/FormattedPrice";
+import { BackButton } from "@/components/ui/BackButton";
 import { SECTORS } from "@/lib/sectors";
 
 export default async function SavedPage() {
@@ -28,7 +29,10 @@ export default async function SavedPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
-      <h1 className="mt-4 font-display text-[24px] font-bold">Shopping List</h1>
+      <div className="mt-4 flex items-center gap-2">
+        <BackButton fallbackHref="/profile" />
+        <h1 className="font-display text-[24px] font-bold">Shopping List</h1>
+      </div>
       <p className="mt-1 text-[13px] text-text-secondary">
         Everything you&apos;ve saved — product, brand and price, in one place.
       </p>

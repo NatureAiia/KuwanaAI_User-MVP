@@ -5,6 +5,7 @@ import { UserRoleSelect } from "@/components/admin/UserRoleSelect";
 import { UserStatusToggle } from "@/components/admin/UserStatusToggle";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { Badge } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function AdminUsersPage() {
   const admin = await requireAdmin();
@@ -73,8 +74,8 @@ export default async function AdminUsersPage() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-6 text-center text-text-muted">
-                  No users yet.
+                <td colSpan={4} className="p-6">
+                  <EmptyState variant="inline" title="No users yet." />
                 </td>
               </tr>
             )}

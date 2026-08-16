@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { FieldError } from "@/components/ui/FieldError";
 
 const fieldClasses =
   "tap-target mt-1 w-full rounded-lg border border-border bg-bg-surface p-2.5 text-[13.5px] outline-none focus:border-accent-sky";
@@ -17,11 +18,20 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   },
 );
 
-export function FormField({ label, children }: { label: string; children: ReactNode }) {
+export function FormField({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string | null;
+  children: ReactNode;
+}) {
   return (
     <label className="block">
       <span className="text-[12.5px] font-medium text-text-secondary">{label}</span>
       {children}
+      <FieldError error={error} />
     </label>
   );
 }

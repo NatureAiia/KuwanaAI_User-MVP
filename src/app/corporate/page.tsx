@@ -13,6 +13,7 @@ import { ensureSentimentComputed, getSentimentSummary } from "@/lib/sentiment";
 import { emailDomain } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ExportCsvButton } from "@/components/ExportCsvButton";
 import { CorporateTag } from "@/components/corporate/CorporateTag";
 import { CorporateStatCard } from "@/components/corporate/CorporateStatCard";
@@ -441,7 +442,14 @@ export default async function CorporateDashboardPage({
               </Card>
             );
           })}
-          {bySector.length === 0 && <p className="text-[13px] text-text-muted">No live listings in this sector yet.</p>}
+          {bySector.length === 0 && (
+            <EmptyState
+              icon={Building2}
+              title="No live listings in this sector yet"
+              description="Rollups appear here once at least one provider has a published listing in view."
+              action={activeSector ? { label: "View all sectors", href: "/corporate?sector=all" } : undefined}
+            />
+          )}
         </div>
       </section>
     </div>

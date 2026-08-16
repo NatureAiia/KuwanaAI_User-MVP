@@ -18,15 +18,25 @@ export function EconomicDriverForm() {
   const [previousValue, setPreviousValue] = useState("");
   const [period, setPeriod] = useState(currentPeriod());
   const [currencyCode, setCurrencyCode] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [valueError, setValueError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
     setError(null);
-    if (!name.trim() || !value.trim()) {
-      setError("Name and value are required");
-      return;
+    setNameError(null);
+    setValueError(null);
+    let hasError = false;
+    if (!name.trim()) {
+      setNameError("Name is required");
+      hasError = true;
     }
+    if (!value.trim()) {
+      setValueError("Value is required");
+      hasError = true;
+    }
+    if (hasError) return;
 
     setSaving(true);
     try {
@@ -63,7 +73,7 @@ export function EconomicDriverForm() {
         updates that month&apos;s reading instead of duplicating it.
       </p>
 
-      <FormField label="Name">
+      <FormField label="Name" error={nameError}>
         <Input
           placeholder="e.g. USD_ZIG_RATE, inflation_rate"
           value={name}
@@ -84,7 +94,7 @@ export function EconomicDriverForm() {
       </div>
 
       <div className="flex gap-2">
-        <FormField label="Value">
+        <FormField label="Value" error={valueError}>
           <Input type="number" step="0.0001" value={value} onChange={(e) => setValue(e.target.value)} />
         </FormField>
         <FormField label="Previous value (optional)">

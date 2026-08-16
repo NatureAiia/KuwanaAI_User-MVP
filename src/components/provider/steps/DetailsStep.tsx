@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { clsx } from "clsx";
 import { CURRENCIES, type CurrencyCode } from "@/lib/currency";
 import { ImageGalleryField } from "@/components/provider/ImageGalleryField";
 import { Button } from "@/components/ui/Button";
+import { FieldError } from "@/components/ui/FieldError";
 
 export function DetailsStep({
   name,
@@ -32,7 +34,13 @@ export function DetailsStep({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const canContinue = name.trim().length > 0 && Number(price) > 0;
+  const [nameTouched, setNameTouched] = useState(false);
+  const [priceTouched, setPriceTouched] = useState(false);
+  const nameValid = name.trim().length > 0;
+  const priceValid = Number(price) > 0;
+  const canContinue = nameValid && priceValid;
+  const nameError = nameTouched && !nameValid ? "Enter a name for this listing" : null;
+  const priceError = priceTouched && !priceValid ? "Enter a price greater than 0" : null;
 
   return (
     <div>
@@ -42,9 +50,11 @@ export function DetailsStep({
       <input
         value={name}
         onChange={(e) => onNameChange(e.target.value)}
+        onBlur={() => setNameTouched(true)}
         placeholder="e.g. Prepaid Data Bundle — 5GB"
         className="tap-target mt-1.5 w-full rounded-xl border border-border bg-bg-surface-raised px-4 py-3 text-[14px] outline-none focus:border-accent-sky"
       />
+      <FieldError error={nameError} />
 
       <label className="mt-4 block text-[12.5px] font-medium text-text-secondary">
         Description <span className="font-normal text-text-muted">(optional)</span>
@@ -64,6 +74,7 @@ export function DetailsStep({
           inputMode="decimal"
           value={price}
           onChange={(e) => onPriceChange(e.target.value.replace(/[^0-9.]/g, ""))}
+          onBlur={() => setPriceTouched(true)}
           placeholder="0.00"
           className="tap-target w-28 rounded-xl border border-border bg-bg-surface-raised px-3 py-3 text-center font-mono text-[16px] outline-none focus:border-accent-sky"
         />
@@ -85,6 +96,7 @@ export function DetailsStep({
           ))}
         </div>
       </div>
+      <FieldError error={priceError} />
 
       <label className="mt-5 block text-[12.5px] font-medium text-text-secondary">Photos</label>
       <div className="mt-1.5">
