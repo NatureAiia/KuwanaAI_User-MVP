@@ -26,13 +26,16 @@ import { findModel, type AiFeature, type ModelSpec } from "./models";
  * wrong-but-fast answer is worse than a slow one.
  */
 export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
-  // Chat streams to a waiting user and can carry an image, so the starting
-  // rung must be vision-capable — the self-hosted model is both that and
-  // free, so it leads. The OpenRouter free tier is next in case Ollama is
-  // unreachable, then paid Claude for anything that needs real capability.
-  chat: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
+  // The self-hosted Llama rung would normally lead here (free, no
+  // shared-queue latency, vision-capable) but is left out of every ladder
+  // below until LLAMA_VISION_MODEL is actually pulled into the local Ollama
+  // install — until then it 404s on every single call, adding 10-30s of dead
+  // latency before falling through to a rung that can actually answer. Add
+  // "llama-3.2-vision" back to the front of these once `ollama pull
+  // llama3.2-vision` has been run; it stays in the catalog so /admin/llm can
+  // still select it manually in the meantime.
+  chat: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
   recommendations: [
-    "llama-3.2-vision",
     "nvidia/nemotron-3-super-120b-a12b:free",
     "claude-haiku-4-5",
     "claude-sonnet-5",
@@ -40,19 +43,19 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // Intake is a closed-list classifier — the cheapest rung handles nearly all
   // of it, and a wrong answer degrades to "no confident match" rather than
   // showing a user something false.
-  intake: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  intake: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
   // Every extraction lands in an admin review queue before it touches a
   // listing, so a wrong answer costs a reviewer a click rather than showing a
   // user something false — the cheap rung is the right default here too.
-  scrape_extract: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  scrape_extract: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
   // A narrative explaining outliers the heuristic already found — never the
   // decision itself, so a weak-but-free rung is the right default; escalation
   // only kicks in if that rung actually fails to produce usable prose.
-  pricing_intelligence_narrative: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  pricing_intelligence_narrative: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
   // A closed 3-way classification of a short social post — the cheapest rung
   // handles this the same way it handles `intake`, and a wrong label costs
   // nothing worse than a mis-colored badge in an admin triage queue.
-  sentiment_analysis: ["llama-3.2-vision", "nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  sentiment_analysis: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */
