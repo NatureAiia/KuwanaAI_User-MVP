@@ -1,5 +1,5 @@
 import { clsx } from "clsx";
-import { Clock, Sparkles } from "lucide-react";
+import { Clock } from "lucide-react";
 import Markdown from "react-markdown";
 import { ChatListingPreview } from "@/components/chat/ChatListingPreview";
 
@@ -49,21 +49,15 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div>
       <div className={clsx("flex items-end gap-1.5", isUser ? "justify-end" : "justify-start")}>
-        {!isUser && (
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
-            <Sparkles size={12} />
+        {isUser ? (
+          <div className="max-w-[78%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-sky px-3.5 py-2.5 text-[13.5px] leading-[1.5] text-[var(--text-on-accent-sky)]">
+            {message.content}
+          </div>
+        ) : (
+          <div className="w-full text-[13.5px] leading-[1.6] text-text-primary">
+            <Markdown components={MARKDOWN_COMPONENTS}>{message.content}</Markdown>
           </div>
         )}
-        <div
-          className={clsx(
-            "max-w-[78%] rounded-2xl px-3.5 py-2.5 text-[13.5px] leading-[1.5]",
-            isUser
-              ? "whitespace-pre-wrap rounded-br-md bg-accent-sky text-[var(--text-on-accent-sky)]"
-              : "rounded-bl-md border border-border bg-bg-surface-raised text-text-primary",
-          )}
-        >
-          {isUser ? message.content : <Markdown components={MARKDOWN_COMPONENTS}>{message.content}</Markdown>}
-        </div>
         {isUser && message.status === "sending" && (
           <Clock size={12} className="mb-1 shrink-0 text-text-muted" aria-label="Sending" />
         )}

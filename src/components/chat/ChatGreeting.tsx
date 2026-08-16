@@ -1,4 +1,4 @@
-import { Bot, Compass, HelpCircle, TrendingDown, TrendingUp, Radar, ShieldAlert } from "lucide-react";
+import { Compass, HelpCircle, TrendingDown, TrendingUp, Radar, ShieldAlert } from "lucide-react";
 
 const CONSUMER_PROMPTS = [
   { label: "Compare data bundles", icon: Compass },
@@ -22,28 +22,22 @@ export function ChatGreeting({
   variant?: "consumer" | "corporate";
 }) {
   const prompts = variant === "corporate" ? CORPORATE_PROMPTS : CONSUMER_PROMPTS;
+  const heading =
+    variant === "corporate" ? "What can I help with in your catalog today?" : "What are you comparing today?";
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-sky/15 text-accent-sky">
-        <Bot size={26} />
-      </div>
-      <p className="mt-4 font-display text-[17px] font-bold">Hey there!</p>
-      <p className="mt-1 max-w-[280px] text-[13px] text-text-secondary">
-        {variant === "corporate"
-          ? "I'm the Kuwana Business Assistant. Ask me about your catalog, alerts, or investigations."
-          : "I'm the Kuwana Assistant. Ask me about providers, comparisons, or how to get the best value."}
-      </p>
+      <p className="font-display text-[26px] font-bold">{heading}</p>
 
-      <div className="mt-6 grid w-full grid-cols-2 gap-2.5">
+      <div className="mt-8 flex w-full max-w-[360px] flex-col">
         {prompts.map(({ label, icon: Icon }) => (
           <button
             key={label}
             type="button"
             onClick={() => onPick(label)}
-            className="tap-target flex items-center gap-2 rounded-xl border border-border bg-bg-surface p-3 text-left text-[12.5px] font-medium text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
+            className="tap-target flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium text-text-secondary hover:bg-bg-surface-raised hover:text-text-primary"
           >
-            <Icon size={15} className="shrink-0 text-accent-teal" />
+            <Icon size={16} className="shrink-0 text-text-muted" />
             {label}
           </button>
         ))}

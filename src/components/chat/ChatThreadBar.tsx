@@ -34,10 +34,10 @@ export function ChatThreadBar({
         type="button"
         onClick={onNewChat}
         className={clsx(
-          "tap-target flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-[12px] font-medium",
+          "tap-target flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-medium",
           activeId === null
-            ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
-            : "border-border text-text-secondary hover:bg-bg-surface-raised",
+            ? "bg-accent-sky/15 text-accent-sky"
+            : "text-text-secondary hover:bg-bg-surface-raised",
         )}
       >
         <Plus size={13} />
@@ -50,10 +50,10 @@ export function ChatThreadBar({
           onClick={() => onSelect(thread.id)}
           title={thread.preview}
           className={clsx(
-            "tap-target max-w-[180px] shrink-0 truncate rounded-full border px-3 py-1.5 text-[12px] font-medium",
+            "tap-target max-w-[180px] shrink-0 truncate rounded-full px-3 py-1.5 text-[12px] font-medium",
             activeId === thread.id
-              ? "border-accent-sky bg-accent-sky/15 text-accent-sky"
-              : "border-border text-text-secondary hover:bg-bg-surface-raised",
+              ? "bg-accent-sky/15 text-accent-sky"
+              : "text-text-secondary hover:bg-bg-surface-raised",
           )}
         >
           {thread.preview}

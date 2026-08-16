@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { clsx } from "clsx";
 import { Link2 } from "lucide-react";
-import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatGreeting } from "@/components/chat/ChatGreeting";
 import { ChatComposer, type ComposerImage } from "@/components/chat/ChatComposer";
 import { ChatThreadBar, type ChatThread } from "@/components/chat/ChatThreadBar";
@@ -31,6 +30,13 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
     const raw = searchParams.get("listingIds");
     return raw ? raw.split(",").filter(Boolean) : [];
   });
+  // Carried over from the compare page's "Ask in chat" link so the assistant
+  // reasons about the same budget/constraints the AI recommendation used.
+  const [activeBudgetFlexibility] = useState<string | null>(() => searchParams.get("budgetFlexibility"));
+  const [activeConstraints] = useState<string[]>(() => {
+    const raw = searchParams.get("constraints");
+    return raw ? raw.split(",").filter(Boolean) : [];
+  });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hydrating, setHydrating] = useState(true);
@@ -39,6 +45,34 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Tracks the sticky top bar's actual height (it varies — the thread pill
+  // row and listing banner are both conditional) so the sticky date divider
+  // below it knows exactly where to stop instead of overlapping.
+  const topBarRef = useRef<HTMLDivElement>(null);
+  const [dividerTop, setDividerTop] = useState(64);
+
+  useLayoutEffect(() => {
+    const el = topBarRef.current;
+    if (!el) return;
+    const update = () => setDividerTop(64 + el.getBoundingClientRect().height);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const groups = useMemo(() => {
+    const out: { key: string; date: Date | null; messages: ChatMessage[] }[] = [];
+    for (const m of messages) {
+      const day = m.createdAt ? new Date(m.createdAt) : null;
+      const last = out[out.length - 1];
+      const sameDay = last?.date && day && last.date.toDateString() === day.toDateString();
+      if (last && (!day || sameDay)) last.messages.push(m);
+      else out.push({ key: m.id, date: day, messages: [m] });
+    }
+    return out;
+  }, [messages]);
 
   function loadThreads() {
     fetch("/api/chat/threads")
@@ -140,6 +174,8 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
         body: JSON.stringify({
           content,
           listingIds: activeListingIds.length > 0 ? activeListingIds : undefined,
+          budgetFlexibility: activeBudgetFlexibility ?? undefined,
+          constraints: activeConstraints.length > 0 ? activeConstraints : undefined,
           conversationId: activeConversationId ?? undefined,
           image,
         }),
@@ -217,39 +253,38 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
 
   return (
     <div className={clsx("flex flex-1 flex-col", hasBottomTabBar ? "pb-40 md:pb-28" : "pb-28")}>
-      <ChatHeader />
+      <div ref={topBarRef} className="sticky top-16 z-30 bg-bg-base/95 pb-3 backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-2xl">
+          <ChatThreadBar
+            threads={threads}
+            activeId={activeConversationId}
+            onSelect={switchThread}
+            onNewChat={() => switchThread(null)}
+          />
 
-      <ChatThreadBar
-        threads={threads}
-        activeId={activeConversationId}
-        onSelect={switchThread}
-        onNewChat={() => switchThread(null)}
-      />
-
-      {activeListingIds.length > 0 && (
-        <div className="mt-3 flex items-center gap-1.5 rounded-xl border border-accent-sky/30 bg-accent-sky/5 px-3 py-2 text-[11.5px] font-medium text-accent-sky">
-          <Link2 size={13} />
-          Discussing {activeListingIds.length} listing{activeListingIds.length > 1 ? "s" : ""} from your comparison
+          {activeListingIds.length > 0 && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-xl bg-accent-sky/10 px-3 py-2 text-[11.5px] font-medium text-accent-sky">
+              <Link2 size={13} />
+              Discussing {activeListingIds.length} listing{activeListingIds.length > 1 ? "s" : ""} from your comparison
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      <div className="mt-4 flex flex-1 flex-col gap-3">
+      <div className="mx-auto mt-4 flex w-full max-w-2xl flex-1 flex-col gap-3">
         {hydrating ? (
           <p className="py-10 text-center text-[13px] text-text-muted">Loading conversation…</p>
         ) : messages.length === 0 ? (
           <ChatGreeting onPick={sendMessage} variant={variant} />
         ) : (
-          messages.map((m, i) => {
-            const prev = messages[i - 1];
-            const showDivider =
-              !prev || (m.createdAt && prev.createdAt && new Date(m.createdAt).toDateString() !== new Date(prev.createdAt).toDateString());
-            return (
-              <div key={m.id}>
-                {showDivider && m.createdAt && <DateDivider date={new Date(m.createdAt)} />}
-                <MessageBubble message={m} />
-              </div>
-            );
-          })
+          groups.map((group) => (
+            <div key={group.key} className="flex flex-col gap-3">
+              {group.date && <DateDivider date={group.date} stickyTop={dividerTop} />}
+              {group.messages.map((m) => (
+                <MessageBubble key={m.id} message={m} />
+              ))}
+            </div>
+          ))
         )}
         {sending && !messages.some((m) => m.id.startsWith("stream-")) && (
           <TypingIndicator label={thinkingLabel ?? undefined} />
@@ -263,7 +298,7 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
           hasBottomTabBar ? "bottom-16" : "bottom-0",
         )}
       >
-        <div className="mx-auto w-4/5">
+        <div className="mx-auto w-full max-w-2xl">
           <ChatComposer onSend={sendMessage} disabled={sending || hydrating} />
         </div>
       </div>

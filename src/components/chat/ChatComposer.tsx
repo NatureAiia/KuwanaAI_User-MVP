@@ -65,7 +65,7 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="flex items-center gap-1 rounded-full border border-border bg-bg-surface-raised px-2 py-1.5">
+      <div className="flex items-center gap-1.5 rounded-full bg-bg-surface-raised px-3 py-2 shadow-[0_6px_20px_-10px_rgba(2,6,23,0.4)]">
         <input
           ref={fileInputRef}
           type="file"

@@ -63,6 +63,8 @@ const IMAGE_MEDIA_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 const postSchema = z.object({
   content: z.string().trim().max(2000),
   listingIds: z.array(z.string()).max(6).optional(),
+  budgetFlexibility: z.enum(["low", "medium", "high"]).optional(),
+  constraints: z.array(z.string().trim().min(1).max(80)).max(3).optional(),
   conversationId: z.string().uuid().optional(),
   image: z
     .object({
@@ -136,7 +138,7 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { content, listingIds, image, conversationId } = parsed.data;
+  const { content, listingIds, budgetFlexibility, constraints, image, conversationId } = parsed.data;
   if (!content && !image) {
     return NextResponse.json({ error: "Message cannot be empty" }, { status: 400 });
   }
@@ -220,6 +222,17 @@ export async function POST(req: Request) {
       }));
       system += `\n\nGrounding data for the listing(s) the user is asking about — only reference numbers from here, never invent any:\n${JSON.stringify(grounding, null, 2)}`;
     }
+  }
+
+  if (budgetFlexibility || (constraints && constraints.length > 0)) {
+    const parts: string[] = [];
+    if (budgetFlexibility) {
+      parts.push(
+        `Budget flexibility: ${budgetFlexibility}${budgetFlexibility === "low" ? " (price is the deciding factor — cheapest acceptable option)" : budgetFlexibility === "medium" ? " (value-conscious, some room)" : " (price is not the deciding factor)"}`,
+      );
+    }
+    if (constraints?.length) parts.push(`Stated constraints: ${constraints.join("; ")}`);
+    system += `\n\nUser context carried over from their comparison — use to tailor your reasoning, never claim a constraint is met unless the grounding data supports it:\n${parts.join("\n")}`;
   }
 
   // Provider-neutral shape; lib/ai/provider.ts translates it for whichever

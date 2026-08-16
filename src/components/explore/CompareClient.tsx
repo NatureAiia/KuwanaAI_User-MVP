@@ -246,6 +246,16 @@ export function CompareClient({
     (r) => r.requirements_to_qualify.length > 0,
   );
 
+  // Carries the same budget/constraint context the AI recommendation used
+  // into the "Ask in chat" links, so a follow-up question there is grounded
+  // on what the user already told the compare page, not just the raw listings.
+  const chatHref = (() => {
+    const params = new URLSearchParams({ listingIds: listings.map((l) => l.id).join(",") });
+    if (budgetFlexibility) params.set("budgetFlexibility", budgetFlexibility);
+    if (constraints && constraints.length > 0) params.set("constraints", constraints.join(","));
+    return `/chat?${params.toString()}`;
+  })();
+
   const shareData: CompareShareData = {
     categoryName,
     listings,
@@ -540,7 +550,7 @@ export function CompareClient({
             <LinkButton
               variant="ghost"
               size="lg"
-              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+              href={chatHref}
             >
               <MessageCircle size={16} />
               Ask in chat
@@ -750,7 +760,7 @@ export function CompareClient({
               {recommendation.explanation.data_traceability_notes}
             </p>
             <Link
-              href={`/chat?listingIds=${listings.map((l) => l.id).join(",")}`}
+              href={chatHref}
               className="tap-target mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-sky hover:underline"
             >
               <MessageCircle size={14} />
