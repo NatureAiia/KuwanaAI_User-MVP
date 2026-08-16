@@ -64,12 +64,12 @@ export const MODEL_CATALOG: ModelSpec[] = [
   {
     id: "llama-3.2-vision",
     provider: "ollama",
-    label: "Llama 3.2 Vision (self-hosted)",
+    label: "Self-hosted (Ollama)",
     inputPrice: 0,
     outputPrice: 0,
     contextWindow: 128_000,
-    vision: true,
-    note: "Self-hosted via Ollama (see LLAMA_VISION_BASE_URL) — no external API cost, no shared-queue latency or daily cap unlike OpenRouter's free tier, but only reachable if the Ollama server is actually running.",
+    vision: false,
+    note: "Self-hosted via Ollama — actual model comes from LLAMA_VISION_MODEL (set to whatever text model is pulled locally; the catalog id is a historical name, not the literal model). No external API cost, no shared-queue latency or daily cap unlike OpenRouter's free tier, but only reachable if the Ollama server is actually running, and vision is off since the currently-configured model is text-only.",
   },
   {
     id: "nvidia/nemotron-3-super-120b-a12b:free",

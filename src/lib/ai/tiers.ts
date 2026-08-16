@@ -26,17 +26,21 @@ import { findModel, type AiFeature, type ModelSpec } from "./models";
  * wrong-but-fast answer is worse than a slow one.
  */
 export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
-  // The self-hosted Llama rung would normally lead here (free, no
-  // shared-queue latency, vision-capable) but is left out of every ladder
-  // below until LLAMA_VISION_MODEL is actually pulled into the local Ollama
-  // install — until then it 404s on every single call, adding 10-30s of dead
-  // latency before falling through to a rung that can actually answer. Add
-  // "llama-3.2-vision" back to the front of these once `ollama pull
-  // llama3.2-vision` has been run; it stays in the catalog so /admin/llm can
-  // still select it manually in the meantime.
+  // The self-hosted Llama rung is left out of the chat ladder because
+  // LLAMA_VISION_MODEL is a text-only model in this environment — chat is the
+  // one feature that takes images, and routing a photo to a non-vision model
+  // would silently degrade the answer. "llama-3.2-vision" stays in the
+  // catalog so /admin/llm can still select it manually.
   chat: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
+  // Text-only, so the self-hosted rung sits between the OpenRouter free tier
+  // and Anthropic: OpenRouter's free queue is the primary path, but it can
+  // time out, and Anthropic/paid-OpenRouter rungs are only reachable once
+  // ANTHROPIC_API_KEY / OpenRouter credits are actually configured. The
+  // self-hosted rung needs neither, so it's the fallback that's guaranteed to
+  // work as long as Ollama is running.
   recommendations: [
     "nvidia/nemotron-3-super-120b-a12b:free",
+    "llama-3.2-vision",
     "claude-haiku-4-5",
     "claude-sonnet-5",
   ],
