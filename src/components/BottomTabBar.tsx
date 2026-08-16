@@ -10,6 +10,10 @@ import { NAV_ITEMS, isNavItemActive } from "@/lib/nav";
 const QUEST_FAB_POSITION_KEY = "kuwana:quest-fab-position";
 const QUEST_FAB_SIZE = 56;
 const DRAG_THRESHOLD = 4;
+// A quick click/tap must still navigate normally — dragging only engages
+// after the pointer has been held this long, same gesture as a real
+// press-and-hold-to-drag interaction on both desktop and mobile.
+const HOLD_TO_DRAG_MS = 200;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), Math.max(min, max));
@@ -19,7 +23,15 @@ export function BottomTabBar() {
   const pathname = usePathname();
   const questsActive = isNavItemActive(pathname, "/profile/quests");
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragState = useRef({ dragging: false, moved: false, startX: 0, startY: 0, posX: 0, posY: 0 });
+  const dragState = useRef({
+    armed: false,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    posX: 0,
+    posY: 0,
+    holdTimer: null as ReturnType<typeof setTimeout> | null,
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem(QUEST_FAB_POSITION_KEY);
@@ -37,12 +49,26 @@ export function BottomTabBar() {
 
   function handlePointerDown(e: React.PointerEvent<HTMLAnchorElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
-    dragState.current = { dragging: true, moved: false, startX: e.clientX, startY: e.clientY, posX: rect.left, posY: rect.top };
+    if (dragState.current.holdTimer) clearTimeout(dragState.current.holdTimer);
+    dragState.current = {
+      armed: false,
+      moved: false,
+      startX: e.clientX,
+      startY: e.clientY,
+      posX: rect.left,
+      posY: rect.top,
+      // Click-and-hold on desktop, touch-and-hold on mobile: both arrive as
+      // pointer events, so one timer covers both — only after it fires does
+      // movement start repositioning the button.
+      holdTimer: setTimeout(() => {
+        dragState.current.armed = true;
+      }, HOLD_TO_DRAG_MS),
+    };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLAnchorElement>) {
-    if (!dragState.current.dragging) return;
+    if (!dragState.current.armed) return;
     const dx = e.clientX - dragState.current.startX;
     const dy = e.clientY - dragState.current.startY;
     if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragState.current.moved = true;
@@ -53,8 +79,10 @@ export function BottomTabBar() {
     });
   }
 
-  function handlePointerUp() {
-    dragState.current.dragging = false;
+  function handlePointerEnd() {
+    if (dragState.current.holdTimer) clearTimeout(dragState.current.holdTimer);
+    dragState.current.holdTimer = null;
+    dragState.current.armed = false;
     if (dragState.current.moved) {
       setPos((current) => {
         if (current) localStorage.setItem(QUEST_FAB_POSITION_KEY, JSON.stringify(current));
@@ -105,16 +133,18 @@ export function BottomTabBar() {
       {/* Quests moved out of the primary nav (see nav.ts) to make room for
           Shorts — reached here instead as a floating action button. Defaults
           above the tab bar on mobile (bottom-20, clear of its ~64px height)
-          and to a plain bottom-right corner on desktop. Draggable — users can
-          reposition it anywhere on screen and the spot is remembered in
-          localStorage across visits. */}
+          and to a plain bottom-right corner on desktop. Press-and-hold then
+          drag to reposition (mouse or touch, via Pointer Events) — a plain
+          click/tap still navigates to Quests. The chosen spot is remembered
+          in localStorage across visits. */}
       <Link
         href="/profile/quests"
         aria-label="Quests"
         aria-current={questsActive ? "page" : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
         onClick={handleClick}
         style={pos ? { left: pos.x, top: pos.y } : undefined}
         className={clsx(
