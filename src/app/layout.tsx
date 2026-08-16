@@ -6,6 +6,9 @@ import { PageTransition } from "@/components/PageTransition";
 import { SkipLink } from "@/components/SkipLink";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { SoftNavTracker } from "@/components/SoftNavTracker";
+import { ScrollProgressBar } from "@/components/ScrollProgressBar";
+import { GlobalBackToTop } from "@/components/GlobalBackToTop";
+import { UtmTracker } from "@/components/UtmTracker";
 import { getSiteUrl } from "@/lib/siteUrl";
 import { THEME_INIT_SCRIPT } from "@/lib/themeScript";
 import "./globals.css";
@@ -64,11 +67,14 @@ export default function RootLayout({
         />
         <OfflineBanner />
         <SoftNavTracker />
+        <UtmTracker />
+        <ScrollProgressBar />
         <SkipLink />
         <GamificationToastHost />
         <CurrencyProvider>
           <PageTransition>{children}</PageTransition>
         </CurrencyProvider>
+        <GlobalBackToTop />
       </body>
     </html>
   );

@@ -12,6 +12,9 @@ import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { LoadingFacts } from "@/components/loading/LoadingFacts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
+import { ProgressSteps } from "@/components/ui/ProgressSteps";
+import { FieldError } from "@/components/ui/FieldError";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import { markHardNav } from "@/components/SoftNavTracker";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
 import {
@@ -192,6 +195,7 @@ export default function SignupPage() {
   const [step, setStep] = useState<Step>("role");
   const historyRef = useRef<Step[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [processingStage, setProcessingStage] = useState<"account" | "profile">("account");
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -329,6 +333,7 @@ export default function SignupPage() {
     startedProcessing.current = true;
 
     (async () => {
+      setProcessingStage("account");
       const supabase = createClient();
       const { error: signUpError } = await supabase.auth.signUp({ email, password });
       if (signUpError) {
@@ -343,6 +348,7 @@ export default function SignupPage() {
         setStep("account");
         return;
       }
+      setProcessingStage("profile");
 
       const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
       // Replace the "Other" marker with whatever the user typed, if anything
@@ -455,6 +461,17 @@ export default function SignupPage() {
     leaderboardConsent,
     router,
   ]);
+
+  function accountFieldErrors(): { username: string | null; email: string | null; password: string | null } {
+    return {
+      username:
+        username && !/^[a-zA-Z0-9_]{3,20}$/.test(username.trim())
+          ? "Use 3–20 letters, numbers, or underscores only."
+          : null,
+      email: email && !email.includes("@") ? "Email must include an @ symbol." : null,
+      password: password && password.length < 6 ? "Password needs at least 6 characters." : null,
+    };
+  }
 
   function canContinue(s: ConsumerStep | "orgDetails" | "industry") {
     switch (s) {
@@ -569,37 +586,52 @@ export default function SignupPage() {
             <label className="block">
               <span className="text-[13px] font-medium text-text-secondary">Username</span>
               <input
+                required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 minLength={3}
                 maxLength={20}
                 pattern="[a-zA-Z0-9_]+"
                 title="Letters, numbers, and underscores only"
+                placeholder="e.g. tendai_m"
+                aria-invalid={!!accountFieldErrors().username}
                 className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
-              <span className="mt-1 block text-[12px] text-text-muted">
-                This is your unique ID on Kuwana — letters, numbers, and underscores only.
-              </span>
+              {accountFieldErrors().username ? (
+                <FieldError error={accountFieldErrors().username} />
+              ) : (
+                <span className="mt-1 block text-[12px] text-text-muted">
+                  This is your unique ID on Kuwana — letters, numbers, and underscores only.
+                </span>
+              )}
             </label>
             <label className="block">
               <span className="text-[13px] font-medium text-text-secondary">Email</span>
               <input
                 type="email"
+                required
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                aria-invalid={!!accountFieldErrors().email}
                 className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
               />
+              <FieldError error={accountFieldErrors().email} />
             </label>
             <label className="block">
               <span className="text-[13px] font-medium text-text-secondary">
                 Password (min 6 characters)
               </span>
-              <input
-                type="password"
+              <PasswordInput
+                required
+                minLength={6}
+                placeholder="At least 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                aria-invalid={!!accountFieldErrors().password}
+                className="mt-1.5"
               />
+              <FieldError error={accountFieldErrors().password} />
             </label>
             <p className="text-[12px] text-text-muted">
               {role === "corporate"
@@ -667,6 +699,7 @@ export default function SignupPage() {
                     {role === "corporate" ? "Organization name" : "Business name"}
                   </span>
                   <input
+                    required
                     value={organizationName}
                     onChange={(e) => setOrganizationName(e.target.value)}
                     placeholder={role === "corporate" ? "e.g. CBZ Bank Limited" : "e.g. Tendai's Airtime Kiosk"}
@@ -1128,6 +1161,26 @@ export default function SignupPage() {
 
         {step === "processing" && (
           <LoadingFacts title="Saving your profile" subtitle="Getting your comparison scores ready">
+            <ProgressSteps
+              className="mt-6 max-w-[260px]"
+              steps={[
+                {
+                  key: "account",
+                  label: "Creating your account",
+                  state: error && processingStage === "account" ? "error" : processingStage === "account" ? "active" : "done",
+                },
+                {
+                  key: "profile",
+                  label: "Saving your profile",
+                  state:
+                    processingStage !== "profile"
+                      ? "pending"
+                      : error
+                        ? "error"
+                        : "active",
+                },
+              ]}
+            />
             {error && (
               <div className="mt-6 space-y-3">
                 <p className="text-[13px] text-accent-coral">{error}</p>

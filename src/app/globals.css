@@ -183,3 +183,33 @@ html {
     animation: none;
   }
 }
+
+/* ---------------------------------------------------------------------- */
+/* Print — strip chrome that only makes sense on a screen (nav, floating   */
+/* action buttons, scroll indicators) and fall back to plain black-on-     */
+/* white so printed pages don't waste ink on dark surfaces/glows.          */
+/* ---------------------------------------------------------------------- */
+@media print {
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    font-weight: normal;
+  }
+}

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { safeRedirectPath } from "@/lib/safeRedirect";
 import { Button } from "@/components/ui/Button";
+import { PasswordInput } from "@/components/ui/PasswordInput";
 import WaterButton from "@/components/ui/WaterButton";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { useIsDesktop } from "@/lib/useIsDesktop";
@@ -30,7 +31,13 @@ function LoginForm() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setLoading(false);
-      setError(error.message);
+      setError(
+        /invalid login credentials/i.test(error.message)
+          ? "That email and password don't match. Check for typos, or reset your password."
+          : /email not confirmed/i.test(error.message)
+            ? "Confirm your email first — check your inbox for the link we sent."
+            : error.message,
+      );
       return;
     }
 
@@ -72,6 +79,7 @@ function LoginForm() {
           <input
             type="email"
             required
+            placeholder="you@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
@@ -79,12 +87,12 @@ function LoginForm() {
         </label>
         <label className="block">
           <span className="text-[13px] font-medium text-text-secondary">Password</span>
-          <input
-            type="password"
+          <PasswordInput
             required
+            placeholder="Your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+            className="mt-1.5"
           />
         </label>
 
