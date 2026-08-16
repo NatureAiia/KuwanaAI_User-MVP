@@ -1,5 +1,5 @@
 ---
 deployment:
   tasks:
-    - /bin/cp -R * /home/UAT/kuwana/
-    - /bin/cp -R .* /home/UAT/kuwana/ 2>/dev/null || true
+    - /bin/mkdir -p /home/uat/kuwana
+    - /bin/cp -R /home/uat/repositories/KuwanaAI_User-MVP/* /home/uat/kuwana/
