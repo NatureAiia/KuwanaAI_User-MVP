@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AccountStatus } from "@prisma/client";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type ListingAction = "keep" | "remove";
 
@@ -20,13 +21,16 @@ export function UserStatusToggle({
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const suspended = status === "suspended";
+  const confirm = useConfirmDialog();
 
   async function submit(listingAction: ListingAction) {
     if (
       listingAction === "remove" &&
-      !confirm(
-        `This permanently deletes all ${providerListingCount} listing(s) for this provider and revokes any API keys. This can't be undone. Continue?`,
-      )
+      !(await confirm.ask({
+        title: `This permanently deletes all ${providerListingCount} listing(s) for this provider and revokes any API keys. Continue?`,
+        description: "This can't be undone.",
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -52,7 +56,8 @@ export function UserStatusToggle({
   }
 
   async function reactivate() {
-    if (!confirm("Reactivate this account? They'll regain full access immediately.")) return;
+    if (!(await confirm.ask({ title: "Reactivate this account? They'll regain full access immediately." })))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
@@ -68,6 +73,7 @@ export function UserStatusToggle({
 
   return (
     <>
+      {confirm.render()}
       <button
         onClick={() => (suspended ? reactivate() : setOpen(true))}
         disabled={loading}

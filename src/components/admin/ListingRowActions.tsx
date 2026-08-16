@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function ListingRowActions({
   listingId,
@@ -26,6 +27,7 @@ export function ListingRowActions({
   const [currency, setCurrency] = useState(currentCurrency);
   const [sourceUrl, setSourceUrl] = useState(currentSourceUrl ?? "");
   const [loading, setLoading] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function patch(body: Record<string, unknown>) {
     setLoading(true);
@@ -50,7 +52,8 @@ export function ListingRowActions({
   }
 
   async function remove() {
-    if (!confirm("Delete this listing? This can't be undone.")) return;
+    if (!(await confirm.ask({ title: "Delete this listing?", description: "This can't be undone.", danger: true })))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/listings/${listingId}`, { method: "DELETE" });
@@ -62,7 +65,9 @@ export function ListingRowActions({
 
   if (rejecting) {
     return (
-      <div className="flex flex-col gap-1.5">
+      <>
+        {confirm.render()}
+        <div className="flex flex-col gap-1.5">
         <input
           autoFocus
           placeholder="Reason the provider will see"
@@ -84,13 +89,16 @@ export function ListingRowActions({
             Cancel
           </Button>
         </div>
-      </div>
+        </div>
+      </>
     );
   }
 
   if (!editing) {
     return (
-      <div className="flex flex-wrap gap-1.5">
+      <>
+        {confirm.render()}
+        <div className="flex flex-wrap gap-1.5">
         {status === "pending_review" && (
           <>
             <button
@@ -126,12 +134,15 @@ export function ListingRowActions({
         >
           <Trash2 size={14} />
         </button>
-      </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <>
+      {confirm.render()}
+      <div className="flex flex-wrap items-center gap-1.5">
       <input
         type="number"
         step="0.01"
@@ -156,6 +167,7 @@ export function ListingRowActions({
       <Button variant="ghost" size="md" onClick={() => setEditing(false)} className="!px-2 !py-1.5 !text-[12px]">
         Cancel
       </Button>
-    </div>
+      </div>
+    </>
   );
 }

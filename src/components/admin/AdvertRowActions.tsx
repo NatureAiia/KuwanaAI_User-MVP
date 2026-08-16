@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function AdvertRowActions({ advertId, active }: { advertId: string; active: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function toggle() {
     setLoading(true);
@@ -23,7 +25,8 @@ export function AdvertRowActions({ advertId, active }: { advertId: string; activ
   }
 
   async function remove() {
-    if (!confirm("Delete this advert? This can't be undone.")) return;
+    if (!(await confirm.ask({ title: "Delete this advert?", description: "This can't be undone.", danger: true })))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/adverts/${advertId}`, { method: "DELETE" });
@@ -34,7 +37,9 @@ export function AdvertRowActions({ advertId, active }: { advertId: string; activ
   }
 
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <>
+      {confirm.render()}
+      <div className="flex flex-wrap gap-1.5">
       <button
         onClick={toggle}
         disabled={loading}
@@ -54,6 +59,7 @@ export function AdvertRowActions({ advertId, active }: { advertId: string; activ
       >
         <Trash2 size={14} />
       </button>
-    </div>
+      </div>
+    </>
   );
 }

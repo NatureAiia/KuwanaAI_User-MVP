@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, UserCheck, UserMinus } from "lucide-react";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type RiskLevel = "low" | "medium" | "high";
 
@@ -20,6 +21,7 @@ export function BusinessConditionRowActions({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function setRisk(next: RiskLevel) {
     if (next === riskLevel) return;
@@ -51,7 +53,14 @@ export function BusinessConditionRowActions({
   }
 
   async function remove() {
-    if (!confirm("Stop tracking this condition? This can't be undone.")) return;
+    if (
+      !(await confirm.ask({
+        title: "Stop tracking this condition?",
+        description: "This can't be undone.",
+        danger: true,
+      }))
+    )
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/business-conditions/${id}`, { method: "DELETE" });
@@ -62,7 +71,9 @@ export function BusinessConditionRowActions({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
+    <>
+      {confirm.render()}
+      <div className="flex items-center gap-1.5">
       <select
         value={riskLevel}
         disabled={loading}
@@ -94,6 +105,7 @@ export function BusinessConditionRowActions({
       >
         <Trash2 size={14} />
       </button>
-    </div>
+      </div>
+    </>
   );
 }

@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function ScrapeSourceRowActions({ id, enabled }: { id: string; enabled: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState<"toggle" | "run" | "delete" | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const confirm = useConfirmDialog();
 
   async function toggleEnabled() {
     setLoading("toggle");
@@ -41,7 +43,7 @@ export function ScrapeSourceRowActions({ id, enabled }: { id: string; enabled: b
   }
 
   async function remove() {
-    if (!confirm("Remove this source? It won't be crawled again.")) return;
+    if (!(await confirm.ask({ title: "Remove this source? It won't be crawled again.", danger: true }))) return;
     setLoading("delete");
     try {
       const res = await fetch(`/api/admin/scrape-sources/${id}`, { method: "DELETE" });
@@ -52,7 +54,9 @@ export function ScrapeSourceRowActions({ id, enabled }: { id: string; enabled: b
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <>
+      {confirm.render()}
+      <div className="flex flex-col items-end gap-1">
       <div className="flex flex-wrap items-center gap-1.5">
         <label className="tap-target flex items-center gap-1.5 text-[11.5px] text-text-secondary">
           <input type="checkbox" checked={enabled} disabled={loading !== null} onChange={toggleEnabled} />
@@ -78,6 +82,7 @@ export function ScrapeSourceRowActions({ id, enabled }: { id: string; enabled: b
         </button>
       </div>
       {runError && <p className="text-[11px] text-accent-coral">{runError}</p>}
-    </div>
+      </div>
+    </>
   );
 }

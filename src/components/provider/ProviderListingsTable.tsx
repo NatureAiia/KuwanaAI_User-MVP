@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/Card";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { ProviderListingThumbnail } from "@/components/provider/ProviderListingThumbnail";
 import { ProviderListingRowActions } from "@/components/provider/ProviderListingRowActions";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PackageSearch } from "lucide-react";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type Status = "draft" | "pending_review" | "published" | "rejected";
 
@@ -33,6 +36,11 @@ export function ProviderListingsTable({ rows }: { rows: ProviderListingRow[] }) 
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
+  const confirm = useConfirmDialog();
+
+  function clearFilters() {
+    router.push("/provider");
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -70,7 +78,14 @@ export function ProviderListingsTable({ rows }: { rows: ProviderListingRow[] }) 
   }
 
   async function bulkDelete() {
-    if (!confirm(`Delete ${deletable.length} product(s)? This can't be undone.`)) return;
+    if (
+      !(await confirm.ask({
+        title: `Delete ${deletable.length} product(s)?`,
+        description: "This can't be undone.",
+        danger: true,
+      }))
+    )
+      return;
     setBulkLoading(true);
     try {
       await Promise.all(deletable.map((r) => fetch(`/api/provider/listings/${r.id}`, { method: "DELETE" })));
@@ -83,17 +98,26 @@ export function ProviderListingsTable({ rows }: { rows: ProviderListingRow[] }) 
 
   if (rows.length === 0) {
     return (
-      <div className="mt-4 flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border p-10 text-center">
-        <p className="text-[13.5px] text-text-muted">No products match these filters yet.</p>
-        <LinkButton href="/provider/listings/new" size="md">
-          + Add product
-        </LinkButton>
+      <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-border p-10">
+        <EmptyState
+          icon={PackageSearch}
+          title="No products match these filters"
+          description="Try clearing the status, search, or category filter to see the rest of your catalog."
+          action={{ label: "Clear filters", onClick: clearFilters }}
+        />
+        <div className="mt-4 flex justify-center">
+          <LinkButton href="/provider/listings/new" size="md">
+            + Add product
+          </LinkButton>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="mt-4">
+    <>
+      {confirm.render()}
+      <div className="mt-4">
       {selected.size > 0 && (
         <div className="sticky top-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-accent-sky/40 bg-accent-sky/10 px-4 py-2.5">
           <span className="text-[12.5px] font-semibold text-accent-sky">{selected.size} selected</span>
@@ -213,6 +237,7 @@ export function ProviderListingsTable({ rows }: { rows: ProviderListingRow[] }) 
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

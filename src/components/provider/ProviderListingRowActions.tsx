@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function ProviderListingRowActions({
   listingId,
@@ -14,6 +15,7 @@ export function ProviderListingRowActions({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function patch(body: Record<string, unknown>) {
     setLoading(true);
@@ -30,7 +32,8 @@ export function ProviderListingRowActions({
   }
 
   async function remove() {
-    if (!confirm("Delete this product? This can't be undone.")) return;
+    if (!(await confirm.ask({ title: "Delete this product?", description: "This can't be undone.", danger: true })))
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/provider/listings/${listingId}`, { method: "DELETE" });
@@ -41,7 +44,9 @@ export function ProviderListingRowActions({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <>
+      {confirm.render()}
+      <div className="flex flex-wrap items-center gap-1.5">
       <Link
         href={`/provider/listings/${listingId}/edit`}
         className="tap-target rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
@@ -63,6 +68,7 @@ export function ProviderListingRowActions({
           Delete
         </Button>
       )}
-    </div>
+      </div>
+    </>
   );
 }

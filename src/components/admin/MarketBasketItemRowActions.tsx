@@ -3,13 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function MarketBasketItemRowActions({ itemId }: { itemId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function remove() {
-    if (!confirm("Remove this component from its basket? This can't be undone.")) return;
+    if (
+      !(await confirm.ask({
+        title: "Remove this component from its basket?",
+        description: "This can't be undone.",
+        danger: true,
+      }))
+    )
+      return;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/market-basket-items/${itemId}`, { method: "DELETE" });
@@ -20,13 +29,16 @@ export function MarketBasketItemRowActions({ itemId }: { itemId: string }) {
   }
 
   return (
-    <button
-      onClick={remove}
-      disabled={loading}
-      aria-label="Remove basket component"
-      className="tap-target rounded-lg border border-border p-1.5 text-text-secondary hover:border-accent-coral/50 hover:text-accent-coral"
-    >
-      <Trash2 size={14} />
-    </button>
+    <>
+      {confirm.render()}
+      <button
+        onClick={remove}
+        disabled={loading}
+        aria-label="Remove basket component"
+        className="tap-target rounded-lg border border-border p-1.5 text-text-secondary hover:border-accent-coral/50 hover:text-accent-coral"
+      >
+        <Trash2 size={14} />
+      </button>
+    </>
   );
 }

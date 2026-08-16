@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Crown, User as UserIcon, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 export function TeamMemberRow({
   email,
@@ -17,10 +18,11 @@ export function TeamMemberRow({
 }) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
+  const confirm = useConfirmDialog();
 
   async function remove() {
     if (!userId) return;
-    if (!confirm(`Remove ${email} from your team?`)) return;
+    if (!(await confirm.ask({ title: `Remove ${email} from your team?`, danger: true }))) return;
     setRemoving(true);
     try {
       const res = await fetch(`/api/provider/team/${userId}`, { method: "DELETE" });
@@ -31,7 +33,9 @@ export function TeamMemberRow({
   }
 
   return (
-    <Card className="flex items-center justify-between gap-3 !p-3.5">
+    <>
+      {confirm.render()}
+      <Card className="flex items-center justify-between gap-3 !p-3.5">
       <div className="flex items-center gap-3">
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-surface-raised text-text-secondary">
           {role === "Owner" ? <Crown size={16} className="text-accent-teal" /> : <UserIcon size={16} />}
@@ -52,6 +56,7 @@ export function TeamMemberRow({
           <X size={16} />
         </button>
       )}
-    </Card>
+      </Card>
+    </>
   );
 }
