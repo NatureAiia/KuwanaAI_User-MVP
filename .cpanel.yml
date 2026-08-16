@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - /bin/cp -R * /home/UAT/kuwana/
+    - /bin/cp -R .* /home/UAT/kuwana/ 2>/dev/null || true
