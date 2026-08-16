@@ -3,6 +3,7 @@ import { getProviderMetricValue, getAlertRulesWithStatus, METRIC_LABEL } from "@
 import { getInvestigationsForProvider } from "@/lib/investigations";
 
 const MAX_SAVED_LISTINGS = 10;
+const MAX_COMPARISONS = 5;
 
 /**
  * A consumer's own account facts the chat assistant can answer questions
@@ -13,7 +14,7 @@ const MAX_SAVED_LISTINGS = 10;
  * detecting intent first.
  */
 export async function getConsumerChatContext(userId: string) {
-  const [user, saved, unreadNotifications] = await Promise.all([
+  const [user, saved, unreadNotifications, comparisons] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { walletBalanceUsd: true, walletBalanceZig: true } }),
     prisma.savedListing.findMany({
       where: { userId },
@@ -22,7 +23,26 @@ export async function getConsumerChatContext(userId: string) {
       include: { listing: { include: { provider: true } } },
     }),
     prisma.notification.count({ where: { userId, read: false } }),
+    prisma.comparison.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: MAX_COMPARISONS,
+      include: { category: true },
+    }),
   ]);
+
+  // Comparisons only store listing ids — a second small query resolves the
+  // names/providers actually worth showing the model, rather than a raw id
+  // list it cannot say anything useful about.
+  const comparisonListingIds = [...new Set(comparisons.flatMap((c) => c.listingIds))];
+  const comparisonListings =
+    comparisonListingIds.length > 0
+      ? await prisma.listing.findMany({
+          where: { id: { in: comparisonListingIds } },
+          include: { provider: true },
+        })
+      : [];
+  const listingById = new Map(comparisonListings.map((l) => [l.id, l]));
 
   return {
     wallet_balance_usd: user ? Number(user.walletBalanceUsd) : 0,
@@ -34,6 +54,16 @@ export async function getConsumerChatContext(userId: string) {
       price: Number(s.listing.price),
       currency: s.listing.currency,
       provider: s.listing.provider.name,
+    })),
+    // Most recent first — lets the assistant open with "you were comparing
+    // X and Y" without the client ever having to pass comparison ids in.
+    past_comparisons: comparisons.map((c) => ({
+      category: c.category.name,
+      compared_at: c.createdAt.toISOString(),
+      listings: c.listingIds
+        .map((id) => listingById.get(id))
+        .filter((l): l is NonNullable<typeof l> => !!l)
+        .map((l) => ({ name: l.name, provider: l.provider.name, price: Number(l.price), currency: l.currency })),
     })),
   };
 }
