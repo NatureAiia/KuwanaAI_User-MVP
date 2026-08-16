@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - /bin/mkdir -p /home/uat/kuwana
+    - /bin/cp -R /home/uat/repositories/KuwanaAI_User-MVP/* /home/uat/kuwana/
