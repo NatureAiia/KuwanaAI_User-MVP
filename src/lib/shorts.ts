@@ -1,26 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import { getListingPriceTrends } from "@/lib/catalog";
+import type { PriceTrend } from "@/lib/priceTrend";
+import type { AdvertShortsCard, ListingShortsCard, ShortsCard } from "@/lib/shortsTypes";
 
-export type ListingShortsCard = {
-  kind: "listing";
-  id: string;
-  name: string;
-  image: string;
-  price: string;
-  currency: string;
-  providerName: string;
-  sectorSlug: string;
-  categorySlug: string;
-};
-
-export type AdvertShortsCard = {
-  kind: "advert";
-  id: string;
-  sponsorName: string;
-  tagline: string;
-  image: string;
-};
-
-export type ShortsCard = ListingShortsCard | AdvertShortsCard;
+export type { ListingShortsCard, AdvertShortsCard, ShortsCard } from "@/lib/shortsTypes";
 
 function shuffle<T>(items: T[]): T[] {
   const result = [...items];
@@ -37,6 +20,7 @@ const CARD_SELECT = {
   images: true,
   price: true,
   currency: true,
+  freshnessStatus: true,
   provider: { select: { name: true, logoUrl: true } },
   category: { select: { slug: true, sector: { select: { slug: true } } } },
 } as const;
@@ -48,25 +32,42 @@ const CARD_SELECT = {
 // render at all rather than a placeholder.
 const BRAND_PLACEHOLDER = "/kuwana-mark.png";
 
-function toListingCard(listing: {
-  id: string;
-  name: string;
-  images: string[];
-  price: { toString(): string };
-  currency: string;
-  provider: { name: string; logoUrl: string | null };
-  category: { slug: string; sector: { slug: string } };
-}): ListingShortsCard {
+function toListingCard(
+  listing: {
+    id: string;
+    name: string;
+    images: string[];
+    price: { toString(): string };
+    currency: string;
+    freshnessStatus: string;
+    provider: { name: string; logoUrl: string | null };
+    category: { slug: string; sector: { slug: string } };
+  },
+  priceTrend: PriceTrend | null,
+): ListingShortsCard {
   return {
     kind: "listing",
     id: listing.id,
     name: listing.name,
     image: listing.images[0] || listing.provider.logoUrl || BRAND_PLACEHOLDER,
+    providerLogoUrl: listing.provider.logoUrl,
     price: listing.price.toString(),
     currency: listing.currency,
     providerName: listing.provider.name,
     sectorSlug: listing.category.sector.slug,
     categorySlug: listing.category.slug,
+    freshnessStatus: listing.freshnessStatus as ListingShortsCard["freshnessStatus"],
+    priceTrend,
+  };
+}
+
+function toAdvertCard(advert: { id: string; sponsorName: string; tagline: string; imageUrl: string }, cardId: string): AdvertShortsCard {
+  return {
+    kind: "advert",
+    id: cardId,
+    sponsorName: advert.sponsorName,
+    tagline: advert.tagline,
+    image: advert.imageUrl,
   };
 }
 
@@ -111,7 +112,12 @@ export async function getShortsFeed(userId: string, limit = 24): Promise<ShortsC
           take: limit * 3,
         });
 
-  const listingCards = shuffle(pool).slice(0, limit).map(toListingCard);
+  const picked = shuffle(pool).slice(0, limit);
+  // Price trend is a real, transparent signal (Kuwana's whole pitch is
+  // explainable comparisons) — shown on each card instead of the vanity
+  // like/comment counts an earlier pass added.
+  const trends = await getListingPriceTrends(picked.map((l) => l.id));
+  const listingCards = picked.map((listing) => toListingCard(listing, trends[listing.id] ?? null));
 
   const adverts = await prisma.advert.findMany({
     where: { active: true },
@@ -120,13 +126,7 @@ export async function getShortsFeed(userId: string, limit = 24): Promise<ShortsC
   });
   if (adverts.length === 0) return listingCards;
   if (listingCards.length === 0) {
-    return adverts.map((advert) => ({
-      kind: "advert",
-      id: `advert-${advert.id}`,
-      sponsorName: advert.sponsorName,
-      tagline: advert.tagline,
-      image: advert.imageUrl,
-    }));
+    return adverts.map((advert) => toAdvertCard(advert, `advert-${advert.id}`));
   }
 
   const feed: ShortsCard[] = [];
@@ -135,7 +135,7 @@ export async function getShortsFeed(userId: string, limit = 24): Promise<ShortsC
     feed.push(card);
     if ((i + 1) % ADVERT_EVERY === 0) {
       const advert = adverts[advertIndex % adverts.length];
-      feed.push({ kind: "advert", id: `advert-${advert.id}-${i}`, sponsorName: advert.sponsorName, tagline: advert.tagline, image: advert.imageUrl });
+      feed.push(toAdvertCard(advert, `advert-${advert.id}-${i}`));
       advertIndex++;
     }
   });
