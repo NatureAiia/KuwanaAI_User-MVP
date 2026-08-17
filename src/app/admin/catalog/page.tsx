@@ -41,7 +41,7 @@ export default async function AdminCatalogPage({
     }),
     prisma.listing.count({ where: { status: "pending_review" } }),
     prisma.category.findMany({
-      include: { sector: true },
+      include: { sector: true, attributeSchema: { orderBy: { sortOrder: "asc" } } },
       orderBy: [{ sector: { name: "asc" } }, { name: "asc" }],
     }),
     prisma.provider.findMany({ orderBy: { name: "asc" }, include: { owner: { select: { email: true } } } }),

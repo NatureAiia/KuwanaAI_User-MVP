@@ -8,6 +8,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { boundedJsonRecord } from "@/lib/zodShared";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { recordEvent } from "@/lib/gamification/process-event";
 
 const updateSchema = z.object({
@@ -37,6 +38,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, markVerifiedNow, ...rest } = parsed.data;
+
+  if (attributes) {
+    const target = await prisma.listing.findUnique({ where: { id }, select: { categoryId: true } });
+    if (target) {
+      const attrError = await validateListingAttributes(target.categoryId, attributes);
+      if (attrError) return privateJson({ error: attrError }, { status: 400 });
+    }
+  }
 
   // Capture the pre-edit price before it's overwritten below — needed to
   // snapshot into ListingPriceHistory, which every price-trend/sparkline/

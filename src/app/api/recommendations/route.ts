@@ -213,6 +213,17 @@ export async function POST(req: Request) {
     const userContextBlock =
       userContext.length > 0 ? `\nUser context (use to tailor your reasoning — never claim a constraint is met unless the listing data supports it):\n${userContext.join("\n")}` : "";
 
+    // Listings below carry raw attribute key/value pairs only (e.g.
+    // `atm_withdrawal_fee: 1`) — without this glossary the model has to guess
+    // what a key means and what unit its number is in from the key name alone.
+    const attributeGlossaryBlock =
+      attributeSchema.length > 0
+        ? `\nAttribute glossary (key: label, unit if any) — ${attributeSchema
+            .filter((a) => a.key !== "price")
+            .map((a) => `${a.key}: ${a.label}${a.unit ? ` (${a.unit})` : ""}`)
+            .join("; ")}`
+        : "";
+
     try {
       result = await generateAiJson<CachedRecommendation>({
         feature: "recommendations",
@@ -234,7 +245,9 @@ export async function POST(req: Request) {
           "freshness_adjustment, trend_adjustment, trust_adjustment, total), a price_trend, requirements_to_qualify " +
           "(any upfront balance/deposit or condition needed to access it), and total_cost (recurring or per-use fees). " +
           "Use these as your primary evidence, and reference them concretely in your reasoning rather than restating " +
-          "the raw price. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
+          "the raw price. Each listing's `attributes` are raw key/value pairs; the prompt's attribute glossary gives " +
+          "each key's human label and unit — use it to interpret values correctly instead of guessing from the key " +
+          "name alone. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
           "(or a materially higher one than its peers), say so explicitly and weigh it honestly in the tradeoffs — " +
           "this is an eligibility signal, not just a spec difference. Only reference data present in the listings " +
           "provided; never invent statistics. Speak in Kuwana's own voice — never refer to yourself as an AI, a " +
@@ -245,7 +258,7 @@ export async function POST(req: Request) {
           '"key_differentiator": string}, "alternative_options": [{"listing_name": string, "key_differentiator": ' +
           'string}], "explanation": {"summary": string, "key_tradeoffs": string[], "data_traceability_notes": ' +
           'string}, "suggested_action": string, "confidence": number between 0 and 1}.',
-        prompt: `Category: ${category.name}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
+        prompt: `Category: ${category.name}${attributeGlossaryBlock}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
       });
     } catch (err) {
       // Previously unhandled — the client would get a bare 500 with no JSON

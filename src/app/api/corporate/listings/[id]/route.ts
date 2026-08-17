@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireOwnCorporateOrg } from "@/lib/corporateAuth";
 import { corporateListingUpdateSchema } from "@/lib/corporateListingSchema";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 
@@ -26,6 +27,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { reason, attributes, ...rest } = parsed.data;
+  const attrError = await validateListingAttributes(existing.categoryId, attributes);
+  if (attrError) return privateJson({ error: attrError }, { status: 400 });
 
   const listing = await prisma.listing.update({
     where: { id },
