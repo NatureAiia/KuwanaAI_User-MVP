@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { boundedJsonRecord } from "@/lib/zodShared";
 import { recordEvent } from "@/lib/gamification/process-event";
 
 const bodySchema = z.object({
@@ -31,13 +34,18 @@ const bodySchema = z.object({
       "retail",
     ])
     .optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  // Unbounded, this was a free write-amplification primitive into a Json
+  // column, same class of issue boundedJsonRecord was added for elsewhere.
+  metadata: boundedJsonRecord(40, 8_000).optional(),
 });
 
 export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  const limited = await enforceRateLimit(`events:${user.id}`, RATE_LIMITS.authedWrite);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -49,5 +57,5 @@ export async function POST(req: Request) {
     { timeout: 15_000 },
   );
 
-  return NextResponse.json({ gamification });
+  return privateJson({ gamification });
 }

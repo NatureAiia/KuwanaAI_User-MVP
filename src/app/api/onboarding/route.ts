@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
 import { emailDomain, emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
@@ -11,6 +12,9 @@ export async function POST(req: Request) {
   if (!user?.email) {
     return privateJson({ error: "Not authenticated" }, { status: 401 });
   }
+
+  const limited = await enforceRateLimit(`onboarding:${user.id}`, RATE_LIMITS.authedWrite);
+  if (limited) return limited;
   // Captured into its own const, rather than read as `user.email` further
   // down: TypeScript's narrowing of the guard above doesn't persist through
   // `user.email` accesses inside the nested transaction closure below.

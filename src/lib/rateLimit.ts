@@ -209,6 +209,15 @@ export const RATE_LIMITS = {
   publicRead: { limit: 120, windowSeconds: 60 },
   /** /api/bi/v1/* — keyed by ApiKey.id, not IP, so one BI tool's schedule can't starve another key's budget. */
   biApi: { limit: 60, windowSeconds: 60 },
+  /** Binary uploads (listing/advert images) — each call buffers up to MAX_IMAGE_BYTES in memory and costs real storage/bandwidth, so tighter than authedWrite. */
+  mediaUpload: { limit: 10, windowSeconds: 60 },
+  /**
+   * Second, IP-keyed limit stacked on top of wallet top-up's per-user limit —
+   * a per-account cap alone is fully bypassed by spreading calls across a
+   * farm of accounts from one machine. Same IP-spoofability caveat as
+   * clientKey() above: a cost/abuse-shape control, not an access control.
+   */
+  walletTopupIp: { limit: 20, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /* -------------------------------------------------------------------------- */

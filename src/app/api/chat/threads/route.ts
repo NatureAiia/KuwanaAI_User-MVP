@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireConsumerOrCorporate } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 
 const PREVIEW_LENGTH = 48;
 
@@ -22,7 +22,7 @@ export async function GET() {
     include: { messages: { orderBy: { createdAt: "asc" }, take: 1, select: { content: true } } },
   });
 
-  return NextResponse.json({
+  return privateJson({
     threads: conversations
       // A conversation with no messages yet shouldn't exist (created inside
       // the same transaction as its first message), but skip it defensively
