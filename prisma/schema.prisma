@@ -43,6 +43,16 @@ model User {
   username               String    @unique
   role                   Role      @default(consumer)
   createdAt              DateTime  @default(now()) @map("created_at")
+  // bcrypt hash (cost 12), set at registration by api/auth/register and compared
+  // in nextAuth.ts's authorize(). Nullable: rows predating the Auth.js migration
+  // have no extractable hash (Supabase owned auth.users before this), and any
+  // future passwordless identity would legitimately have none either. A null
+  // here means "cannot sign in with a password" — authorize() treats it that way.
+  passwordHash           String?   @map("password_hash")
+  // Set once /api/onboarding completes successfully. Null between
+  // /api/auth/register creating the row and onboarding finishing — filters out
+  // abandoned signups from admin/leaderboard views without a separate table.
+  onboardingCompletedAt  DateTime? @map("onboarding_completed_at")
   // Admin-only kill switch (see requireUser() in lib/auth.ts, the single
   // choke point almost every page/route calls through) — a suspended
   // account is blocked everywhere immediately, not just re-gated at login.
