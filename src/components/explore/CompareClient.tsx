@@ -269,7 +269,7 @@ export function CompareClient({
     <div className="mt-4">
       {/* Header row: title on the left, share-as-PDF action on the right. */}
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-[22px] font-bold">Compare {categoryName}</h1>
+        <h2 className="font-display text-[22px] font-bold">Compare {categoryName}</h2>
         <CompareShareButton data={shareData} />
       </div>
 

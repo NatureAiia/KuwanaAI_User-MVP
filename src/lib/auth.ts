@@ -88,19 +88,28 @@ export async function requireConsumerOrCorporate(): Promise<
  * `admin` is now a real Role (see schema.prisma), but the original
  * ADMIN_EMAILS allowlist stays as a fallback during the transition — any
  * email in it is treated as admin even before its User row is migrated to
- * role: admin (see scripts/migrate-admin-role.ts). Drop the allowlist check
- * once every operator account has been migrated.
+ * role: admin (see scripts/migrate-admin-role.ts). Drop this once every
+ * operator account has been migrated. Exported (not just used by
+ * requireAdmin) so any other admin-detection call site — e.g.
+ * api/notifications/route.ts, which reads the role directly instead of going
+ * through requireAdmin() — stays allowlist-aware too, instead of disagreeing
+ * with requireAdmin() about who counts as admin.
  */
+export function isAllowlistedAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const allowlist = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return allowlist.includes(email.toLowerCase());
+}
+
 export async function requireAdmin(): Promise<
   (NonNullable<Awaited<ReturnType<typeof requireUser>>> & { email: string }) | null
 > {
   const user = await requireUser();
   if (!user?.email) return null;
-  const allowlist = (process.env.ADMIN_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
-  const isAllowlisted = allowlist.includes(user.email.toLowerCase());
+  const isAllowlisted = isAllowlistedAdmin(user.email);
   const isAdminRole = !isAllowlisted && (await getUserRole(user.id)) === "admin";
   // The `!user?.email` check above already guarantees email is a string —
   // this cast just reflects that in the type once, instead of every call

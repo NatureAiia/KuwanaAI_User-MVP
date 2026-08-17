@@ -11,7 +11,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { user: { findUnique } },
 }));
 
-const { requireUser, getUserRole, requireConsumer, requireAdmin } = await import("@/lib/auth");
+const { requireUser, getUserRole, requireConsumer, requireAdmin, isAllowlistedAdmin } = await import("@/lib/auth");
 
 const originalAdminEmails = process.env.ADMIN_EMAILS;
 
@@ -96,5 +96,27 @@ describe("requireAdmin", () => {
     delete process.env.ADMIN_EMAILS;
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "admin@example.com" } } });
     expect(await requireAdmin()).toBeNull();
+  });
+});
+
+describe("isAllowlistedAdmin", () => {
+  it("returns false when the email is null/undefined", () => {
+    expect(isAllowlistedAdmin(null)).toBe(false);
+    expect(isAllowlistedAdmin(undefined)).toBe(false);
+  });
+
+  it("returns false when ADMIN_EMAILS is unset (fails closed, not open)", () => {
+    delete process.env.ADMIN_EMAILS;
+    expect(isAllowlistedAdmin("admin@example.com")).toBe(false);
+  });
+
+  it("returns false when the email isn't on the allowlist", () => {
+    process.env.ADMIN_EMAILS = "someone-else@example.com";
+    expect(isAllowlistedAdmin("admin@example.com")).toBe(false);
+  });
+
+  it("returns true when the email is on the allowlist, case-insensitively", () => {
+    process.env.ADMIN_EMAILS = "Admin@Example.com, other@example.com";
+    expect(isAllowlistedAdmin("admin@example.com")).toBe(true);
   });
 });

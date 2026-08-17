@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 import { adminUserUpdateSchema } from "@/lib/adminUserSchema";
 import { logAdminAction } from "@/lib/adminAudit";
 import { revalidateCatalog } from "@/lib/cacheTags";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const { id } = await params;
   const parsed = adminUserUpdateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const before = await prisma.user.findUnique({ where: { id }, select: { role: true, accountStatus: true } });
-  if (!before) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!before) return privateJson({ error: "Not found" }, { status: 404 });
 
   const suspending = parsed.data.accountStatus === "suspended";
   const user = await prisma.user.update({
@@ -94,5 +94,5 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
   }
 
-  return NextResponse.json({ user });
+  return privateJson({ user });
 }

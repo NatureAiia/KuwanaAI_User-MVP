@@ -23,7 +23,15 @@ export async function GET() {
   if (!admin) return privateJson({ error: "Not authorised" }, { status: 403 });
 
   const keys = await prisma.apiKey.findMany({
-    include: { provider: { select: { name: true } } },
+    select: {
+      id: true,
+      label: true,
+      scopes: true,
+      createdAt: true,
+      lastUsedAt: true,
+      revokedAt: true,
+      provider: { select: { name: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
   return privateJson({ keys });

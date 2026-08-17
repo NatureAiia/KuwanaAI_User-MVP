@@ -116,7 +116,18 @@ export function ShortsFeed({ cards, initialSavedIds = [] }: { cards: ShortsCard[
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId }),
     }).catch(() => null);
-    if (res?.ok && !isSaved) {
+
+    if (!res?.ok) {
+      setSavedIds((prev) => {
+        const next = new Set(prev);
+        if (isSaved) next.add(listingId);
+        else next.delete(listingId);
+        return next;
+      });
+      return;
+    }
+
+    if (!isSaved) {
       const data = await res.json().catch(() => null);
       notifyGamification(data?.gamification);
     }

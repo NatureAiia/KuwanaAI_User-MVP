@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 import { logAdminAction } from "@/lib/adminAudit";
 
 const updateSchema = z.object({
@@ -33,11 +33,11 @@ const updateSchema = z.object({
 // a single API call should do as a side effect.
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const { id } = await params;
   const parsed = updateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { ownerEmail, corporateDomain, ...rest } = parsed.data;
 
@@ -47,11 +47,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   } else if (ownerEmail) {
     const owner = await prisma.user.findUnique({ where: { email: ownerEmail } });
     if (!owner) {
-      return NextResponse.json({ error: `No user found with email ${ownerEmail}` }, { status: 404 });
+      return privateJson({ error: `No user found with email ${ownerEmail}` }, { status: 404 });
     }
     const alreadyLinked = await prisma.provider.findUnique({ where: { ownerUserId: owner.id } });
     if (alreadyLinked && alreadyLinked.id !== id) {
-      return NextResponse.json(
+      return privateJson(
         { error: `${ownerEmail} already owns another provider (${alreadyLinked.name})` },
         { status: 409 },
       );
@@ -93,7 +93,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       });
     }
 
-    return NextResponse.json({ provider });
+    return privateJson({ provider });
   } catch (err) {
     // The alreadyLinked check above is a look-then-act race — two concurrent
     // requests linking different providers to the same email could both pass
@@ -102,7 +102,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     // friendly response the pre-check already gives in the common case,
     // instead of a raw 500.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      return NextResponse.json(
+      return privateJson(
         {
           error: corporateDomain
             ? `${corporateDomain} is already linked to another provider — try again`

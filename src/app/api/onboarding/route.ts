@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
@@ -7,14 +7,14 @@ import { emailDomain, emailMatchesRegulator, isPersonalEmailDomain } from "@/lib
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser?.email) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  const user = await requireUser();
+  if (!user?.email) {
+    return privateJson({ error: "Not authenticated" }, { status: 401 });
   }
+  // Captured into its own const, rather than read as `user.email` further
+  // down: TypeScript's narrowing of the guard above doesn't persist through
+  // `user.email` accesses inside the nested transaction closure below.
+  const email = user.email;
 
   // One email, one account: the `users.email` unique constraint enforces
   // this at the data layer, and this guard turns the collision into a clear
@@ -22,11 +22,11 @@ export async function POST(req: Request) {
   // own row (the upsert below targets that same id), so a hit here always
   // means the email already belongs to a different account.
   const existingAccount = await prisma.user.findUnique({
-    where: { email: authUser.email },
+    where: { email },
     select: { id: true },
   });
-  if (existingAccount && existingAccount.id !== authUser.id) {
-    return NextResponse.json(
+  if (existingAccount && existingAccount.id !== user.id) {
+    return privateJson(
       { error: "This email can only be used once." },
       { status: 409 },
     );
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return privateJson({ error: parsed.error.flatten() }, { status: 400 });
   }
   const data = parsed.data;
 
@@ -43,23 +43,23 @@ export async function POST(req: Request) {
       where: { username: data.username },
       select: { id: true },
     });
-    if (existingUsername && existingUsername.id !== authUser.id) {
-      return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
+    if (existingUsername && existingUsername.id !== user.id) {
+      return privateJson({ error: "That username is already taken." }, { status: 409 });
     }
   }
 
   // The security boundary for Corporate/Regulator lives here, not in the
-  // schema — both checks key off authUser.email (from Supabase's verified
+  // schema — both checks key off user.email (from Supabase's verified
   // session), which the client can't spoof, unlike a role in the request
   // body. See HANDOFF.md and src/lib/orgVerification.ts.
-  if (data.role === "corporate" && isPersonalEmailDomain(authUser.email)) {
-    return NextResponse.json(
+  if (data.role === "corporate" && isPersonalEmailDomain(email)) {
+    return privateJson(
       { error: "Corporate accounts need a work email address — please sign up again with your company email." },
       { status: 403 },
     );
   }
-  if (data.role === "regulator" && !emailMatchesRegulator(authUser.email, data.regulatorName)) {
-    return NextResponse.json(
+  if (data.role === "regulator" && !emailMatchesRegulator(email, data.regulatorName)) {
+    return privateJson(
       { error: `That email isn't a verified ${data.regulatorName} address — please sign up again with your ${data.regulatorName} email.` },
       { status: 403 },
     );
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
   const username =
     data.role === "consumer"
       ? data.username
-      : `${profileName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20) || data.role}_${authUser.id.slice(0, 8)}`;
+      : `${profileName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20) || data.role}_${user.id.slice(0, 8)}`;
 
   let gamification;
   try {
@@ -100,13 +100,13 @@ export async function POST(req: Request) {
         const primarySector = data.role === "corporate" ? data.primarySector : undefined;
 
         await tx.user.upsert({
-          where: { id: authUser.id },
-          update: { email: authUser.email!, role: data.role, username, primarySector },
-          create: { id: authUser.id, email: authUser.email!, role: data.role, username, primarySector },
+          where: { id: user.id },
+          update: { email, role: data.role, username, primarySector },
+          create: { id: user.id, email, role: data.role, username, primarySector },
         });
 
         await tx.userProfile.upsert({
-          where: { userId: authUser.id },
+          where: { userId: user.id },
           update: {
             fullName: profileName,
             ...(data.role === "consumer"
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
               : {}),
           },
           create: {
-            userId: authUser.id,
+            userId: user.id,
             fullName: profileName,
             ...(data.role === "consumer"
               ? { ageRange: data.ageRange, occupation: data.occupation, location: data.location, socialPlatforms: data.socialPlatforms }
@@ -133,12 +133,12 @@ export async function POST(req: Request) {
         // different person overwrite someone else's business.
         if (data.role === "provider") {
           await tx.provider.upsert({
-            where: { ownerUserId: authUser.id },
+            where: { ownerUserId: user.id },
             update: { name: data.businessName, ...(data.businessDescription ? { description: data.businessDescription } : {}) },
             create: {
               name: data.businessName,
               description: data.businessDescription || null,
-              ownerUserId: authUser.id,
+              ownerUserId: user.id,
               verified: false,
             },
           });
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
         // name/description. isPersonalEmailDomain already rejected a
         // missing/personal domain above, so `domain` is never null here.
         if (data.role === "corporate") {
-          const domain = emailDomain(authUser.email!)!;
+          const domain = emailDomain(email)!;
           await tx.provider.upsert({
             where: { corporateDomain: domain },
             update: {},
@@ -169,31 +169,31 @@ export async function POST(req: Request) {
         for (const [sector, sectorData] of Object.entries(footprintsBySector)) {
           if (!sectorData) continue;
           await tx.sectorFootprint.upsert({
-            where: { userId_sector: { userId: authUser.id, sector: sector as Sector } },
+            where: { userId_sector: { userId: user.id, sector: sector as Sector } },
             update: { data: sectorData },
-            create: { userId: authUser.id, sector: sector as Sector, data: sectorData },
+            create: { userId: user.id, sector: sector as Sector, data: sectorData },
           });
         }
 
         for (const [consentType, granted] of Object.entries(data.consents)) {
           await tx.consent.upsert({
-            where: { userId_consentType: { userId: authUser.id, consentType } },
+            where: { userId_consentType: { userId: user.id, consentType } },
             update: { granted, grantedAt: new Date() },
-            create: { userId: authUser.id, consentType, granted },
+            create: { userId: user.id, consentType, granted },
           });
         }
 
-        return recordEvent(tx, { userId: authUser.id, eventType: "profile_completed" });
+        return recordEvent(tx, { userId: user.id, eventType: "profile_completed" });
       },
       { timeout: 15_000 },
     );
   } catch (err) {
     console.error("[onboarding] failed to save profile:", err);
-    return NextResponse.json(
+    return privateJson(
       { error: "Something went wrong saving your profile. Please try again." },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ gamification });
+  return privateJson({ gamification });
 }

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 import { notifyListingDecision } from "@/lib/notifications";
 import { logAdminAction } from "@/lib/adminAudit";
 import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
@@ -30,11 +30,11 @@ const updateSchema = z.object({
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const { id } = await params;
   const parsed = updateSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, markVerifiedNow, ...rest } = parsed.data;
 
@@ -107,12 +107,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // The catalog read cache is tag-keyed, not TTL-only — without this an
   // edited or deleted listing keeps serving stale until the backstop expires.
   revalidateCatalog();
-  return NextResponse.json({ listing });
+  return privateJson({ listing });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const admin = await requireAdmin();
-  if (!admin) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+  if (!admin) return privateJson({ error: "Not authorized" }, { status: 403 });
 
   const { id } = await params;
   const listing = await prisma.listing.delete({ where: { id } });
@@ -128,5 +128,5 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   // The catalog read cache is tag-keyed, not TTL-only — without this an
   // edited or deleted listing keeps serving stale until the backstop expires.
   revalidateCatalog();
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }

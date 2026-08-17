@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { privateJson } from "@/lib/apiResponse";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
@@ -31,14 +31,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const existing = await prisma.listing.findUnique({ where: { id } });
   if (!existing || existing.providerId !== auth.provider.id) {
-    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    return privateJson({ error: "Listing not found" }, { status: 404 });
   }
   if (!PATCH_ALLOWED_STATUSES.includes(existing.status as (typeof PATCH_ALLOWED_STATUSES)[number])) {
-    return NextResponse.json({ error: "This listing can't be edited here" }, { status: 409 });
+    return privateJson({ error: "This listing can't be edited here" }, { status: 409 });
   }
 
   const parsed = providerUpdateListingSchema.safeParse(await req.json());
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, status: requestedStatus, ...rest } = parsed.data;
   const priceChanged = rest.price !== undefined && Number(existing.price) !== rest.price;
@@ -85,7 +85,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // The catalog read cache is tag-keyed, not TTL-only — without this an
   // edited listing keeps serving stale until the backstop expires.
   revalidateCatalog();
-  return NextResponse.json({ listing });
+  return privateJson({ listing });
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -95,15 +95,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const existing = await prisma.listing.findUnique({ where: { id } });
   if (!existing || existing.providerId !== auth.provider.id) {
-    return NextResponse.json({ error: "Listing not found" }, { status: 404 });
+    return privateJson({ error: "Listing not found" }, { status: 404 });
   }
   if (!DELETE_ALLOWED_STATUSES.includes(existing.status as (typeof DELETE_ALLOWED_STATUSES)[number])) {
-    return NextResponse.json(
+    return privateJson(
       { error: "This listing is published and can't be deleted here — ask an admin." },
       { status: 409 },
     );
   }
 
   await prisma.listing.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  return privateJson({ ok: true });
 }

@@ -28,6 +28,7 @@ export async function runFxRefresh() {
 
   const liveRates = body.rates as Record<string, number>;
   let updated = 0;
+  let failed = 0;
 
   for (const currency of CURRENCIES) {
     if (currency.code === "USD") continue; // USD is always the pivot, always 1.
@@ -39,18 +40,23 @@ export async function runFxRefresh() {
       continue;
     }
 
-    await prisma.fxRate.upsert({
-      where: { code: currency.code },
-      update: { perUsd: rate, source: SOURCE, fetchedAt: new Date() },
-      create: { code: currency.code, perUsd: rate, source: SOURCE },
-    });
-    updated += 1;
-    console.log(`[fx-refresh] ${currency.code}: 1 USD = ${rate}`);
+    try {
+      await prisma.fxRate.upsert({
+        where: { code: currency.code },
+        update: { perUsd: rate, source: SOURCE, fetchedAt: new Date() },
+        create: { code: currency.code, perUsd: rate, source: SOURCE },
+      });
+      updated += 1;
+      console.log(`[fx-refresh] ${currency.code}: 1 USD = ${rate}`);
+    } catch (err) {
+      failed += 1;
+      console.error(`[fx-refresh] ${currency.code} upsert failed:`, err);
+    }
   }
 
   const trackedNonUsd = CURRENCIES.length - 1;
-  console.log(`\n[fx-refresh] updated ${updated}/${trackedNonUsd} live currencies.`);
-  return { updated, trackedNonUsd };
+  console.log(`\n[fx-refresh] updated ${updated}/${trackedNonUsd} live currencies (${failed} failed).`);
+  return { updated, trackedNonUsd, failed };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

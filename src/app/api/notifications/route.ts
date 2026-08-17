@@ -1,6 +1,6 @@
 import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
-import { requireUser, getUserRole } from "@/lib/auth";
+import { requireUser, getUserRole, isAllowlistedAdmin } from "@/lib/auth";
 import { emailDomain } from "@/lib/orgVerification";
 import { syncPriceDropNotifications } from "@/lib/notifications";
 import { getAlertRulesWithStatus, syncAlertRuleNotifications } from "@/lib/alerts";
@@ -50,7 +50,7 @@ export async function GET() {
       const rules = await getAlertRulesWithStatus(provider.id);
       await syncAlertRuleNotifications(rules);
     }
-  } else if (role === "admin") {
+  } else if (role === "admin" || isAllowlistedAdmin(user.email)) {
     await syncBusinessConditionReviewNotifications(user.id);
   } else if (role === "regulator") {
     const rules = await getPriceCapRulesWithBreaches();

@@ -30,6 +30,8 @@ export function BottomTabBar() {
     startY: 0,
     posX: 0,
     posY: 0,
+    lastX: 0,
+    lastY: 0,
     holdTimer: null as ReturnType<typeof setTimeout> | null,
   });
 
@@ -38,6 +40,7 @@ export function BottomTabBar() {
     if (!saved) return;
     try {
       const parsed = JSON.parse(saved) as { x: number; y: number };
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a one-time saved position from localStorage, not deriving render output
       setPos({
         x: clamp(parsed.x, 4, window.innerWidth - QUEST_FAB_SIZE - 4),
         y: clamp(parsed.y, 4, window.innerHeight - QUEST_FAB_SIZE - 4),
@@ -57,17 +60,26 @@ export function BottomTabBar() {
       startY: e.clientY,
       posX: rect.left,
       posY: rect.top,
+      lastX: e.clientX,
+      lastY: e.clientY,
       // Click-and-hold on desktop, touch-and-hold on mobile: both arrive as
       // pointer events, so one timer covers both — only after it fires does
-      // movement start repositioning the button.
+      // movement start repositioning the button. The drag origin resets to
+      // the pointer's live position at arm-time (not its position at
+      // pointerdown), so movement during the hold window doesn't get
+      // applied as one jump the instant dragging arms.
       holdTimer: setTimeout(() => {
         dragState.current.armed = true;
+        dragState.current.startX = dragState.current.lastX;
+        dragState.current.startY = dragState.current.lastY;
       }, HOLD_TO_DRAG_MS),
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: React.PointerEvent<HTMLAnchorElement>) {
+    dragState.current.lastX = e.clientX;
+    dragState.current.lastY = e.clientY;
     if (!dragState.current.armed) return;
     const dx = e.clientX - dragState.current.startX;
     const dy = e.clientY - dragState.current.startY;

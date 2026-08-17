@@ -1,6 +1,8 @@
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { pollTransactionStatus } from "@/lib/paynow";
 import { applyPaynowStatusUpdate } from "@/lib/wallet";
+import { requireUser } from "@/lib/auth";
 import { Card } from "@/components/ui/Card";
 import { LinkButton } from "@/components/ui/Button";
 
@@ -16,9 +18,14 @@ export default async function WalletReturnPage({
 }: {
   searchParams: Promise<{ ref?: string }>;
 }) {
+  const user = await requireUser();
+  if (!user) return null;
+
   const { ref } = await searchParams;
 
   let tx = ref ? await prisma.walletTransaction.findUnique({ where: { reference: ref } }) : null;
+
+  if (tx && tx.userId !== user.id) notFound();
 
   // The webhook is the source of truth, but the browser return can beat it —
   // nudge with one poll so this page doesn't show a stale "pending" for a

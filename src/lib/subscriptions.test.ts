@@ -23,6 +23,12 @@ vi.mock("@/lib/prisma", () => ({
 
 const { ensurePlan, getOrCreateSubscription, ensureAllSubscriptions, hasFeature } = await import("@/lib/subscriptions");
 
+function addMonths(date: Date, months: number): Date {
+  const d = new Date(date);
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d;
+}
+
 function plan(overrides: Partial<{ id: string; billingPeriodMonths: number; features: string[] }> = {}) {
   return {
     id: "plan-1",
@@ -89,11 +95,11 @@ describe("getOrCreateSubscription", () => {
     expect(result).toBe(existing);
   });
 
-  it("rolls the period forward by exactly one billing cycle once it's elapsed", async () => {
-    const past = new Date("2026-01-01T00:00:00.000Z");
-    const existing = { id: "sub-1", userId: "user-1", currentPeriodEnd: past, plan: plan({ billingPeriodMonths: 1 }) };
+  it("rolls the period forward by exactly one billing cycle when only one has elapsed", async () => {
+    const past = new Date(Date.now() - 5 * 86_400_000); // ended 5 days ago
+    const existing = { id: "sub-1", userId: "user-1", currentPeriodStart: addMonths(past, -1), currentPeriodEnd: past, plan: plan({ billingPeriodMonths: 1 }) };
     subscriptionFindUnique.mockResolvedValue(existing);
-    subscriptionUpdate.mockResolvedValue({ ...existing, currentPeriodStart: past, currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z") });
+    subscriptionUpdate.mockResolvedValue(existing);
 
     await getOrCreateSubscription("user-1", "consumer");
 
@@ -101,10 +107,36 @@ describe("getOrCreateSubscription", () => {
       where: { id: "sub-1" },
       data: {
         currentPeriodStart: past,
-        currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z"),
+        currentPeriodEnd: addMonths(past, 1),
       },
       include: { plan: true },
     });
+  });
+
+  it("catches up to the current period in one call when several billing cycles have elapsed (e.g. a missed cron run)", async () => {
+    const longAgo = new Date(Date.now() - 400 * 86_400_000); // well over a year of monthly cycles overdue
+    const existing = { id: "sub-1", userId: "user-1", currentPeriodStart: addMonths(longAgo, -1), currentPeriodEnd: longAgo, plan: plan({ billingPeriodMonths: 1 }) };
+    subscriptionFindUnique.mockResolvedValue(existing);
+    subscriptionUpdate.mockResolvedValue(existing);
+
+    await getOrCreateSubscription("user-1", "consumer");
+
+    expect(subscriptionUpdate).toHaveBeenCalledTimes(1);
+    const { data } = subscriptionUpdate.mock.calls[0]![0] as { data: { currentPeriodStart: Date; currentPeriodEnd: Date } };
+    // Caught up to the current period, not left stuck in the past and not
+    // overshot past it — currentPeriodStart is the most recent boundary at
+    // or before now, currentPeriodEnd is the very next one after it.
+    expect(data.currentPeriodStart.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(data.currentPeriodEnd.getTime()).toBeGreaterThan(Date.now());
+    expect(data.currentPeriodEnd.getTime()).toBe(addMonths(data.currentPeriodStart, 1).getTime());
+  });
+
+  it("throws instead of looping forever when the plan's billingPeriodMonths is invalid", async () => {
+    const past = new Date(Date.now() - 5 * 86_400_000);
+    const existing = { id: "sub-1", userId: "user-1", currentPeriodStart: addMonths(past, -1), currentPeriodEnd: past, plan: plan({ billingPeriodMonths: 0 }) };
+    subscriptionFindUnique.mockResolvedValue(existing);
+
+    await expect(getOrCreateSubscription("user-1", "consumer")).rejects.toThrow(/billingPeriodMonths/);
   });
 });
 

@@ -39,14 +39,31 @@ export async function ensurePlan(role: EligibleRole): Promise<Plan> {
 
 type SubscriptionWithPlan = Subscription & { plan: Plan };
 
-/** Advances a subscription past its elapsed period by exactly one billing cycle. */
+/**
+ * Advances a subscription past its elapsed period(s) — looped rather than a
+ * single +1-cycle step, so an account overdue by more than one billing
+ * period (e.g. the reset cron missed a run) is caught up to the current
+ * period in one call instead of staying stuck expired until an additional
+ * run catches up. `billingPeriodMonths` has no DB check constraint, so a
+ * 0/negative value is guarded explicitly rather than looping forever.
+ */
 async function rollover(sub: SubscriptionWithPlan): Promise<SubscriptionWithPlan> {
+  const months = sub.plan.billingPeriodMonths;
+  if (months < 1) {
+    throw new Error(`Plan ${sub.plan.key} has invalid billingPeriodMonths=${months}`);
+  }
+
+  const now = new Date();
+  let start = sub.currentPeriodStart;
+  let end = sub.currentPeriodEnd;
+  while (end <= now) {
+    start = end;
+    end = addMonths(end, months);
+  }
+
   return prisma.subscription.update({
     where: { id: sub.id },
-    data: {
-      currentPeriodStart: sub.currentPeriodEnd,
-      currentPeriodEnd: addMonths(sub.currentPeriodEnd, sub.plan.billingPeriodMonths),
-    },
+    data: { currentPeriodStart: start, currentPeriodEnd: end },
     include: { plan: true },
   });
 }
