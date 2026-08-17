@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { boundedJsonRecord } from "@/lib/zodShared";
 import { validateListingAttributes } from "@/lib/attributeValidation";
 import { logAdminAction } from "@/lib/adminAudit";
+import { MAX_IMAGES } from "@/components/provider/imageGallery";
 
 /**
  * Admin content API — an alternative to hand-editing prisma/seed.ts for
@@ -33,10 +34,12 @@ const createSchema = z.object({
   categoryId: z.string(),
   providerId: z.string(),
   name: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
   attributes: boundedJsonRecord(50, 16_000),
   price: z.number().positive().max(100_000_000),
   currency: z.string().trim().length(3).default("USD"),
   sourceUrl: z.string().url().max(2000).optional(),
+  images: z.array(z.string().url()).max(MAX_IMAGES).optional(),
 });
 
 export async function POST(req: Request) {

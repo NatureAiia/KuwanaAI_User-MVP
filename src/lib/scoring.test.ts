@@ -14,7 +14,7 @@ function listing(overrides: Partial<ListingDTO> & { id: string; price: number })
     description: null,
     rating: null,
     reviewCount: 0,
-    provider: { id: "p1", name: "Provider", logoUrl: null, verified: true },
+    provider: { id: "p1", name: "Provider", logoUrl: null, verified: true, websiteUrl: null },
     ...overrides,
   };
 }
@@ -93,8 +93,8 @@ describe("computeDecisionScores", () => {
 
   it("applies a trust penalty for an unverified provider", () => {
     const listings = [
-      listing({ id: "verified", price: 10, provider: { id: "p1", name: "A", logoUrl: null, verified: true } }),
-      listing({ id: "unverified", price: 10, provider: { id: "p2", name: "B", logoUrl: null, verified: false } }),
+      listing({ id: "verified", price: 10, provider: { id: "p1", name: "A", logoUrl: null, verified: true, websiteUrl: null } }),
+      listing({ id: "unverified", price: 10, provider: { id: "p2", name: "B", logoUrl: null, verified: false, websiteUrl: null } }),
     ];
     const scores = computeDecisionScores(listings, []);
     expect(scores.verified.trustAdjustment).toBe(0);
@@ -116,7 +116,7 @@ describe("computeDecisionScores", () => {
 
   it("always clamps the total score into [0, 100]", () => {
     const listings = [
-      listing({ id: "worst", price: 10, freshnessStatus: "unverified", provider: { id: "p", name: "P", logoUrl: null, verified: false } }),
+      listing({ id: "worst", price: 10, freshnessStatus: "unverified", provider: { id: "p", name: "P", logoUrl: null, verified: false, websiteUrl: null } }),
     ];
     const scores = computeDecisionScores(listings, [], {
       worst: { direction: "up", changePercent: 200, periodDays: 10, currentPrice: 10, earliestPrice: 3, points: [] },

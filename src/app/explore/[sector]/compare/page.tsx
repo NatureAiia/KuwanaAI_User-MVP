@@ -70,6 +70,7 @@ export default async function ComparePage({
       <CompareClientLazy
         sectorSlug={sector}
         categoryId={categoryId}
+        categorySlug={category.slug}
         categoryName={category.name}
         listings={listings}
         attributeSchema={attributeSchema}

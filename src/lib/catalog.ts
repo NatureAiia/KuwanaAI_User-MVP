@@ -20,7 +20,7 @@ function toListingDTO(listing: {
   images: string[];
   rating: unknown;
   reviewCount: number;
-  provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
+  provider: { id: string; name: string; logoUrl: string | null; verified: boolean; websiteUrl: string | null };
 }): ListingDTO {
   return {
     id: listing.id,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { AttributeFieldsEditor, attributeValuesToTyped } from "@/components/attributes/AttributeFieldsEditor";
+import { ImageGalleryField } from "@/components/provider/ImageGalleryField";
 import type { AttributeField } from "@/components/provider/types";
 
 type CategoryOption = { id: string; name: string; sector: { name: string }; attributeSchema: AttributeField[] };
@@ -21,9 +22,11 @@ export function NewListingForm({
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "");
   const [providerId, setProviderId] = useState(providers[0]?.id ?? "");
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [sourceUrl, setSourceUrl] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [attributeValues, setAttributeValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -48,7 +51,9 @@ export function NewListingForm({
           price: Number(price),
           currency,
           attributes,
+          ...(description ? { description } : {}),
           ...(sourceUrl ? { sourceUrl } : {}),
+          ...(images.length > 0 ? { images } : {}),
         }),
       });
       if (!res.ok) {
@@ -57,8 +62,10 @@ export function NewListingForm({
         return;
       }
       setName("");
+      setDescription("");
       setPrice("");
       setSourceUrl("");
+      setImages([]);
       setAttributeValues({});
       router.refresh();
     } finally {
@@ -117,6 +124,14 @@ export function NewListingForm({
         className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       />
 
+      <textarea
+        placeholder="Description (optional) — the more detail, the better for shoppers comparing this product"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+      />
+
       <div className="flex gap-2">
         <input
           required
@@ -141,6 +156,13 @@ export function NewListingForm({
         onChange={(e) => setSourceUrl(e.target.value)}
         className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       />
+
+      <div>
+        <p className="mb-1.5 text-[12px] font-medium text-text-secondary">
+          Photos (shown to shoppers on this listing)
+        </p>
+        <ImageGalleryField images={images} onChange={setImages} uploadUrl="/api/admin/listings/images" />
+      </div>
 
       <AttributeFieldsEditor
         fields={category?.attributeSchema ?? []}

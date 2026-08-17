@@ -41,8 +41,10 @@ const {
   AdminWrite,
 } = await import("@/lib/catalog");
 
-function makeProvider(overrides: Partial<{ id: string; name: string; logoUrl: string | null; verified: boolean }> = {}) {
-  return { id: "provider-1", name: "Econet", logoUrl: null, verified: true, ...overrides };
+function makeProvider(
+  overrides: Partial<{ id: string; name: string; logoUrl: string | null; verified: boolean; websiteUrl: string | null }> = {},
+) {
+  return { id: "provider-1", name: "Econet", logoUrl: null, verified: true, websiteUrl: null, ...overrides };
 }
 
 function makeListingRow(overrides: Record<string, unknown> = {}) {

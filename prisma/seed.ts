@@ -59,6 +59,11 @@ type AttrDef = {
   isComparable?: boolean;
 };
 
+// A provider is usually just a name; give it a websiteUrl when the source
+// is known so the "visit provider" link (see resolveProviderLink) has a
+// fallback even for listings without their own sourceUrl.
+type ProviderSeed = string | { name: string; websiteUrl?: string };
+
 type SectorSeed = {
   slug: string;
   name: string;
@@ -67,8 +72,17 @@ type SectorSeed = {
     slug: string;
     name: string;
     attributes: AttrDef[];
-    providers: string[];
-    listings: { name: string; provider: string; price: number; attrs: Record<string, unknown> }[];
+    providers: ProviderSeed[];
+    listings: {
+      name: string;
+      provider: string;
+      price: number;
+      attrs: Record<string, unknown>;
+      // Optional per-listing overrides — omit to keep today's defaults
+      // (no source URL, freshnessStatus "fresh").
+      sourceUrl?: string;
+      freshnessStatus?: "fresh" | "stale" | "unverified";
+    }[];
   }[];
 };
 
@@ -215,6 +229,29 @@ const SECTORS: SectorSeed[] = [
           { name: "Fidelity Life Starter Cover", provider: "Fidelity Life", price: 8, attrs: { premium_monthly: 8, coverage_amount: 5000, term_years: 5, funeral_cover: false, payout_speed_days: 18 } },
         ],
       },
+      {
+        slug: "medical-aid-plans",
+        name: "Medical aid plans",
+        attributes: [
+          { key: "monthly_contribution", label: "Monthly contribution", dataType: "number", unit: "USD" },
+          { key: "hospital_cover", label: "Hospital cover", dataType: "enum" },
+          { key: "day_to_day_cover", label: "Day-to-day cover", dataType: "enum" },
+          { key: "dependants_allowed", label: "Dependants allowed", dataType: "boolean" },
+          { key: "dental_cover", label: "Dental & optical", dataType: "boolean" },
+        ],
+        providers: ["Cimas", "PSMAS", "First Mutual Health", "Alliance Health", "Aura Medical Aid Scheme", "FLIMAS"],
+        listings: [
+          { name: "Cimas Smart Primary", provider: "Cimas", price: 45, attrs: { monthly_contribution: 45, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "Cimas Premium Plan", provider: "Cimas", price: 120, attrs: { monthly_contribution: 120, hospital_cover: "Full", day_to_day_cover: "Comprehensive", dependants_allowed: true, dental_cover: true } },
+          { name: "PSMAS ZimCare", provider: "PSMAS", price: 25, attrs: { monthly_contribution: 25, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "PSMAS MegaCare", provider: "PSMAS", price: 60, attrs: { monthly_contribution: 60, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
+          { name: "First Mutual Health Essential", provider: "First Mutual Health", price: 30, attrs: { monthly_contribution: 30, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "First Mutual Health Classic", provider: "First Mutual Health", price: 75, attrs: { monthly_contribution: 75, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
+          { name: "Alliance Health Scheme", provider: "Alliance Health", price: 35, attrs: { monthly_contribution: 35, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+          { name: "Aura Medical Aid Scheme", provider: "Aura Medical Aid Scheme", price: 40, attrs: { monthly_contribution: 40, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: false } },
+          { name: "FLIMAS Family Plan", provider: "FLIMAS", price: 28, attrs: { monthly_contribution: 28, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
+        ],
+      },
     ],
   },
   {
@@ -289,34 +326,13 @@ const SECTORS: SectorSeed[] = [
     ],
   },
   {
+    // Medical aid plans moved to the insurance sector above — kept as an
+    // empty shell (rather than deleted) for future healthcare categories
+    // like doctors/clinics.
     slug: "healthcare",
     name: "Healthcare",
     status: "live",
-    categories: [
-      {
-        slug: "medical-aid-plans",
-        name: "Medical aid plans",
-        attributes: [
-          { key: "monthly_contribution", label: "Monthly contribution", dataType: "number", unit: "USD" },
-          { key: "hospital_cover", label: "Hospital cover", dataType: "enum" },
-          { key: "day_to_day_cover", label: "Day-to-day cover", dataType: "enum" },
-          { key: "dependants_allowed", label: "Dependants allowed", dataType: "boolean" },
-          { key: "dental_cover", label: "Dental & optical", dataType: "boolean" },
-        ],
-        providers: ["Cimas", "PSMAS", "First Mutual Health", "Alliance Health", "Aura Medical Aid Scheme", "FLIMAS"],
-        listings: [
-          { name: "Cimas Smart Primary", provider: "Cimas", price: 45, attrs: { monthly_contribution: 45, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
-          { name: "Cimas Premium Plan", provider: "Cimas", price: 120, attrs: { monthly_contribution: 120, hospital_cover: "Full", day_to_day_cover: "Comprehensive", dependants_allowed: true, dental_cover: true } },
-          { name: "PSMAS ZimCare", provider: "PSMAS", price: 25, attrs: { monthly_contribution: 25, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
-          { name: "PSMAS MegaCare", provider: "PSMAS", price: 60, attrs: { monthly_contribution: 60, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
-          { name: "First Mutual Health Essential", provider: "First Mutual Health", price: 30, attrs: { monthly_contribution: 30, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
-          { name: "First Mutual Health Classic", provider: "First Mutual Health", price: 75, attrs: { monthly_contribution: 75, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: true } },
-          { name: "Alliance Health Scheme", provider: "Alliance Health", price: 35, attrs: { monthly_contribution: 35, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
-          { name: "Aura Medical Aid Scheme", provider: "Aura Medical Aid Scheme", price: 40, attrs: { monthly_contribution: 40, hospital_cover: "Full", day_to_day_cover: "Moderate", dependants_allowed: true, dental_cover: false } },
-          { name: "FLIMAS Family Plan", provider: "FLIMAS", price: 28, attrs: { monthly_contribution: 28, hospital_cover: "Limited", day_to_day_cover: "Restricted", dependants_allowed: true, dental_cover: false } },
-        ],
-      },
-    ],
+    categories: [],
   },
   {
     slug: "transport",
@@ -324,20 +340,64 @@ const SECTORS: SectorSeed[] = [
     status: "live",
     categories: [
       {
-        slug: "ride-fares",
-        name: "Ride fares",
+        slug: "bus-fares",
+        name: "Intercity bus fares",
         attributes: [
-          { key: "fare_estimate", label: "Fare estimate", dataType: "number", unit: "USD" },
-          { key: "wait_time", label: "Wait time", dataType: "number", unit: "min" },
-          { key: "vehicle_type", label: "Vehicle type", dataType: "enum" },
-          { key: "safety_rating", label: "Safety rating", dataType: "number", unit: "/5" },
+          { key: "fare", label: "Fare", dataType: "number", unit: "USD" },
+          { key: "route", label: "Route", dataType: "string" },
+          { key: "duration_hours", label: "Duration", dataType: "number", unit: "hours" },
+          { key: "class", label: "Class", dataType: "enum" },
         ],
-        providers: ["Vaya", "inDrive", "Hwindi"],
+        providers: [
+          // No confirmed official ZUPCO website turned up in research —
+          // each listing below cites the fare source directly instead.
+          "ZUPCO",
+          { name: "CityLink Luxury Coaches", websiteUrl: "https://www.citylinkcoaches.co.zw/" },
+          // Pathfinder's own site couldn't be confirmed either; the listing
+          // below cites the third-party profile the fare range came from.
+          "Pathfinder Luxury Coaches",
+        ],
         listings: [
-          { name: "Vaya Standard (5km, CBD)", provider: "Vaya", price: 3.5, attrs: { fare_estimate: 3.5, wait_time: 6, vehicle_type: "Sedan", safety_rating: 4.5 } },
-          { name: "Vaya Comfort (5km, CBD)", provider: "Vaya", price: 5, attrs: { fare_estimate: 5, wait_time: 8, vehicle_type: "SUV", safety_rating: 4.7 } },
-          { name: "inDrive Negotiated (5km, CBD)", provider: "inDrive", price: 2.8, attrs: { fare_estimate: 2.8, wait_time: 10, vehicle_type: "Sedan", safety_rating: 4.1 } },
-          { name: "Hwindi Kombi Seat (5km, CBD)", provider: "Hwindi", price: 1, attrs: { fare_estimate: 1, wait_time: 12, vehicle_type: "Kombi", safety_rating: 3.6 } },
+          // Fares confirmed via zimpricecheck.com's bus-fare price-update page.
+          {
+            name: "ZUPCO Harare–Bulawayo",
+            provider: "ZUPCO",
+            price: 15,
+            attrs: { fare: 15, route: "Harare–Bulawayo", duration_hours: 6, class: "Standard" },
+            sourceUrl: "https://zimpricecheck.com/price-updates/bus-fare-and-transport-costs/",
+          },
+          {
+            name: "ZUPCO Harare–Mutare",
+            provider: "ZUPCO",
+            price: 10,
+            attrs: { fare: 10, route: "Harare–Mutare", duration_hours: 4, class: "Standard" },
+            sourceUrl: "https://zimpricecheck.com/price-updates/bus-fare-and-transport-costs/",
+          },
+          {
+            name: "ZUPCO Harare–Gweru",
+            provider: "ZUPCO",
+            price: 12,
+            attrs: { fare: 12, route: "Harare–Gweru", duration_hours: 3, class: "Standard" },
+            sourceUrl: "https://zimpricecheck.com/price-updates/bus-fare-and-transport-costs/",
+          },
+          // Fare is an approximate corridor figure (couldn't fetch CityLink's
+          // fares page directly) — flagged unverified for an admin to confirm.
+          {
+            name: "CityLink Harare–Bulawayo (Luxury)",
+            provider: "CityLink Luxury Coaches",
+            price: 25,
+            attrs: { fare: 25, route: "Harare–Bulawayo", duration_hours: 5, class: "Luxury" },
+            sourceUrl: "https://www.citylinkcoaches.co.zw/routes-fares/",
+            freshnessStatus: "unverified",
+          },
+          {
+            name: "Pathfinder Harare–Bulawayo (Luxury)",
+            provider: "Pathfinder Luxury Coaches",
+            price: 25,
+            attrs: { fare: 25, route: "Harare–Bulawayo", duration_hours: 5, class: "Luxury" },
+            sourceUrl: "https://www.victoriafalls-guide.net/pathfinder-bus.html",
+            freshnessStatus: "unverified",
+          },
         ],
       },
     ],
@@ -554,11 +614,13 @@ const SECTORS: SectorSeed[] = [
           { key: "pack_size", label: "Pack size", dataType: "string" },
           { key: "store", label: "Store", dataType: "enum" },
         ],
-        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        providers: ["Pick n Pay", "Spar", "Bon Marché", "OK Zimbabwe", "Choppies"],
         listings: [
           { name: "White Star Maize Meal 10kg", provider: "Pick n Pay", price: 8.5, attrs: { brand: "White Star", pack_size: "10kg", store: "Pick n Pay" } },
           { name: "White Star Maize Meal 10kg", provider: "Spar", price: 8.2, attrs: { brand: "White Star", pack_size: "10kg", store: "Spar" } },
           { name: "White Star Maize Meal 10kg", provider: "Bon Marché", price: 8.9, attrs: { brand: "White Star", pack_size: "10kg", store: "Bon Marché" } },
+          { name: "White Star Maize Meal 10kg", provider: "OK Zimbabwe", price: 8.3, attrs: { brand: "White Star", pack_size: "10kg", store: "OK Zimbabwe" } },
+          { name: "White Star Maize Meal 10kg", provider: "Choppies", price: 7.9, attrs: { brand: "White Star", pack_size: "10kg", store: "Choppies" } },
         ],
       },
       {
@@ -569,11 +631,13 @@ const SECTORS: SectorSeed[] = [
           { key: "pack_size", label: "Pack size", dataType: "string" },
           { key: "store", label: "Store", dataType: "enum" },
         ],
-        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        providers: ["Pick n Pay", "Spar", "Bon Marché", "OK Zimbabwe", "Choppies"],
         listings: [
           { name: "Dona Cooking Oil 2L", provider: "Pick n Pay", price: 6.4, attrs: { brand: "Dona", pack_size: "2L", store: "Pick n Pay" } },
           { name: "Dona Cooking Oil 2L", provider: "Spar", price: 6.1, attrs: { brand: "Dona", pack_size: "2L", store: "Spar" } },
           { name: "Dona Cooking Oil 2L", provider: "Bon Marché", price: 6.6, attrs: { brand: "Dona", pack_size: "2L", store: "Bon Marché" } },
+          { name: "Dona Cooking Oil 2L", provider: "OK Zimbabwe", price: 6.2, attrs: { brand: "Dona", pack_size: "2L", store: "OK Zimbabwe" } },
+          { name: "Dona Cooking Oil 2L", provider: "Choppies", price: 5.9, attrs: { brand: "Dona", pack_size: "2L", store: "Choppies" } },
         ],
       },
       {
@@ -584,11 +648,13 @@ const SECTORS: SectorSeed[] = [
           { key: "pack_size", label: "Pack size", dataType: "string" },
           { key: "store", label: "Store", dataType: "enum" },
         ],
-        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        providers: ["Pick n Pay", "Spar", "Bon Marché", "OK Zimbabwe", "Choppies"],
         listings: [
           { name: "Star Sugar 2kg", provider: "Pick n Pay", price: 3.8, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Pick n Pay" } },
           { name: "Star Sugar 2kg", provider: "Spar", price: 3.6, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Spar" } },
           { name: "Star Sugar 2kg", provider: "Bon Marché", price: 4.0, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Bon Marché" } },
+          { name: "Star Sugar 2kg", provider: "OK Zimbabwe", price: 3.7, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "OK Zimbabwe" } },
+          { name: "Star Sugar 2kg", provider: "Choppies", price: 3.5, attrs: { brand: "Star Sugar", pack_size: "2kg", store: "Choppies" } },
         ],
       },
       {
@@ -599,11 +665,13 @@ const SECTORS: SectorSeed[] = [
           { key: "pack_size", label: "Pack size", dataType: "string" },
           { key: "store", label: "Store", dataType: "enum" },
         ],
-        providers: ["Pick n Pay", "Spar", "Bon Marché"],
+        providers: ["Pick n Pay", "Spar", "Bon Marché", "OK Zimbabwe", "Choppies"],
         listings: [
           { name: "Yummy Rice 5kg", provider: "Pick n Pay", price: 9.5, attrs: { brand: "Yummy", pack_size: "5kg", store: "Pick n Pay" } },
           { name: "Yummy Rice 5kg", provider: "Spar", price: 9.1, attrs: { brand: "Yummy", pack_size: "5kg", store: "Spar" } },
           { name: "Yummy Rice 5kg", provider: "Bon Marché", price: 9.8, attrs: { brand: "Yummy", pack_size: "5kg", store: "Bon Marché" } },
+          { name: "Yummy Rice 5kg", provider: "OK Zimbabwe", price: 9.3, attrs: { brand: "Yummy", pack_size: "5kg", store: "OK Zimbabwe" } },
+          { name: "Yummy Rice 5kg", provider: "Choppies", price: 8.9, attrs: { brand: "Yummy", pack_size: "5kg", store: "Choppies" } },
         ],
       },
     ],
@@ -626,6 +694,12 @@ async function main() {
       });
 
       for (const [i, attr] of catSeed.attributes.entries()) {
+        if (!attr.label || !attr.label.trim()) {
+          throw new Error(
+            `Seed error: attribute "${attr.key}" in category "${catSeed.slug}" (sector "${sectorSeed.slug}") ` +
+              "has no human-readable label — every comparable attribute must have one (see savings-accounts above for the pattern).",
+          );
+        }
         await prisma.attributeSchemaField.upsert({
           where: { categoryId_key: { categoryId: category.id, key: attr.key } },
           update: { label: attr.label, dataType: attr.dataType, unit: attr.unit, sortOrder: i },
@@ -642,11 +716,15 @@ async function main() {
       }
 
       const providerIdByName = new Map<string, string>();
-      for (const name of catSeed.providers) {
+      for (const p of catSeed.providers) {
+        const name = typeof p === "string" ? p : p.name;
+        const websiteUrl = typeof p === "string" ? undefined : p.websiteUrl;
         const provider = await prisma.provider.upsert({
           where: { id: `${sectorSeed.slug}-${name}` },
-          update: {},
-          create: { id: `${sectorSeed.slug}-${name}`, name, verified: true },
+          // Only touch websiteUrl when the seed actually specifies one — a
+          // re-seed must never blank out a URL an admin set via /admin/catalog.
+          update: websiteUrl ? { websiteUrl } : {},
+          create: { id: `${sectorSeed.slug}-${name}`, name, verified: true, ...(websiteUrl ? { websiteUrl } : {}) },
         });
         providerIdByName.set(name, provider.id);
       }
@@ -665,7 +743,8 @@ async function main() {
           attributes: listing.attrs as Prisma.InputJsonValue,
           price: listing.price,
           currency: "USD",
-          freshnessStatus: "fresh" as const,
+          sourceUrl: listing.sourceUrl ?? null,
+          freshnessStatus: listing.freshnessStatus ?? ("fresh" as const),
           lastVerifiedAt: new Date(),
           ...buildRating(seedKey),
         };

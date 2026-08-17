@@ -19,13 +19,15 @@ import { SignalBloom } from "@/components/SignalBloom";
 import { FormattedPrice } from "@/components/FormattedPrice";
 import { CompareShareButton } from "@/components/explore/CompareShareButton";
 import { computeDecisionScores } from "@/lib/scoring";
-import { buildTotalCostSummary, isCostAttribute } from "@/lib/totalCost";
 import { notifyGamification, type GamificationUpdate } from "@/lib/gamification/client";
 import type { CompareShareData } from "@/lib/comparePdf";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
-import { TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { TREND_TONE, TREND_ARROW, resolveProviderLink, NOT_A_RESELLER_NOTICE } from "@/lib/listingDisplay";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
+import { ExternalLink } from "lucide-react";
+import { CategoryIntakeModal } from "@/components/explore/CategoryIntakeModal";
+import { getIntakeQuestions } from "@/lib/insuranceIntake";
 
 function formatValue(value: unknown, dataType: AttributeSchemaFieldDTO["dataType"], unit: string | null) {
   if (value === undefined || value === null) return "—";
@@ -43,12 +45,18 @@ type RecommendationResponse = {
       value_score: number;
       total_cost_summary: string | null;
       key_differentiator: string;
+      source_url: string | null;
+      website_url: string | null;
+      last_verified_at: string;
     };
     alternative_options: {
       listing_id: string;
       provider_name: string;
       listing_title: string;
       key_differentiator: string;
+      source_url: string | null;
+      website_url: string | null;
+      last_verified_at: string;
     }[];
     eligibility_requirements: {
       listing_id: string;
@@ -91,6 +99,7 @@ let knownItemCounter = 0;
 export function CompareClient({
   sectorSlug,
   categoryId,
+  categorySlug,
   categoryName,
   listings,
   attributeSchema,
@@ -101,6 +110,7 @@ export function CompareClient({
 }: {
   sectorSlug: string;
   categoryId: string;
+  categorySlug?: string;
   categoryName: string;
   listings: ListingDTO[];
   attributeSchema: AttributeSchemaFieldDTO[];
@@ -114,6 +124,15 @@ export function CompareClient({
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
   const loggedComparison = useRef(false);
+
+  // Insurance-only pre-recommendation clarifying-question step (see
+  // lib/insuranceIntake.ts) — checked once against any note already saved
+  // for this category so a returning user isn't asked again every time.
+  const intakeQuestions = categorySlug ? getIntakeQuestions(sectorSlug, categorySlug) : null;
+  const [showIntake, setShowIntake] = useState(false);
+  const [savingIntake, setSavingIntake] = useState(false);
+  const [hasCheckedIntakeNote, setHasCheckedIntakeNote] = useState(false);
+  const [hasIntakeNote, setHasIntakeNote] = useState(false);
 
   // Traditional (Python, rules-based) comparison — deliberately separate from
   // the AI state so either engine can run independently of the other.
@@ -164,7 +183,34 @@ export function CompareClient({
     });
   }
 
+  // The click handler behind "Get AI recommendation" — for Insurance
+  // categories with intake questions configured, checks whether the user
+  // already has a saved note for this category first; if not, shows the
+  // CategoryIntakeModal before actually requesting the recommendation.
+  // Once a note exists (or the user skips), it goes straight to
+  // runRecommendation() on every later click.
   async function getRecommendation() {
+    if (intakeQuestions && !hasCheckedIntakeNote) {
+      try {
+        const params = new URLSearchParams({ sector: sectorSlug, category: categorySlug ?? "" });
+        const res = await fetch(`/api/user/notes?${params.toString()}`);
+        const data = res.ok ? await res.json() : null;
+        setHasCheckedIntakeNote(true);
+        if (data?.note) {
+          setHasIntakeNote(true);
+        } else {
+          setShowIntake(true);
+          return;
+        }
+      } catch {
+        setHasCheckedIntakeNote(true);
+        // Fall through — a failed notes lookup shouldn't block the recommendation itself.
+      }
+    }
+    await runRecommendation();
+  }
+
+  async function runRecommendation() {
     setLoadingRecommendation(true);
     setRecommendationError(null);
     try {
@@ -196,6 +242,31 @@ export function CompareClient({
     } finally {
       setLoadingRecommendation(false);
     }
+  }
+
+  async function submitIntake(answers: { question: string; answer: string }[]) {
+    setSavingIntake(true);
+    try {
+      if (answers.length > 0 && categorySlug) {
+        await fetch("/api/user/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sector: sectorSlug, category: categorySlug, content: answers }),
+        });
+      }
+    } catch {
+      // Best-effort — don't block the recommendation on a notes-save failure.
+    } finally {
+      setSavingIntake(false);
+      setShowIntake(false);
+      setHasIntakeNote(true);
+      await runRecommendation();
+    }
+  }
+
+  function skipIntake() {
+    setShowIntake(false);
+    runRecommendation();
   }
 
   async function getTraditionalComparison() {
@@ -456,19 +527,6 @@ export function CompareClient({
                 </td>
               ))}
             </tr>
-            {attributeSchema.some((a) => isCostAttribute(a.key)) && (
-              <tr className="border-b border-border bg-bg-surface-raised/40">
-                <td className="p-3 font-medium text-text-secondary">Total cost</td>
-                {listings.map((l) => {
-                  const summary = buildTotalCostSummary(l, attributeSchema);
-                  return (
-                    <td key={l.id} className="p-3 text-[12.5px] leading-snug">
-                      {summary ?? <span className="text-text-muted">—</span>}
-                    </td>
-                  );
-                })}
-              </tr>
-            )}
             <tr className="border-b border-border">
               <td className="p-3 font-medium text-text-secondary">Price trend</td>
               {listings.map((l) => {
@@ -523,9 +581,35 @@ export function CompareClient({
                   ))}
                 </tr>
               ))}
+            <tr className="last:border-0">
+              <td className="p-3 font-medium text-text-secondary">Source</td>
+              {listings.map((l) => {
+                const link = resolveProviderLink(l);
+                return (
+                  <td key={l.id} className="p-3">
+                    {link ? (
+                      <a
+                        href={link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-accent-sky hover:underline"
+                      >
+                        Visit {l.provider.name} <ExternalLink size={11} />
+                      </a>
+                    ) : (
+                      <span className="text-[12.5px] text-text-muted">Not provided</span>
+                    )}
+                    <p className="mt-0.5 text-[11px] text-text-muted">
+                      Updated {new Date(l.lastVerifiedAt).toLocaleDateString("en-ZW", { dateStyle: "medium" })}
+                    </p>
+                  </td>
+                );
+              })}
+            </tr>
           </tbody>
         </table>
       </div>
+      <p className="mt-2 text-[11.5px] leading-snug text-text-muted">{NOT_A_RESELLER_NOTICE}</p>
 
       <div className="mt-5">
         <div className="flex flex-col gap-2">
@@ -564,7 +648,23 @@ export function CompareClient({
           </p>
           {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
           {traditionalError && <p className="text-[13px] text-accent-coral">{traditionalError}</p>}
+          {hasIntakeNote && (
+            <p className="text-[11.5px] text-text-muted">
+              Using your saved {categoryName.toLowerCase()} notes for this recommendation — edit them anytime from
+              your profile.
+            </p>
+          )}
         </div>
+
+        {showIntake && intakeQuestions && (
+          <CategoryIntakeModal
+            categoryName={categoryName}
+            questions={intakeQuestions}
+            onSubmit={submitIntake}
+            onSkip={skipIntake}
+            submitting={savingIntake}
+          />
+        )}
 
         {loadingRecommendation && (
           <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
@@ -677,6 +777,29 @@ export function CompareClient({
                   {recommendation.primary_option.key_differentiator}
                 </p>
               )}
+              <div className="mt-2.5 flex items-center gap-2 text-[11.5px]">
+                {(() => {
+                  const link = recommendation.primary_option.source_url ?? recommendation.primary_option.website_url;
+                  return link ? (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-accent-sky hover:underline"
+                    >
+                      Visit {recommendation.primary_option.provider_name} <ExternalLink size={11} />
+                    </a>
+                  ) : (
+                    <span className="text-text-muted">Source not provided</span>
+                  );
+                })()}
+                <span className="text-text-muted">
+                  · Updated{" "}
+                  {new Date(recommendation.primary_option.last_verified_at).toLocaleDateString("en-ZW", {
+                    dateStyle: "medium",
+                  })}
+                </span>
+              </div>
             </div>
 
             <p className="mt-4 text-[14px] leading-[1.6] text-text-secondary">
@@ -705,20 +828,37 @@ export function CompareClient({
                   Also worth considering
                 </p>
                 <ul className="mt-1.5 space-y-1.5">
-                  {alternatives.map((alt) => (
-                    <li key={alt.listing_id} className="flex gap-1.5 text-[13px] leading-snug text-text-secondary">
-                      <span className="shrink-0 text-accent-teal">→</span>
-                      <span>
-                        <Link
-                          href={`/listing/${alt.listing_id}?sector=${sectorSlug}`}
-                          className="font-semibold text-accent-sky hover:underline"
-                        >
-                          {alt.listing_title}
-                        </Link>{" "}
-                        — {alt.key_differentiator}
-                      </span>
-                    </li>
-                  ))}
+                  {alternatives.map((alt) => {
+                    const altLink = alt.source_url ?? alt.website_url;
+                    return (
+                      <li key={alt.listing_id} className="flex gap-1.5 text-[13px] leading-snug text-text-secondary">
+                        <span className="shrink-0 text-accent-teal">→</span>
+                        <span>
+                          <Link
+                            href={`/listing/${alt.listing_id}?sector=${sectorSlug}`}
+                            className="font-semibold text-accent-sky hover:underline"
+                          >
+                            {alt.listing_title}
+                          </Link>{" "}
+                          — {alt.key_differentiator}
+                          {altLink && (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <a
+                                href={altLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-0.5 text-[11.5px] font-medium text-accent-sky hover:underline"
+                              >
+                                Visit {alt.provider_name} <ExternalLink size={10} />
+                              </a>
+                            </>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -759,6 +899,7 @@ export function CompareClient({
             <p className="mt-4 text-[11px] leading-snug text-text-muted">
               {recommendation.explanation.data_traceability_notes}
             </p>
+            <p className="mt-1.5 text-[11px] leading-snug text-text-muted">{NOT_A_RESELLER_NOTICE}</p>
             <Link
               href={chatHref}
               className="tap-target mt-3 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-sky hover:underline"
