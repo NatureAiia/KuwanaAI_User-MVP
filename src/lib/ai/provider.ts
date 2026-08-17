@@ -97,6 +97,8 @@ export async function generateAiJson<T>(params: {
   maxTokens: number;
   effort?: Effort;
   userId?: string;
+  /** Aborts the in-flight upstream call. An abort never escalates the ladder. */
+  signal?: AbortSignal;
 }): Promise<T> {
   const plan = await planFor(params.feature, params.signals, false);
   const messages: NormalizedMessage[] = [{ role: "user", content: params.prompt }];
@@ -114,16 +116,19 @@ export async function generateAiJson<T>(params: {
       let costUsd: number | null = null;
 
       if (model.provider === "anthropic") {
-        const message = await anthropic.messages.create({
-          model: model.id,
-          max_tokens: params.maxTokens,
-          output_config: {
-            effort: params.effort ?? "low",
-            format: { type: "json_schema", schema: params.schema },
+        const message = await anthropic.messages.create(
+          {
+            model: model.id,
+            max_tokens: params.maxTokens,
+            output_config: {
+              effort: params.effort ?? "low",
+              format: { type: "json_schema", schema: params.schema },
+            },
+            system: params.system,
+            messages: toAnthropicMessages(messages),
           },
-          system: params.system,
-          messages: toAnthropicMessages(messages),
-        });
+          { signal: params.signal },
+        );
         const block = message.content.find((b) => b.type === "text");
         text = block && block.type === "text" ? block.text : "";
         inputTokens = message.usage.input_tokens;
@@ -134,6 +139,7 @@ export async function generateAiJson<T>(params: {
           messages,
           maxTokens: params.maxTokens,
           jsonSchema: { name: params.schemaName, schema: params.schema },
+          signal: params.signal,
         });
         text = result.text;
         inputTokens = result.usage.inputTokens;
@@ -148,6 +154,7 @@ export async function generateAiJson<T>(params: {
           messages,
           maxTokens: params.maxTokens,
           jsonSchema: { name: params.schemaName, schema: params.schema },
+          signal: params.signal,
         });
         text = result.text;
         inputTokens = result.usage.inputTokens;
@@ -193,6 +200,11 @@ export async function generateAiJson<T>(params: {
         complexity: plan.complexity,
       });
 
+      // An abort is the caller withdrawing the request, not this rung being
+      // inadequate. Escalating here would answer "stop spending" by spending
+      // more — on a strictly more expensive model.
+      if (params.signal?.aborted) throw err;
+
       const next = plan.candidates[offset + 1];
       if (next) {
         console.warn(
@@ -221,6 +233,12 @@ export async function* streamAiText(params: {
   messages: NormalizedMessage[];
   maxTokens: number;
   userId?: string;
+  /**
+   * Aborts the in-flight upstream call. Without this the generator can only
+   * stop *consuming* deltas — the provider keeps generating, and billing, into
+   * a socket nobody reads. An abort never escalates the ladder.
+   */
+  signal?: AbortSignal;
 }): AsyncGenerator<string> {
   const hasImage = params.messages.some(
     (m) => typeof m.content !== "string" && Boolean(m.content.image),
@@ -242,12 +260,15 @@ export async function* streamAiText(params: {
 
     try {
       if (model.provider === "anthropic") {
-        const stream = anthropic.messages.stream({
-          model: model.id,
-          max_tokens: params.maxTokens,
-          system: params.system,
-          messages: toAnthropicMessages(messages),
-        });
+        const stream = anthropic.messages.stream(
+          {
+            model: model.id,
+            max_tokens: params.maxTokens,
+            system: params.system,
+            messages: toAnthropicMessages(messages),
+          },
+          { signal: params.signal },
+        );
         for await (const event of stream) {
           if (event.type === "message_start") {
             inputTokens = event.message.usage.input_tokens;
@@ -263,6 +284,7 @@ export async function* streamAiText(params: {
           system: params.system,
           messages,
           maxTokens: params.maxTokens,
+          signal: params.signal,
           onUsage: (usage) => {
             inputTokens = usage.inputTokens;
             outputTokens = usage.outputTokens;
@@ -279,6 +301,7 @@ export async function* streamAiText(params: {
           system: params.system,
           messages,
           maxTokens: params.maxTokens,
+          signal: params.signal,
           onUsage: (usage) => {
             inputTokens = usage.inputTokens;
             outputTokens = usage.outputTokens;
@@ -315,6 +338,10 @@ export async function* streamAiText(params: {
     }
 
     if (errorMessage === null) return;
+
+    // Same rule as generateAiJson: an abort withdraws the request, so it must
+    // not be answered by retrying on a costlier rung.
+    if (params.signal?.aborted) throw lastError;
 
     // Past the point of no return: the caller already has text on screen.
     if (emitted) throw lastError;

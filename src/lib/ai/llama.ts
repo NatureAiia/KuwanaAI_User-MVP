@@ -106,6 +106,7 @@ export async function llamaChat(args: {
   messages: ChatMessage[];
   format?: Record<string, unknown>;
   options?: ChatRequest["options"];
+  signal?: AbortSignal;
 }): Promise<string> {
   const url = `${baseUrl()}/api/chat`;
   const body: ChatRequest = {
@@ -123,8 +124,12 @@ export async function llamaChat(args: {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
+      signal: args.signal,
     });
   } catch (err) {
+    // An abort is the caller's own decision, not the endpoint being down —
+    // rethrow it unwrapped so provider.ts doesn't escalate to the next rung.
+    if (args.signal?.aborted) throw err;
     throw new LlamaUnavailableError(
       `Could not reach the Llama endpoint at ${url}. Is it running? (LLAMA_VISION_BASE_URL)`,
       err,
@@ -156,6 +161,7 @@ export async function llamaChat(args: {
 export async function* llamaChatStream(args: {
   messages: ChatMessage[];
   options?: ChatRequest["options"];
+  signal?: AbortSignal;
 }): AsyncGenerator<string, void, void> {
   const url = `${baseUrl()}/api/chat`;
   const body: ChatRequest = {
@@ -172,8 +178,11 @@ export async function* llamaChatStream(args: {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(body),
+      signal: args.signal,
     });
   } catch (err) {
+    // See llamaChat: an aborted request is the caller stopping, not an outage.
+    if (args.signal?.aborted) throw err;
     throw new LlamaUnavailableError(
       `Could not reach the Llama endpoint at ${url}. Is it running?`,
       err,
@@ -193,26 +202,33 @@ export async function* llamaChatStream(args: {
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let nl: number;
-    while ((nl = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, nl).trim();
-      buffer = buffer.slice(nl + 1);
-      if (!line) continue;
-      try {
-        const obj = JSON.parse(line) as ChatResponse;
-        const delta = obj.message?.content;
-        if (typeof delta === "string" && delta.length > 0) {
-          yield delta;
+  // The finally is load-bearing: a consumer that stops early (the caller
+  // aborted, the client disconnected) runs the generator's `return`, and
+  // without this the socket stays open and Ollama keeps generating into it.
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl: number;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        try {
+          const obj = JSON.parse(line) as ChatResponse;
+          const delta = obj.message?.content;
+          if (typeof delta === "string" && delta.length > 0) {
+            yield delta;
+          }
+        } catch {
+          // Ignore malformed lines — Ollama should always send valid JSON, but
+          // a stray heartbeat shouldn't kill the stream.
         }
-      } catch {
-        // Ignore malformed lines — Ollama should always send valid JSON, but
-        // a stray heartbeat shouldn't kill the stream.
       }
     }
+  } finally {
+    await reader.cancel().catch(() => {});
   }
 }
 

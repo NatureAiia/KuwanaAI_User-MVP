@@ -54,11 +54,13 @@ export async function ollamaComplete(params: {
   messages: NormalizedMessage[];
   maxTokens: number;
   jsonSchema?: { name: string; schema: Record<string, unknown> };
+  signal?: AbortSignal;
 }): Promise<{ text: string; usage: OllamaUsage }> {
   const text = await llamaChat({
     messages: toChatMessages(params.system, params.messages),
     format: params.jsonSchema?.schema,
     options: { num_predict: params.maxTokens },
+    signal: params.signal,
   });
   return { text, usage: ZERO_USAGE };
 }
@@ -68,10 +70,12 @@ export async function* ollamaStream(params: {
   messages: NormalizedMessage[];
   maxTokens: number;
   onUsage: (usage: OllamaUsage) => void;
+  signal?: AbortSignal;
 }): AsyncGenerator<string> {
   for await (const delta of llamaChatStream({
     messages: toChatMessages(params.system, params.messages),
     options: { num_predict: params.maxTokens },
+    signal: params.signal,
   })) {
     yield delta;
   }

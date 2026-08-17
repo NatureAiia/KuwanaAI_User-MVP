@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initiateExpressCheckout, initiateTransaction, normalizeStatus, verifyPaynowHash } from "@/lib/paynow";
+import {
+  initiateExpressCheckout,
+  initiateTransaction,
+  normalizeStatus,
+  pollTransactionStatus,
+  verifyPaynowHash,
+} from "@/lib/paynow";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -68,6 +74,74 @@ describe("verifyPaynowHash", () => {
   it("hash comparison is case-insensitive on the incoming value", () => {
     const hash = computeExpectedHash(baseFields, "usd-test-key");
     expect(verifyPaynowHash({ ...baseFields, hash: hash.toLowerCase() }, "USD")).toBe(true);
+  });
+
+  // The compare is constant-time (crypto.timingSafeEqual), which requires
+  // equal-length buffers. These cover the inputs that would otherwise make it
+  // throw rather than return false — a throw here would be a 500 on the
+  // webhook instead of a clean rejection.
+  it("rejects a hash that is too short without throwing", () => {
+    expect(verifyPaynowHash({ ...baseFields, hash: "ABCD" }, "USD")).toBe(false);
+  });
+
+  it("rejects a hash that is too long without throwing", () => {
+    const hash = computeExpectedHash(baseFields, "usd-test-key");
+    expect(verifyPaynowHash({ ...baseFields, hash: hash + "00" }, "USD")).toBe(false);
+  });
+
+  it("rejects a hash of the right length that differs only in the last character", () => {
+    const hash = computeExpectedHash(baseFields, "usd-test-key");
+    const flipped = hash.slice(0, -1) + (hash.endsWith("A") ? "B" : "A");
+    expect(verifyPaynowHash({ ...baseFields, hash: flipped }, "USD")).toBe(false);
+  });
+
+  it("rejects a hash that differs only in the first character", () => {
+    const hash = computeExpectedHash(baseFields, "usd-test-key");
+    const flipped = (hash.startsWith("A") ? "B" : "A") + hash.slice(1);
+    expect(verifyPaynowHash({ ...baseFields, hash: flipped }, "USD")).toBe(false);
+  });
+});
+
+describe("pollTransactionStatus — host allowlist", () => {
+  function stubFetch() {
+    const fetchMock = vi.fn(async () => new Response("status=Paid&paynowreference=PN-1", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("polls a real Paynow URL", async () => {
+    const fetchMock = stubFetch();
+    const result = await pollTransactionStatus(
+      "https://www.paynow.co.zw/interface/checktransactionstatus?guid=abc",
+    );
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(result).toEqual({ status: "Paid", paynowReference: "PN-1" });
+  });
+
+  it("accepts the apex domain as well as a subdomain", async () => {
+    const fetchMock = stubFetch();
+    await pollTransactionStatus("https://paynow.co.zw/interface/checktransactionstatus?guid=abc");
+
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a lookalike domain", "https://evil-paynow.co.zw/poll"],
+    ["a suffixed domain", "https://paynow.co.zw.attacker.test/poll"],
+    ["an unrelated host", "https://attacker.test/poll"],
+    ["cleartext http", "http://paynow.co.zw/poll"],
+    ["the cloud metadata endpoint", "http://169.254.169.254/latest/meta-data/"],
+    ["a file URL", "file:///etc/passwd"],
+    ["a malformed URL", "not-a-url"],
+  ])("refuses to fetch %s", async (_label, url) => {
+    const fetchMock = stubFetch();
+    const result = await pollTransactionStatus(url);
+
+    // The point is that no request is made at all, not merely that the result
+    // is null — a null after the fetch would still be an SSRF.
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result).toBeNull();
   });
 });
 

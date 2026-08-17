@@ -17,3 +17,10 @@ data:
   # running the image without them.
   NEXT_PUBLIC_SUPABASE_URL: {{ .Values.config.supabaseUrl | quote }}
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: {{ .Values.config.supabasePublishableKey | quote }}
+  # The pool size the application actually applies. The `connection_limit`
+  # parameter on the database URL is Prisma-engine syntax that the Prisma 7
+  # `pg` driver adapter does not read — src/lib/prismaAdapter.ts sets
+  # `Pool({ max })` from this variable instead. Both come from the same
+  # `database.connectionLimit` value so the render-time budget check in
+  # _helpers.tpl stays a true statement about what pods will open.
+  DATABASE_POOL_MAX: {{ .Values.database.connectionLimit | quote }}

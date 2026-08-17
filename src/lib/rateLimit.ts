@@ -99,6 +99,7 @@ let redisUnavailable = false;
 
 type MinimalRedis = {
   incr(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<unknown>;
   pttl(key: string): Promise<number>;
 };
@@ -210,7 +211,106 @@ export const RATE_LIMITS = {
   biApi: { limit: 60, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
+/* -------------------------------------------------------------------------- */
+/* Concurrency slots                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A cap on *simultaneous* long-running requests per user, which a rate limit
+ * cannot express: 20 chats/minute is a reasonable budget, and 20 chats open at
+ * once from one account is not. Each one holds an upstream LLM stream open, so
+ * the cost of the concurrent case is unbounded in a way the per-minute count
+ * never reveals.
+ *
+ * FAILURE POLICY — deliberately the opposite of enforceRateLimit above. That
+ * one degrades to a per-replica counter because dropping a spend limit is
+ * worse than being approximate. This one **fails open**: a Redis outage must
+ * not make chat unusable, and the rate limit is still in force underneath as
+ * the real spend ceiling. So a slot that cannot be acquired for infrastructure
+ * reasons is granted, not refused.
+ *
+ * Slots carry a TTL so a pod that dies mid-stream cannot leak one forever —
+ * without it, a crash would permanently consume a user's budget.
+ */
+const INFLIGHT_KEY_PREFIX = "kuwana:inflight:";
+
+/** Longer than any legitimate stream, short enough that a leaked slot self-heals. */
+const INFLIGHT_TTL_SECONDS = 300;
+
+const inflight = new Map<string, number>();
+
+export type ConcurrencySlot = {
+  /** False when the caller is already at its cap and should be refused. */
+  acquired: boolean;
+  /** Always safe to call, exactly once, including when `acquired` is false. */
+  release: () => Promise<void>;
+};
+
+const NOOP_SLOT: ConcurrencySlot = { acquired: true, release: async () => {} };
+
+export async function acquireConcurrencySlot(key: string, limit: number): Promise<ConcurrencySlot> {
+  const redis = getRedis();
+
+  if (!redis) {
+    // Single-server fallback. Real on one instance, per-replica on many —
+    // same caveat as the in-process rate limiter, and stated for the same
+    // reason: it must not be described as a distributed cap.
+    const current = inflight.get(key) ?? 0;
+    if (current >= limit) return { acquired: false, release: async () => {} };
+    inflight.set(key, current + 1);
+    let released = false;
+    return {
+      acquired: true,
+      release: async () => {
+        if (released) return;
+        released = true;
+        const now = inflight.get(key) ?? 0;
+        if (now <= 1) inflight.delete(key);
+        else inflight.set(key, now - 1);
+      },
+    };
+  }
+
+  const redisKey = INFLIGHT_KEY_PREFIX + key;
+  let count: number;
+  try {
+    count = await redis.incr(redisKey);
+    // Refreshed on every acquire, not just the first: a user who keeps
+    // chatting should never have a live slot expire out from under them.
+    await redis.expire(redisKey, INFLIGHT_TTL_SECONDS);
+  } catch {
+    return NOOP_SLOT; // Fail open — see the policy note above.
+  }
+
+  let released = false;
+  const release = async () => {
+    if (released) return;
+    released = true;
+    try {
+      await redis.decr(redisKey);
+    } catch {
+      // The TTL is the backstop. Nothing useful to do here.
+    }
+  };
+
+  if (count > limit) {
+    // Give the slot straight back — this attempt is being refused, so it must
+    // not sit in the count until the TTL lapses.
+    await release();
+    return { acquired: false, release: async () => {} };
+  }
+
+  return { acquired: true, release };
+}
+
+/** Named budgets, same rationale as RATE_LIMITS. */
+export const CONCURRENCY_LIMITS = {
+  /** Simultaneous open LLM streams per user. Two devices is plausible; ten is not. */
+  chatStreams: 3,
+} as const;
+
 /** Test-only: drops all recorded windows so cases cannot leak into each other. */
 export function __resetRateLimits() {
   hits.clear();
+  inflight.clear();
 }

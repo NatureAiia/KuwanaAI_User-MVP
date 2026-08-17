@@ -294,15 +294,23 @@ networkPolicy:
   allowExternalEgress: true
 
 # --- database connection budget -------------------------------------------
-# Prisma opens a pool per process, defaulting to (cpu_count * 2 + 1). That
-# default is sized for one server, not for an autoscaled fleet: at 20 replicas
-# it silently asks for hundreds of connections and the database starts
-# refusing them — which looks like a total outage, not a capacity problem.
+# The app opens a connection pool per process. Left at its default that pool is
+# sized for one server, not for an autoscaled fleet: at 20 replicas it silently
+# asks for hundreds of connections and the database starts refusing them —
+# which looks like a total outage, not a capacity problem.
 #
 # The budget is: maxReplicas x connectionLimit + migrations + cron <= the
 # server's max_connections. The chart checks this arithmetic at render time
 # for the in-cluster database and fails rather than letting it be discovered
 # in production.
+#
+# HOW IT REACHES THE POOL: as DATABASE_POOL_MAX on the ConfigMap, read by
+# src/lib/prismaAdapter.ts. NOT via the `connection_limit` parameter on the
+# database URL — that is Prisma-engine syntax, and Prisma 7's `pg` driver
+# adapter ignores it entirely (defaulting to 10, i.e. double this value). The
+# URL still carries it for any tool that does read it, but it is not what
+# constrains the app, and the render-time check above would otherwise be
+# asserting a budget nothing enforced.
 database:
   # Per pod. Small on purpose — an SSR request holds a connection for
   # milliseconds, so a handful per pod saturates well past the point where

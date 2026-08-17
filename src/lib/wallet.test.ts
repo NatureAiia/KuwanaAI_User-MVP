@@ -3,9 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const userUpdate = vi.fn();
 const walletTransactionUpdate = vi.fn();
 const walletTransactionUpdateMany = vi.fn();
+// The amount-mismatch path writes outside $transaction (it credits nothing, so
+// there is nothing to make atomic), so the mock has to expose the same
+// delegate at the top level as well as inside the callback.
+const topLevelUpdateMany = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    walletTransaction: { updateMany: topLevelUpdateMany },
     $transaction: vi.fn(async (callback: (db: unknown) => Promise<unknown>) =>
       callback({
         user: { update: userUpdate },
@@ -21,7 +26,9 @@ beforeEach(() => {
   userUpdate.mockReset();
   walletTransactionUpdate.mockReset();
   walletTransactionUpdateMany.mockReset();
+  topLevelUpdateMany.mockReset();
   walletTransactionUpdateMany.mockResolvedValue({ count: 1 });
+  topLevelUpdateMany.mockResolvedValue({ count: 1 });
 });
 
 function tx(overrides: Partial<Parameters<typeof applyPaynowStatusUpdate>[0]> = {}) {
@@ -122,5 +129,99 @@ describe("applyPaynowStatusUpdate", () => {
   it("returns the normalized status", async () => {
     const result = await applyPaynowStatusUpdate(tx(), { status: "Awaiting Delivery" });
     expect(result).toBe("paid");
+  });
+});
+
+describe("applyPaynowStatusUpdate — reported amount", () => {
+  it("credits when the reported amount matches the requested amount", async () => {
+    await applyPaynowStatusUpdate(tx({ amount: 10 }), { status: "Paid", amount: "10.00" });
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { walletBalanceUsd: { increment: 10 } },
+    });
+  });
+
+  it("credits nothing when the customer short-pays", async () => {
+    const result = await applyPaynowStatusUpdate(tx({ amount: 100 }), { status: "Paid", amount: "1.00" });
+
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(result).toBe("failed");
+  });
+
+  it("does not credit the smaller amount either — a short payment is not a discount", async () => {
+    await applyPaynowStatusUpdate(tx({ amount: 100 }), { status: "Paid", amount: "1.00" });
+
+    // Not "increment: 1" and not "increment: 100" — nothing at all.
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it("marks the mismatched transaction failed with a reason an admin can act on", async () => {
+    await applyPaynowStatusUpdate(tx({ amount: 100 }), { status: "Paid", amount: "1.00" });
+
+    expect(topLevelUpdateMany).toHaveBeenCalledWith({
+      where: { id: "tx-1", status: { not: "paid" } },
+      data: expect.objectContaining({
+        status: "failed",
+        failureReason: expect.stringContaining("Amount mismatch"),
+      }),
+    });
+  });
+
+  it("credits nothing when the customer over-pays", async () => {
+    const result = await applyPaynowStatusUpdate(tx({ amount: 10 }), { status: "Paid", amount: "500.00" });
+
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(result).toBe("failed");
+  });
+
+  it("accepts trailing-zero differences — 10.1 and 10.10 are the same money", async () => {
+    await applyPaynowStatusUpdate(tx({ amount: 10.1 }), { status: "Paid", amount: "10.10" });
+
+    expect(userUpdate).toHaveBeenCalled();
+  });
+
+  it("rejects a one-cent discrepancy rather than rounding it away", async () => {
+    const result = await applyPaynowStatusUpdate(tx({ amount: 10 }), { status: "Paid", amount: "9.99" });
+
+    expect(result).toBe("failed");
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-numeric reported amount instead of treating NaN as a match", async () => {
+    const result = await applyPaynowStatusUpdate(tx({ amount: 10 }), { status: "Paid", amount: "abc" });
+
+    expect(result).toBe("failed");
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it("still credits when no amount is reported at all — the poll fallback carries none", async () => {
+    // pollTransactionStatus returns only { status, paynowReference }. Failing
+    // closed here would disable the fallback that exists for when the webhook
+    // never arrives, so an absent amount is not a mismatch.
+    await applyPaynowStatusUpdate(tx({ amount: 10 }), { status: "Paid" });
+
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { walletBalanceUsd: { increment: 10 } },
+    });
+  });
+
+  it("ignores the reported amount for a non-paid status", async () => {
+    const result = await applyPaynowStatusUpdate(tx(), { status: "Cancelled", amount: "0.00" });
+
+    expect(result).toBe("cancelled");
+    expect(topLevelUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("does not re-fail a transaction that is already paid (mismatch check respects idempotency)", async () => {
+    topLevelUpdateMany.mockResolvedValue({ count: 0 });
+
+    await applyPaynowStatusUpdate(tx({ status: "paid", amount: 100 }), { status: "Paid", amount: "1.00" });
+
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(topLevelUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "tx-1", status: { not: "paid" } } }),
+    );
   });
 });

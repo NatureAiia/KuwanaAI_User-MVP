@@ -27,7 +27,7 @@
  * lost even if the enum mapping below needs adjusting later.
  */
 
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 export class PaynowNotConfiguredError extends Error {
   constructor(currency: "USD" | "ZiG") {
@@ -214,18 +214,59 @@ export function verifyPaynowHash(fields: Record<string, string>, currency: "USD"
   try {
     const { key } = getCredentials(currency);
     const expected = computeHash(fields, RESPONSE_HASH_FIELD_ORDER, key);
-    return expected === fields.hash.toUpperCase();
+    // Constant-time. `===` on a MAC leaks, through its own running time, how
+    // many leading characters of a guess were right — which turns forging a
+    // "paid" callback from an infeasible search into a per-character one.
+    // Both sides are fixed-length uppercase SHA512 hex, so a length mismatch
+    // is itself a failure and timingSafeEqual's equal-length requirement is
+    // never the thing that rejects.
+    const candidate = Buffer.from(fields.hash.toUpperCase(), "utf8");
+    const reference = Buffer.from(expected, "utf8");
+    if (candidate.length !== reference.length) return false;
+    return timingSafeEqual(candidate, reference);
   } catch {
     return false;
   }
 }
 
+/**
+ * Paynow's own hosts. `pollUrl` is read back out of our database and then
+ * fetched, so it is a server-side request to a stored URL — the shape that
+ * becomes SSRF the moment anything upstream can influence the stored value.
+ * Today it can only come from Paynow's own response body, which makes this
+ * defence in depth rather than a patch for a live hole; it costs one string
+ * comparison and removes the class.
+ */
+function isPaynowHost(rawUrl: string): boolean {
+  try {
+    const url = new URL(rawUrl);
+    // Suffix match on a dot-prefixed root, so `evil-paynow.co.zw` and
+    // `paynow.co.zw.attacker.test` both fail.
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "paynow.co.zw" || url.hostname.endsWith(".paynow.co.zw"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Poll requests are a fallback on a page render — bounded so a hung Paynow cannot hang the page. */
+const POLL_TIMEOUT_MS = 10_000;
+
 /** GET pollUrl fallback, used by the return page if the webhook hasn't landed yet. Never throws. */
 export async function pollTransactionStatus(
   pollUrl: string,
 ): Promise<{ status: string; paynowReference?: string } | null> {
+  if (!isPaynowHost(pollUrl)) {
+    console.error("[paynow] refusing to poll a non-Paynow URL");
+    return null;
+  }
   try {
-    const res = await fetch(pollUrl, { method: "POST" });
+    const res = await fetch(pollUrl, {
+      method: "POST",
+      signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const raw = await res.text();
     const fields = Object.fromEntries(new URLSearchParams(raw));

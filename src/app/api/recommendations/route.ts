@@ -8,6 +8,7 @@ import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { buildTotalCostSummary } from "@/lib/totalCost";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import {
   getCachedRecommendation,
   isValidRecommendation,
@@ -115,6 +116,12 @@ export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  // Bills a model on a cache miss. Keyed by user id — the route is
+  // authenticated, so identity is known rather than inferred from a
+  // spoofable header.
+  const limited = await enforceRateLimit(`recommendations:${user.id}`, RATE_LIMITS.authedAi);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
