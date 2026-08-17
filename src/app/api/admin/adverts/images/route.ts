@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/components/provider/imageGallery";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 
 const BUCKET = "advert-images";
 
 export async function POST(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Not authorised" }, { status: 403 });
+
+  const limited = await enforceRateLimit(`admin-advert-image-upload:${admin.id}`, RATE_LIMITS.mediaUpload);
+  if (limited) return limited;
 
   const formData = await req.formData();
   const file = formData.get("file");
