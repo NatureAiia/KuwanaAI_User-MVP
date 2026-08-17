@@ -481,57 +481,8 @@ ALTER TABLE "user_streaks" ADD CONSTRAINT "user_streaks_user_id_fkey" FOREIGN KE
 
 COMMIT;
 
--- ---------------------------------------------------------------------
--- SUPABASE-ONLY — links public.users to Supabase's own auth.users.
--- Skip this whole section when targeting non-Supabase Postgres — there is
--- no auth.users table there, and no equivalent of it is needed either.
---
--- Not a native FK: auth.users.id is Postgres uuid, public.users.id is
--- TEXT (Prisma's @default(uuid()) convention) — Postgres refuses a FK
--- across incompatible types outright ("cannot be implemented ... text and
--- uuid"), confirmed by testing it directly before writing this. Triggers
--- get the same two guarantees a same-type FK would:
---   1. public.users can't hold an id with no matching auth.users row
---      (the app already only ever writes users.id from an authenticated
---      session, see src/app/api/onboarding/route.ts — this is a backstop).
---   2. Deleting the Auth user (e.g. via the Supabase dashboard) cascades
---      to the app-side row and, from there, everything that already
---      ON DELETE CASCADEs from public.users above.
--- SECURITY DEFINER + empty search_path per Supabase's own documented
--- pattern for auth.users triggers, to avoid search_path hijacking.
--- ---------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.enforce_users_auth_id()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = NEW.id::uuid) THEN
-    RAISE EXCEPTION 'public.users.id % has no matching auth.users row', NEW.id;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER users_require_auth_id
-BEFORE INSERT OR UPDATE OF id ON public.users
-FOR EACH ROW
-EXECUTE FUNCTION public.enforce_users_auth_id();
-
-CREATE OR REPLACE FUNCTION public.handle_deleted_auth_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = ''
-AS $$
-BEGIN
-  DELETE FROM public.users WHERE id = OLD.id::text;
-  RETURN OLD;
-END;
-$$;
-
-CREATE TRIGGER on_auth_user_deleted
-AFTER DELETE ON auth.users
-FOR EACH ROW
-EXECUTE FUNCTION public.handle_deleted_auth_user();
+-- The Supabase-only auth.users <-> public.users linking triggers that used to
+-- live here were removed once Auth.js (NextAuth v5) replaced Supabase Auth —
+-- see prisma/migrations/20260817040000_drop_supabase_auth_triggers. There is
+-- no equivalent needed: public.users.id is no longer required to reference
+-- any external auth-provider table.
