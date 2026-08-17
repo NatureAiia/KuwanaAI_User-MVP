@@ -95,10 +95,17 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-            # Not read-only: Postgres writes its socket and stat files under
-            # /var/run/postgresql and /tmp, both mounted as emptyDir below,
-            # but the image also touches paths under /var/lib/postgresql.
-            readOnlyRootFilesystem: false
+            # Every path Postgres writes to is already a mount: the PVC at
+            # /var/lib/postgresql/data (with PGDATA a subdirectory of it), and
+            # emptyDirs at /var/run/postgresql for the socket and /tmp. Nothing
+            # is left on the root filesystem.
+            #
+            # This previously said the image "also touches paths under
+            # /var/lib/postgresql" and set false. That is not the case —
+            # verified by running postgres:17-alpine with --read-only and only
+            # these three mounts: initdb completed on an empty volume and the
+            # server came up accepting connections on the unix socket.
+            readOnlyRootFilesystem: true
           ports:
             - name: postgres
               containerPort: 5432

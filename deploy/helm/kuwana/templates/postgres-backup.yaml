@@ -62,6 +62,11 @@ spec:
                 allowPrivilegeEscalation: false
                 capabilities:
                   drop: ["ALL"]
+                # pg_dump writes only to /backup, which is mounted below.
+                # Verified the same way as the StatefulSet: a --read-only
+                # postgres:17-alpine container dumped to a mounted volume,
+                # including the .partial rename, with nothing on the root fs.
+                readOnlyRootFilesystem: true
               env:
                 - name: PGPASSWORD
                   valueFrom:
