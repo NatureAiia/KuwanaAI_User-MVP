@@ -5,18 +5,23 @@ import { useRouter } from "next/navigation";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ImageGalleryField } from "@/components/provider/ImageGalleryField";
 
 export function ListingRowActions({
   listingId,
   currentPrice,
   currentCurrency,
   currentSourceUrl,
+  currentDescription,
+  currentImages,
   status,
 }: {
   listingId: string;
   currentPrice: number;
   currentCurrency: string;
   currentSourceUrl: string | null;
+  currentDescription?: string | null;
+  currentImages?: string[];
   status: "draft" | "pending_review" | "published" | "rejected";
 }) {
   const router = useRouter();
@@ -26,6 +31,8 @@ export function ListingRowActions({
   const [price, setPrice] = useState(String(currentPrice));
   const [currency, setCurrency] = useState(currentCurrency);
   const [sourceUrl, setSourceUrl] = useState(currentSourceUrl ?? "");
+  const [description, setDescription] = useState(currentDescription ?? "");
+  const [images, setImages] = useState<string[]>(currentImages ?? []);
   const [loading, setLoading] = useState(false);
   const confirm = useConfirmDialog();
 
@@ -48,7 +55,13 @@ export function ListingRowActions({
   }
 
   async function save() {
-    await patch({ price: Number(price), currency, sourceUrl: sourceUrl || null });
+    await patch({
+      price: Number(price),
+      currency,
+      sourceUrl: sourceUrl || null,
+      description: description || null,
+      images,
+    });
   }
 
   async function remove() {
@@ -142,31 +155,43 @@ export function ListingRowActions({
   return (
     <>
       {confirm.render()}
+      <div className="flex w-72 flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
-      <input
-        type="number"
-        step="0.01"
-        value={price}
-        onChange={(e) => setPrice(e.target.value)}
-        className="tap-target w-20 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+        <input
+          type="number"
+          step="0.01"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="tap-target w-20 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+        />
+        <input
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className="tap-target w-14 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+        />
+        <input
+          placeholder="Source URL"
+          value={sourceUrl}
+          onChange={(e) => setSourceUrl(e.target.value)}
+          className="tap-target w-32 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
+        />
+      </div>
+      <textarea
+        placeholder="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={2}
+        className="tap-target w-full rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
       />
-      <input
-        value={currency}
-        onChange={(e) => setCurrency(e.target.value)}
-        className="tap-target w-14 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
-      />
-      <input
-        placeholder="Source URL"
-        value={sourceUrl}
-        onChange={(e) => setSourceUrl(e.target.value)}
-        className="tap-target w-32 rounded-lg border border-border bg-bg-surface p-1.5 text-[12px]"
-      />
-      <Button size="md" onClick={save} disabled={loading} className="!px-2.5 !py-1.5 !text-[12px]">
-        Save
-      </Button>
-      <Button variant="ghost" size="md" onClick={() => setEditing(false)} className="!px-2 !py-1.5 !text-[12px]">
-        Cancel
-      </Button>
+      <ImageGalleryField images={images} onChange={setImages} uploadUrl="/api/admin/listings/images" />
+      <div className="flex gap-1.5">
+        <Button size="md" onClick={save} disabled={loading} className="!px-2.5 !py-1.5 !text-[12px]">
+          Save
+        </Button>
+        <Button variant="ghost" size="md" onClick={() => setEditing(false)} className="!px-2 !py-1.5 !text-[12px]">
+          Cancel
+        </Button>
+      </div>
       </div>
     </>
   );

@@ -3,14 +3,14 @@
 import { memo, useState } from "react";
 import Link from "next/link";
 import { clsx } from "clsx";
-import { Bookmark, BookmarkCheck, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Bookmark, BookmarkCheck, CheckCircle2, ExternalLink, ShieldCheck } from "lucide-react";
 import { SignalBloom } from "@/components/SignalBloom";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { CategoryBadge } from "@/components/CategoryBadge";
 import { ListingCoverArt } from "@/components/ListingCoverArt";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { Badge } from "@/components/ui/Card";
-import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW } from "@/lib/listingDisplay";
+import { FRESHNESS_TONE, TREND_TONE, TREND_ARROW, resolveProviderLink } from "@/lib/listingDisplay";
 import { notifyGamification } from "@/lib/gamification/client";
 import { useCurrency } from "@/components/CurrencyProvider";
 import type { ListingDTO } from "@/types/catalog";
@@ -66,6 +66,7 @@ export const ListingCard = memo(function ListingCard({
   const hasSavings = trend && trend.direction === "down" && trend.earliestPrice > trend.currentPrice;
 
   const coverImage = listing.images[0];
+  const providerLink = resolveProviderLink(listing);
 
   return (
     <div
@@ -199,12 +200,27 @@ export const ListingCard = memo(function ListingCard({
           ))}
         </div>
 
+        <p className="mt-1.5 text-[10.5px] text-text-muted">
+          Updated {new Date(listing.lastVerifiedAt).toLocaleDateString("en-ZW", { dateStyle: "medium" })}
+        </p>
+
         <Link
           href={`/listing/${listing.id}?sector=${sectorSlug}`}
           className="tap-target mt-2.5 flex items-center justify-center rounded-xl border border-border text-[12px] font-semibold text-text-secondary hover:border-accent-sky/50 hover:text-accent-sky"
         >
           View details
         </Link>
+        {providerLink && (
+          <a
+            href={providerLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="tap-target mt-1.5 flex items-center justify-center gap-1 text-[11px] font-semibold text-accent-sky hover:underline"
+          >
+            Visit provider <ExternalLink size={10} />
+          </a>
+        )}
       </div>
     </div>
   );

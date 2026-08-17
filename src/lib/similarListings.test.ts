@@ -21,9 +21,9 @@ function listing(
   };
 }
 
-const econet = { id: "econet", name: "Econet", logoUrl: null, verified: true };
-const netone = { id: "netone", name: "NetOne", logoUrl: null, verified: true };
-const telecel = { id: "telecel", name: "Telecel", logoUrl: null, verified: true };
+const econet = { id: "econet", name: "Econet", logoUrl: null, verified: true, websiteUrl: null };
+const netone = { id: "netone", name: "NetOne", logoUrl: null, verified: true, websiteUrl: null };
+const telecel = { id: "telecel", name: "Telecel", logoUrl: null, verified: true, websiteUrl: null };
 
 const dataBundleSchema: AttributeSchemaFieldDTO[] = [
   { key: "data_amount", label: "Data", dataType: "number", unit: "GB", isComparable: true, sortOrder: 0 },
@@ -121,7 +121,7 @@ describe("findClosestMatches", () => {
     const strong1 = listing({ id: "strong1", provider: telecel, attributes: { data_amount: 5, validity_days: 30 } });
     const strong2 = listing({
       id: "strong2",
-      provider: { id: "cbz", name: "CBZ", logoUrl: null, verified: true },
+      provider: { id: "cbz", name: "CBZ", logoUrl: null, verified: true, websiteUrl: null },
       attributes: { data_amount: 6, validity_days: 30 },
     });
 

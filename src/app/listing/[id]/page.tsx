@@ -21,7 +21,7 @@ import { CompareToggleButton } from "@/components/explore/CompareToggleButton";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { PriceSparkline } from "@/components/PriceSparkline";
 import { FormattedPrice } from "@/components/FormattedPrice";
-import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE, PROVENANCE_LABEL } from "@/lib/listingDisplay";
+import { TREND_TONE, TREND_ARROW, FRESHNESS_TONE, PROVENANCE_LABEL, resolveProviderLink, NOT_A_RESELLER_NOTICE } from "@/lib/listingDisplay";
 
 export async function generateMetadata({
   params,
@@ -305,17 +305,23 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
                 </p>
               </div>
             </div>
-            {listing.sourceUrl && (
-              <a
-                href={listing.sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tap-target mt-3 flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-sky hover:underline"
-              >
-                <ExternalLink size={13} />
-                View the original listing
-              </a>
-            )}
+            {(() => {
+              const link = resolveProviderLink(listing);
+              return (
+                link && (
+                  <a
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tap-target mt-3 flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-sky hover:underline"
+                  >
+                    <ExternalLink size={13} />
+                    {listing.sourceUrl ? "View the original listing" : `Visit ${listing.provider.name}`}
+                  </a>
+                )
+              );
+            })()}
+            <p className="mt-2 text-[11px] leading-snug text-text-muted">{NOT_A_RESELLER_NOTICE}</p>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Card";
 import { NewListingFormLazy, NewProviderFormLazy } from "@/components/LazyClients";
 import { ListingRowActions } from "@/components/admin/ListingRowActions";
 import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
+import { ProviderWebsiteLink } from "@/components/admin/ProviderWebsiteLink";
 import { CorporateDomainLink } from "@/components/admin/CorporateDomainLink";
 import { SearchableSection } from "@/components/admin/SearchableSection";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
@@ -133,6 +134,8 @@ export default async function AdminCatalogPage({
                     currentPrice={Number(l.price)}
                     currentCurrency={l.currency}
                     currentSourceUrl={l.sourceUrl}
+                    currentDescription={l.description}
+                    currentImages={l.images}
                     status={l.status}
                   />
                 </td>
@@ -172,6 +175,7 @@ export default async function AdminCatalogPage({
               <tr className="border-b border-border bg-bg-surface-raised text-left">
                 <th className="p-3 font-medium text-text-muted">Provider</th>
                 <th className="p-3 font-medium text-text-muted">Verified</th>
+                <th className="p-3 font-medium text-text-muted">Website</th>
                 <th className="p-3 font-medium text-text-muted">Owner</th>
                 <th className="p-3 font-medium text-text-muted">Corporate domain</th>
               </tr>
@@ -184,6 +188,9 @@ export default async function AdminCatalogPage({
                     <Badge tone={p.verified ? "teal" : "coral"}>{p.verified ? "Verified" : "Unverified"}</Badge>
                   </td>
                   <td className="p-3">
+                    <ProviderWebsiteLink providerId={p.id} currentWebsiteUrl={p.websiteUrl} />
+                  </td>
+                  <td className="p-3">
                     <ProviderOwnerLink providerId={p.id} currentOwnerEmail={p.owner?.email ?? null} />
                   </td>
                   <td className="p-3">
@@ -193,7 +200,7 @@ export default async function AdminCatalogPage({
               ))}
               {providers.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="p-6">
+                  <td colSpan={5} className="p-6">
                     <EmptyState
                       variant="inline"
                       title="No providers yet."

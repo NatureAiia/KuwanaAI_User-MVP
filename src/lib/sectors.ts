@@ -51,7 +51,7 @@ export const SECTORS: Record<
     slug: "insurance",
     icon: ShieldCheck,
     status: "live",
-    blurb: "Motor, health & life cover",
+    blurb: "Motor, life & medical aid cover",
   },
   education: {
     name: "Education",
@@ -85,7 +85,7 @@ export const SECTORS: Record<
     name: "Pharmacy",
     slug: "pharmacy",
     icon: Pill,
-    status: "live",
+    status: "coming_soon",
     blurb: "Health essentials",
   },
   electronics: {
@@ -106,14 +106,14 @@ export const SECTORS: Record<
     name: "Hotels",
     slug: "hotels",
     icon: Hotel,
-    status: "coming_soon",
+    status: "live",
     blurb: "Hotels & stays",
   },
   retail: {
     name: "Retail & Groceries",
     slug: "retail",
     icon: ShoppingCart,
-    status: "coming_soon",
+    status: "live",
     blurb: "Groceries & staples",
   },
 };
@@ -125,5 +125,6 @@ export const LIVE_SECTORS: SectorSlug[] = [
   "education",
   "transport",
   "utilities",
-  "pharmacy",
+  "hotels",
+  "retail",
 ];

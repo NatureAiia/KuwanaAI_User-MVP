@@ -21,7 +21,7 @@ export type ListingDTO = {
   // Null/0 until real review collection exists — never a fabricated number.
   rating: number | null;
   reviewCount: number;
-  provider: { id: string; name: string; logoUrl: string | null; verified: boolean };
+  provider: { id: string; name: string; logoUrl: string | null; verified: boolean; websiteUrl: string | null };
 };
 
 export type CategoryDTO = {

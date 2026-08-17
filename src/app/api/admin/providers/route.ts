@@ -20,6 +20,7 @@ export async function GET() {
 const createSchema = z.object({
   name: z.string().trim().min(1).max(200),
   logoUrl: z.string().url().max(2000).optional(),
+  websiteUrl: z.string().url().max(2000).optional(),
   verified: z.boolean().default(true),
 });
 

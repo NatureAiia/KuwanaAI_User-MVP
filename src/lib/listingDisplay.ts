@@ -33,3 +33,21 @@ export const PROVENANCE_LABEL: Record<"admin" | "scraper" | "seed", string> = {
   scraper: "Automated web scan",
   seed: "Kuwana Team",
 };
+
+/**
+ * The link to show for "visit the provider / see where this data came
+ * from" — prefers the listing's own sourceUrl (the specific page the data
+ * was sourced from) and falls back to the provider's general website when
+ * the listing has none of its own. Used everywhere a listing or
+ * recommendation is rendered so the fallback logic lives in one place.
+ */
+export function resolveProviderLink(listing: {
+  sourceUrl: string | null;
+  provider: { websiteUrl: string | null };
+}): string | null {
+  return listing.sourceUrl ?? listing.provider.websiteUrl ?? null;
+}
+
+/** Shared disclaimer shown anywhere prices/listings/recommendations render — Kuwana surfaces provider data, it doesn't sell or resell it. */
+export const NOT_A_RESELLER_NOTICE =
+  "Kuwana is not a reseller — prices and details are provided by each company and may change without notice.";

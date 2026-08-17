@@ -15,6 +15,7 @@ import {
   Pill,
   Smartphone,
   Sparkles,
+  Bus,
 } from "lucide-react";
 
 /**
@@ -71,6 +72,8 @@ function pickIcon(
     if ("premium_monthly" in attributes) return <ShieldCheck {...props} />;
     if ("term_fees" in attributes) return <GraduationCap {...props} />;
     if ("fare_estimate" in attributes) return <Fuel {...props} />;
+    if ("fare" in attributes) return <Bus {...props} />;
+    if ("monthly_contribution" in attributes) return <HeartPulse {...props} />;
     if ("fee_per_transaction" in attributes) return <Zap {...props} />;
     if ("pack_size" in attributes) return <Pill {...props} />;
     if ("device_type" in attributes) return <Smartphone {...props} />;
@@ -92,8 +95,10 @@ function pickIcon(
     case "primary-schools":
     case "secondary-schools":
       return <GraduationCap {...props} />;
-    case "ride-fares":
-      return <Fuel {...props} />;
+    case "bus-fares":
+      return <Bus {...props} />;
+    case "medical-aid-plans":
+      return <HeartPulse {...props} />;
     case "prepaid-tokens":
       return <Zap {...props} />;
     case "otc-health-essentials":
