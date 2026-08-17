@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { connection } from "next/server";
 import { clsx } from "clsx";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
@@ -14,13 +16,35 @@ export const metadata: Metadata = {
     "Compare telecom, banking, insurance, and education providers in Zimbabwe with transparent, explainable decision scores.",
 };
 
-export default async function ExploreHubPage() {
+/**
+ * The one part of this page that needs a database.
+ *
+ * `await connection()` marks it as request-time work, which stops the build
+ * from trying to prerender it. Without that, `next build` ran this query with
+ * no database reachable and failed the whole build:
+ *
+ *   Error occurred prerendering page "/explore"
+ *   Can't reach database server at 127.0.0.1:5432
+ *
+ * That is not only a local inconvenience — the Dockerfile builds with the same
+ * placeholder DATABASE_URL, so the production image could not be built at all.
+ * It went unnoticed because CI's verify job fails before the build job runs.
+ *
+ * Splitting it out this way keeps the rest of the page — header, intake,
+ * sector grid, all of it static — prerenderable, and streams the adverts in
+ * behind a Suspense boundary instead of making the entire route dynamic.
+ */
+async function SponsorAdverts() {
+  await connection();
   const adverts = await prisma.advert.findMany({
     where: { active: true },
     orderBy: { createdAt: "asc" },
     select: { id: true, sponsorName: true, tagline: true, imageUrl: true },
   });
+  return <AdvertRotator adverts={adverts} />;
+}
 
+export default async function ExploreHubPage() {
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
       <Header />
@@ -29,7 +53,12 @@ export default async function ExploreHubPage() {
 
       <NeedIntake />
 
-      <AdvertRotator adverts={adverts} />
+      {/* No fallback: AdvertRotator renders nothing when there are no
+          adverts, so a placeholder here would reserve space the loaded state
+          may not use and shift the sector grid underneath it. */}
+      <Suspense fallback={null}>
+        <SponsorAdverts />
+      </Suspense>
 
       <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {Object.values(SECTORS).map((sector) => {
