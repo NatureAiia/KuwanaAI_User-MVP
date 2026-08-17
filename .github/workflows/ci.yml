@@ -33,7 +33,18 @@ jobs:
 
       # The generated Prisma client is a type dependency of half the codebase,
       # so this has to happen before tsc, not before the build.
+      #
+      # DIRECT_URL is a syntactic placeholder, not a reachable database.
+      # prisma.config.ts resolves it eagerly via `env("DIRECT_URL")` when the
+      # CLI loads its config, so *every* prisma command needs it present —
+      # including `generate`, which never opens a connection. Without it this
+      # step fails with "PrismaConfigEnvError: Cannot resolve environment
+      # variable: DIRECT_URL" and takes the typecheck, lint and test steps
+      # below down with it. Same placeholder approach the Dockerfile already
+      # uses for DATABASE_URL during the build.
       - run: npx prisma generate
+        env:
+          DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci
 
       - name: Typecheck
         run: npx tsc --noEmit
