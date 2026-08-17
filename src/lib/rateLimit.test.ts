@@ -89,11 +89,17 @@ describe("enforceRateLimit", () => {
 });
 
 describe("clientKey", () => {
-  it("uses the first hop of x-forwarded-for, not the whole chain", () => {
+  // Deliberately inverted from what this asserted before. It previously
+  // expected "203.0.113.5" — the LEFTMOST entry — which encoded the bug the
+  // spoofing-resistance block below covers: everything left of the hop our own
+  // proxy appended is client-supplied, so keying on it let a caller mint a
+  // fresh rate-limit key per request. The rightmost entry is the one our edge
+  // observed, and it is the only part of this header we can trust.
+  it("uses the hop our proxy appended, not the chain the client sent", () => {
     const req = new Request("https://example.test", {
       headers: { "x-forwarded-for": "203.0.113.5, 70.41.3.18" },
     });
-    expect(clientKey(req)).toBe("203.0.113.5");
+    expect(clientKey(req)).toBe("70.41.3.18");
   });
 
   it("falls back to x-real-ip, then to a constant", () => {
@@ -101,6 +107,48 @@ describe("clientKey", () => {
       "198.51.100.9",
     );
     expect(clientKey(new Request("https://example.test"))).toBe("unknown");
+  });
+});
+
+describe("clientKey spoofing resistance", () => {
+  const withHeaders = (headers: Record<string, string>) =>
+    new Request("https://example.test", { headers });
+
+  it("uses the hop our own proxy appended, not the one the client sent", () => {
+    // A client sending its own X-Forwarded-For puts values on the LEFT; our
+    // edge appends what it actually saw on the RIGHT. Reading the leftmost
+    // entry — which this used to do — let a caller mint a fresh rate-limit key
+    // per request and bypass every IP-keyed limit in the app.
+    expect(
+      clientKey(withHeaders({ "x-forwarded-for": "1.1.1.1, 203.0.113.7" })),
+    ).toBe("203.0.113.7");
+  });
+
+  it("gives the same key however many addresses a client prepends", () => {
+    const a = clientKey(withHeaders({ "x-forwarded-for": "9.9.9.9, 203.0.113.7" }));
+    const b = clientKey(withHeaders({ "x-forwarded-for": "8.8.8.8, 7.7.7.7, 203.0.113.7" }));
+    expect(a).toBe(b);
+  });
+
+  it("handles a single-entry header from a direct proxy connection", () => {
+    expect(clientKey(withHeaders({ "x-forwarded-for": "203.0.113.7" }))).toBe("203.0.113.7");
+  });
+
+  it("tolerates whitespace and empty entries", () => {
+    expect(clientKey(withHeaders({ "x-forwarded-for": " 1.1.1.1 , , 203.0.113.7 " }))).toBe("203.0.113.7");
+  });
+
+  it("falls back to x-real-ip, which the proxy sets rather than forwards", () => {
+    expect(clientKey(withHeaders({ "x-real-ip": "198.51.100.9" }))).toBe("198.51.100.9");
+  });
+
+  it("returns a stable placeholder when nothing identifies the caller", () => {
+    expect(clientKey(withHeaders({}))).toBe("unknown");
+  });
+
+  it("never returns an empty key, which would collapse callers together", () => {
+    expect(clientKey(withHeaders({ "x-forwarded-for": "" }))).toBe("unknown");
+    expect(clientKey(withHeaders({ "x-forwarded-for": " , " }))).toBe("unknown");
   });
 });
 
