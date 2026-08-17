@@ -8,6 +8,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
   logoUrl: z.string().url().nullable().optional(),
+  websiteUrl: z.string().url().max(2000).nullable().optional(),
   verified: z.boolean().optional(),
   // Look up by email rather than accepting a raw userId — an admin knows
   // the provider contact's email, not their internal user id. Pass null to

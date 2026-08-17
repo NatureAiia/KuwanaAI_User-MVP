@@ -8,11 +8,14 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { recordPriceChange, logListingUpdate } from "@/lib/catalog";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { boundedJsonRecord } from "@/lib/zodShared";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { MAX_IMAGES } from "@/components/provider/imageGallery";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
+  images: z.array(z.string().url()).max(MAX_IMAGES).optional(),
   attributes: boundedJsonRecord(50, 16_000).optional(),
   price: z.number().positive().max(100_000_000).optional(),
   currency: z.string().trim().length(3).optional(),
@@ -37,6 +40,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, markVerifiedNow, ...rest } = parsed.data;
+
+  if (attributes) {
+    const target = await prisma.listing.findUnique({ where: { id }, select: { categoryId: true } });
+    if (target) {
+      const attrError = await validateListingAttributes(target.categoryId, attributes);
+      if (attrError) return privateJson({ error: attrError }, { status: 400 });
+    }
+  }
 
   // Capture the pre-edit price before it's overwritten below — needed to
   // snapshot into ListingPriceHistory, which every price-trend/sparkline/

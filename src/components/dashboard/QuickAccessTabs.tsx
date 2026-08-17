@@ -6,13 +6,13 @@ import {
   ShieldCheck,
   GraduationCap,
   Zap,
-  Pill,
   Laptop2,
   Shirt,
   HeartPulse,
   Hotel,
   ShoppingCart,
   School,
+  Bus,
 } from "lucide-react";
 import { LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 
@@ -25,9 +25,9 @@ const QUICK_ACCESS_TABS = [
   { label: "Motor cover", href: "/explore/insurance?category=motor-insurance", icon: ShieldCheck },
   { label: "Schools", href: "/explore/education?category=secondary-schools", icon: GraduationCap },
   { label: "University", href: "/explore/education?category=universities", icon: School },
-  { label: "Medical aid", href: "/explore/healthcare?category=medical-aid-plans", icon: HeartPulse },
+  { label: "Medical aid", href: "/explore/insurance?category=medical-aid-plans", icon: HeartPulse },
   { label: "Prepaid tokens", href: "/explore/utilities?category=prepaid-tokens", icon: Zap },
-  { label: "Health essentials", href: "/explore/pharmacy?category=otc-essentials", icon: Pill },
+  { label: "Bus fares", href: "/explore/transport?category=bus-fares", icon: Bus },
   { label: "Hotels", href: "/explore/hotels?category=hotel-stays", icon: Hotel },
   { label: "Groceries", href: "/explore/retail?category=maize-meal", icon: ShoppingCart },
   { label: "Tech & gadgets", href: "/explore/electronics?category=tech-gadgets", icon: Laptop2 },

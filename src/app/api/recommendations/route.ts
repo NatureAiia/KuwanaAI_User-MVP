@@ -7,6 +7,7 @@ import { computeDecisionScores, CURRENT_DECISION_SCORE_VERSION } from "@/lib/sco
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getListingRequirements, formatRequirement } from "@/lib/eligibility";
 import { buildTotalCostSummary } from "@/lib/totalCost";
+import { getUserNote } from "@/lib/userNotes";
 import { recordEvent } from "@/lib/gamification/process-event";
 import {
   getCachedRecommendation,
@@ -104,10 +105,19 @@ const RECOMMENDATION_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildCacheContext(budgetFlexibility: string | null | undefined, constraints: string[] | undefined): string {
+function buildCacheContext(
+  budgetFlexibility: string | null | undefined,
+  constraints: string[] | undefined,
+  noteContent: unknown,
+): string {
   const parts: string[] = [];
   if (budgetFlexibility) parts.push(`budget=${budgetFlexibility}`);
   if (constraints?.length) parts.push(`constraints=${[...constraints].sort().join("|")}`);
+  // The saved note is per-user, so it must be part of the cache key too —
+  // otherwise the first user to hit a given listing/budget/constraint
+  // combination would have their notes-shaped recommendation served back to
+  // every other user comparing the exact same listings.
+  if (noteContent) parts.push(`note=${JSON.stringify(noteContent)}`);
   return parts.join("&");
 }
 
@@ -131,6 +141,14 @@ export async function POST(req: Request) {
   }
 
   const category = listings[0].category;
+
+  // Pulls any notes the user previously saved for this sector/category (see
+  // the Insurance pre-recommendation intake in CategoryIntakeModal) so the
+  // AI has that context automatically, without the client needing to
+  // resend it on every call — the same lookup works for any future sector
+  // that adopts the same intake pattern.
+  const userNote = await getUserNote(user.id, category.sector.slug as Sector, category.slug);
+
   const listingDTOs: ListingDTO[] = listings.map((l) => ({
     id: l.id,
     name: l.name,
@@ -192,7 +210,7 @@ export async function POST(req: Request) {
   // the key too (see recommendationCacheKey).
   const cacheKey = recommendationCacheKey(
     listings.map((l) => l.id),
-    buildCacheContext(budgetFlexibility, constraints),
+    buildCacheContext(budgetFlexibility, constraints, userNote?.content),
   );
   let result = await getCachedRecommendation(cacheKey);
   if (result && !isValidRecommendation(result)) {
@@ -210,8 +228,25 @@ export async function POST(req: Request) {
       );
     }
     if (constraints?.length) userContext.push(`Stated constraints: ${constraints.join("; ")}`);
+    if (userNote?.content && Array.isArray(userNote.content) && userNote.content.length > 0) {
+      const noteLines = (userNote.content as { question: string; answer: string }[])
+        .map((qa) => `${qa.question} ${qa.answer}`)
+        .join("; ");
+      userContext.push(`User-provided notes for this category: ${noteLines}`);
+    }
     const userContextBlock =
       userContext.length > 0 ? `\nUser context (use to tailor your reasoning — never claim a constraint is met unless the listing data supports it):\n${userContext.join("\n")}` : "";
+
+    // Listings below carry raw attribute key/value pairs only (e.g.
+    // `atm_withdrawal_fee: 1`) — without this glossary the model has to guess
+    // what a key means and what unit its number is in from the key name alone.
+    const attributeGlossaryBlock =
+      attributeSchema.length > 0
+        ? `\nAttribute glossary (key: label, unit if any) — ${attributeSchema
+            .filter((a) => a.key !== "price")
+            .map((a) => `${a.key}: ${a.label}${a.unit ? ` (${a.unit})` : ""}`)
+            .join("; ")}`
+        : "";
 
     try {
       result = await generateAiJson<CachedRecommendation>({
@@ -234,7 +269,9 @@ export async function POST(req: Request) {
           "freshness_adjustment, trend_adjustment, trust_adjustment, total), a price_trend, requirements_to_qualify " +
           "(any upfront balance/deposit or condition needed to access it), and total_cost (recurring or per-use fees). " +
           "Use these as your primary evidence, and reference them concretely in your reasoning rather than restating " +
-          "the raw price. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
+          "the raw price. Each listing's `attributes` are raw key/value pairs; the prompt's attribute glossary gives " +
+          "each key's human label and unit — use it to interpret values correctly instead of guessing from the key " +
+          "name alone. Eligibility comes first: if an option carries a requirement the user is unlikely to meet " +
           "(or a materially higher one than its peers), say so explicitly and weigh it honestly in the tradeoffs — " +
           "this is an eligibility signal, not just a spec difference. Only reference data present in the listings " +
           "provided; never invent statistics. Speak in Kuwana's own voice — never refer to yourself as an AI, a " +
@@ -245,7 +282,7 @@ export async function POST(req: Request) {
           '"key_differentiator": string}, "alternative_options": [{"listing_name": string, "key_differentiator": ' +
           'string}], "explanation": {"summary": string, "key_tradeoffs": string[], "data_traceability_notes": ' +
           'string}, "suggested_action": string, "confidence": number between 0 and 1}.',
-        prompt: `Category: ${category.name}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
+        prompt: `Category: ${category.name}${attributeGlossaryBlock}${userContextBlock}\n\nListings:\n${JSON.stringify(dataForModel, null, 2)}\n\nRecommend the single best listing, up to 3 worthwhile alternatives, honest tradeoffs, and one concrete next step.`,
       });
     } catch (err) {
       // Previously unhandled — the client would get a bare 500 with no JSON
@@ -281,6 +318,9 @@ export async function POST(req: Request) {
         provider_name: listing.provider.name,
         listing_title: listing.name,
         key_differentiator: alt.key_differentiator,
+        source_url: listing.sourceUrl,
+        website_url: listing.provider.websiteUrl,
+        last_verified_at: listing.lastVerifiedAt.toISOString(),
       };
     })
     .filter((alt): alt is NonNullable<typeof alt> => alt !== null)
@@ -326,6 +366,9 @@ export async function POST(req: Request) {
         value_score: scores[primary.id]?.total ?? 0,
         total_cost_summary: buildTotalCostSummary(primaryDTO, attributeSchema),
         key_differentiator: result.primary_option.key_differentiator,
+        source_url: primary.sourceUrl,
+        website_url: primary.provider.websiteUrl,
+        last_verified_at: primary.lastVerifiedAt.toISOString(),
       },
       alternative_options: alternatives,
       eligibility_requirements,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Award, ShoppingBag, ChevronRight, Settings, Trophy } from "lucide-react";
+import { Flame, Award, ShoppingBag, ChevronRight, Settings, Trophy, NotebookPen } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { SignalBloom } from "@/components/SignalBloom";
@@ -85,6 +85,16 @@ export default async function ProfilePage() {
               <p className="text-[14px] font-medium">Shopping list</p>
               <p className="text-[12px] text-text-muted">{savedCount} saved</p>
             </div>
+          </div>
+          <ChevronRight size={16} className="text-text-muted" />
+        </Link>
+        <Link
+          href="/profile/notes"
+          className="tap-target flex items-center justify-between rounded-xl border border-border bg-bg-surface px-4"
+        >
+          <div className="flex items-center gap-3">
+            <NotebookPen size={18} className="text-accent-sky" />
+            <span className="text-[14px] font-medium">My notes</span>
           </div>
           <ChevronRight size={16} className="text-text-muted" />
         </Link>

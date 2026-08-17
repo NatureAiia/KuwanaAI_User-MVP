@@ -99,6 +99,7 @@ model User {
   priceCapRulesCreated    PriceCapRule[]
   complaints              ConsumerComplaint[]
   adminAlertRulesCreated  AdminAlertRule[]
+  notes                   UserNote[]
 
   @@map("users")
 }
@@ -140,6 +141,31 @@ model SectorFootprint {
 
   @@unique([userId, sector])
   @@map("sector_footprints")
+}
+
+// Free-text "memory" captured from a category-specific clarifying-question
+// prompt (currently shown before an Insurance AI recommendation) — one row
+// per (user, sector, category), overwritten on re-submit rather than kept as
+// a log. Read back by the recommendations route to fold into the AI prompt
+// context whenever a matching sector/category is requested, so it's reusable
+// by any future sector's intake flow, not just Insurance's.
+model UserNote {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sector    Sector
+  // Category slug (e.g. "medical-aid-plans"); "" means sector-general notes.
+  // Kept a plain non-null string (rather than nullable) so the compound
+  // unique constraint below works as a single upsert target without having
+  // to special-case null in every read/write call site.
+  category  String   @default("")
+  content   Json
+  source    String   @default("intake")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, sector, category])
+  @@map("user_notes")
 }
 
 model Consent {
@@ -223,6 +249,9 @@ model Provider {
   id              String  @id @default(uuid())
   name            String
   logoUrl         String? @map("logo_url")
+  // The company's own homepage — the fallback "visit provider" link used
+  // wherever a Listing has no more specific sourceUrl of its own.
+  websiteUrl      String? @map("website_url")
   verified        Boolean @default(true)
   // Nullable: the ~15 seeded reference providers (CBZ, Econet, etc.) have no
   // login of their own — this is only set when a "provider" role account is

@@ -16,9 +16,12 @@ type PendingUpload = { file: File; status: "uploading" | "error"; message?: stri
 export function ImageGalleryField({
   images,
   onChange,
+  uploadUrl = "/api/provider/listings/images",
 }: {
   images: string[];
   onChange: (images: string[]) => void;
+  /** Defaults to the provider-portal upload route; pass the admin one when rendered from /admin/catalog. */
+  uploadUrl?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingUpload[]>([]);
@@ -28,7 +31,7 @@ export function ImageGalleryField({
     try {
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch("/api/provider/listings/images", { method: "POST", body });
+      const res = await fetch(uploadUrl, { method: "POST", body });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const message =

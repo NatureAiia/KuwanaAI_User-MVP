@@ -1,9 +1,8 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { computeDecisionScores } from "@/lib/scoring";
-import { buildTotalCostSummary, isCostAttribute } from "@/lib/totalCost";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
-import { TREND_ARROW } from "@/lib/listingDisplay";
+import { TREND_ARROW, resolveProviderLink, NOT_A_RESELLER_NOTICE } from "@/lib/listingDisplay";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 
@@ -124,13 +123,6 @@ export function downloadComparePdf(data: CompareShareData) {
 
   body.push(["Price", ...data.listings.map((l) => formatPrice(l.price, l.currency))]);
 
-  if (data.attributeSchema.some((a) => isCostAttribute(a.key))) {
-    body.push([
-      "Total cost",
-      ...data.listings.map((l) => buildTotalCostSummary(l, data.attributeSchema) ?? "—"),
-    ]);
-  }
-
   body.push([
     "Price trend",
     ...data.listings.map((l) => {
@@ -153,6 +145,15 @@ export function downloadComparePdf(data: CompareShareData) {
       ...data.listings.map((l) => formatValue(l.attributes[attr.key], attr.dataType, attr.unit)),
     ]);
   }
+
+  body.push([
+    "Source",
+    ...data.listings.map((l) => {
+      const link = resolveProviderLink(l);
+      const updated = new Date(l.lastVerifiedAt).toLocaleDateString("en-ZW", { dateStyle: "medium" });
+      return link ? `${link} (updated ${updated})` : `Not provided (updated ${updated})`;
+    }),
+  ]);
 
   autoTable(doc, {
     head: [head],
@@ -236,7 +237,8 @@ export function downloadComparePdf(data: CompareShareData) {
   y = paragraph(
     doc,
     "Kuwana is not a financial or advisory service — we help you make your own informed decision. This " +
-      "comparison and any recommendation are for informational purposes only.",
+      "comparison and any recommendation are for informational purposes only. " +
+      NOT_A_RESELLER_NOTICE,
     margin,
     y,
     contentWidth,

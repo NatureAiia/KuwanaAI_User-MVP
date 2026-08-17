@@ -9,6 +9,7 @@ export function NewProviderForm() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
   const [verified, setVerified] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,12 @@ export function NewProviderForm() {
       const res = await fetch("/api/admin/providers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, verified, ...(logoUrl ? { logoUrl } : {}) }),
+        body: JSON.stringify({
+          name,
+          verified,
+          ...(logoUrl ? { logoUrl } : {}),
+          ...(websiteUrl ? { websiteUrl } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -30,6 +36,7 @@ export function NewProviderForm() {
       }
       setName("");
       setLogoUrl("");
+      setWebsiteUrl("");
       router.refresh();
     } finally {
       setLoading(false);
@@ -52,6 +59,12 @@ export function NewProviderForm() {
           placeholder="Logo URL (optional)"
           value={logoUrl}
           onChange={(e) => setLogoUrl(e.target.value)}
+          className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
+        />
+        <input
+          placeholder="Website URL (optional)"
+          value={websiteUrl}
+          onChange={(e) => setWebsiteUrl(e.target.value)}
           className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
         />
         <label className="flex items-center gap-2 text-[13px] text-text-secondary">

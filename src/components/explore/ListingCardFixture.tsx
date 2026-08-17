@@ -20,7 +20,7 @@ function fakeListing(id: string): ListingDTO {
     images: [],
     rating: null,
     reviewCount: 0,
-    provider: { id: "fixture-provider", name: "Sample Provider", logoUrl: null, verified: true },
+    provider: { id: "fixture-provider", name: "Sample Provider", logoUrl: null, verified: true, websiteUrl: null },
   };
 }
 
