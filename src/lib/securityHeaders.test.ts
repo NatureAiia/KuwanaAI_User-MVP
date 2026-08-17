@@ -31,7 +31,25 @@ describe("contentSecurityPolicy", () => {
 
   it("allows remote provider logos over https but not remote scripts", () => {
     expect(directive(prod, "img-src")).toContain("https:");
-    expect(directive(prod, "script-src")).not.toContain("https:");
+
+    // The point is that script-src must not carry the blanket `https:`
+    // *scheme* source, which would authorise any script from anywhere. It is
+    // asserted per-token rather than as a substring, because a specific host
+    // like https://challenges.cloudflare.com (Turnstile) also contains the
+    // text "https:" while being the opposite of a blanket allowance.
+    const scriptSources = directive(prod, "script-src").split(/\s+/);
+    expect(scriptSources).not.toContain("https:");
+    expect(scriptSources).not.toContain("*");
+    expect(scriptSources).not.toContain("'unsafe-inline'");
+  });
+
+  it("allows the Turnstile iframe and nothing else to be framed", () => {
+    // frame-src is not covered by 'strict-dynamic'; without it the widget is
+    // blocked and the CAPTCHA silently never renders.
+    const frameSources = directive(prod, "frame-src").split(/\s+/);
+    expect(frameSources).toContain("https://challenges.cloudflare.com");
+    expect(frameSources).not.toContain("*");
+    expect(frameSources).not.toContain("https:");
   });
 
   it("upgrades insecure requests only in production", () => {

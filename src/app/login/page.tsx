@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import WaterButton from "@/components/ui/WaterButton";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { Turnstile } from "@/components/Turnstile";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { markHardNav } from "@/components/SoftNavTracker";
 
@@ -21,6 +22,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Empty when Turnstile isn't configured; Supabase ignores the option then.
+  const [captchaToken, setCaptchaToken] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -28,7 +31,14 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Login matters as much as signup here: it is the credential-stuffing
+    // surface, and it is equally invisible to this app's rate limiter because
+    // the call goes straight from the browser to Supabase.
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
+    });
     if (error) {
       setLoading(false);
       setError(
@@ -97,6 +107,8 @@ function LoginForm() {
         </label>
 
         {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+
+        <Turnstile onToken={setCaptchaToken} />
 
         {isDesktop ? (
           <WaterButton
