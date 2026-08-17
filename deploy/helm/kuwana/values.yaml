@@ -199,6 +199,22 @@ secrets:
   supabaseServiceRoleKey: ""
   anthropicApiKey: ""
   cronSecret: ""
+  # Optional — each gates a feature rather than the app booting.
+  #
+  # OpenRouter carries most of the model ladder (see MODEL_CATALOG in
+  # src/lib/ai/models.ts): without it, every rung except the Anthropic ones and
+  # the self-hosted Ollama one throws "OPENROUTER_API_KEY is not set".
+  openrouterApiKey: ""
+  # Firecrawl backs the admin scraper (src/lib/scrape/firecrawl.ts).
+  firecrawlApiKey: ""
+  # Paynow issues a separate merchant integration per settlement currency, so
+  # USD and ZiG are independent pairs. With neither set, no wallet top-up can
+  # be credited at all — getCredentials() in src/lib/paynow.ts throws
+  # PaynowNotConfiguredError for whichever currency is missing.
+  paynowIntegrationId: ""
+  paynowIntegrationKey: ""
+  paynowIntegrationIdZig: ""
+  paynowIntegrationKeyZig: ""
 
 externalSecret:
   enabled: false
@@ -224,6 +240,31 @@ externalSecret:
       remoteRef:
         key: kuwana/production
         property: cron_secret
+    - secretKey: OPENROUTER_API_KEY
+      remoteRef:
+        key: kuwana/production
+        property: openrouter_api_key
+    - secretKey: FIRECRAWL_API_KEY
+      remoteRef:
+        key: kuwana/production
+        property: firecrawl_api_key
+    # One integration pair per settlement currency — see the note above.
+    - secretKey: PAYNOW_INTEGRATION_ID
+      remoteRef:
+        key: kuwana/production
+        property: paynow_integration_id
+    - secretKey: PAYNOW_INTEGRATION_KEY
+      remoteRef:
+        key: kuwana/production
+        property: paynow_integration_key
+    - secretKey: PAYNOW_INTEGRATION_ID_ZIG
+      remoteRef:
+        key: kuwana/production
+        property: paynow_integration_id_zig
+    - secretKey: PAYNOW_INTEGRATION_KEY_ZIG
+      remoteRef:
+        key: kuwana/production
+        property: paynow_integration_key_zig
 
 serviceAccount:
   create: true

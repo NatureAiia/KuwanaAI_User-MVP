@@ -8,8 +8,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
-import { GalleryTunnel } from "./GalleryTunnel";
+import dynamic from "next/dynamic";
 import Text3DFlip from "@/components/ui/Text3DFlip";
+
+/**
+ * Loaded on demand rather than imported directly, because GalleryTunnel pulls
+ * in `three` — by a wide margin the largest dependency in the app.
+ *
+ * This component is the loading shell for the dashboard, admin, corporate,
+ * provider and regulator sections plus the signup step, so a static import
+ * put the whole 3D library into the first chunk those routes fetch: the code
+ * shown *while waiting* was the heaviest thing being waited on. Worse, the
+ * tunnel is not even rendered under prefers-reduced-motion, so those users
+ * downloaded a renderer they were never going to see.
+ *
+ * ssr: false because it draws to a <canvas> and has no server output worth
+ * producing.
+ */
+const GalleryTunnel = dynamic(
+  () => import("./GalleryTunnel").then((m) => m.GalleryTunnel),
+  { ssr: false },
+);
 
 const ROTATE_MS = 2600;
 

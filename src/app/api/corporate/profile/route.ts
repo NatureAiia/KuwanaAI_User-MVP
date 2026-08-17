@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { requireOwnCorporateOrg } from "@/lib/corporateAuth";
+import { revalidateCatalog } from "@/lib/cacheTags";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(200).optional(),
@@ -19,5 +20,9 @@ export async function PATCH(req: Request) {
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const provider = await prisma.provider.update({ where: { id: auth.provider.id }, data: parsed.data });
+  // The provider's name and logo are embedded in every ListingDTO, so a
+  // profile edit changes what the cached catalog reads return even though
+  // nothing about a listing itself was touched.
+  revalidateCatalog();
   return privateJson({ provider });
 }

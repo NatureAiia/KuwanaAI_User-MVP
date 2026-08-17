@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { privateJson } from "@/lib/apiResponse";
 import { logAdminAction } from "@/lib/adminAudit";
+import { revalidateCatalog } from "@/lib/cacheTags";
 
 const updateSchema = z.object({
   name: z.string().min(1).optional(),
@@ -69,6 +70,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         ...(corporateDomain !== undefined ? { corporateDomain } : {}),
       },
     });
+
+    // Name, logo and the `verified` badge are embedded in every ListingDTO,
+    // so this changes what the cached catalog reads return even when no
+    // listing was touched. The sibling POST /api/admin/providers already did
+    // this; the edit path was missed.
+    revalidateCatalog();
 
     if (ownerUserId !== undefined) {
       await logAdminAction({

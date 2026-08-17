@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import { CATALOG_TAG, PRICE_HISTORY_TAG } from "@/lib/cacheTags";
 import { ListingStatus } from "@prisma/client";
 import { computeDecisionScores } from "@/lib/scoring";
 import { findClosestMatches } from "@/lib/similarListings";
@@ -39,54 +41,48 @@ function toListingDTO(listing: {
   };
 }
 
-// Short-lived cross-request cache for the hot catalog reads below. React's
-// cache() (used above) only dedups within a single request, but every page
-// load on /explore, /compare and the listings API re-hits the same remote
-// Postgres queries. Listings/categories change only via ingestion and
-// approval flows, so a 30s window of staleness is invisible — and it turns
-// repeat navigation from ~1s of DB round-trips into a near-instant hit.
-// Also coalesces concurrent in-flight calls so a burst of requests doesn't
-// fan out into N identical queries. Deliberately not used for anything
-// user-specific (saved listings, profiles, streaks, auth).
-const CATALOG_TTL_MS = 30_000;
-const MAX_TTL_ENTRIES = 200;
+/**
+ * Cross-request cache for the hot catalog reads below.
+ *
+ * React's cache() (still wrapped around each export) dedupes within a single
+ * request. This layer is what makes a result survive *between* requests, and —
+ * when REDIS_URL is set, via the cacheHandler wired in next.config.ts — across
+ * replicas. Every page load on /explore, /compare and the listings API would
+ * otherwise re-run the same remote Postgres queries.
+ *
+ * This used to be a hand-rolled Map with a 30s TTL. That cached correctly but
+ * could not be *invalidated*: the eleven admin/provider/corporate write routes
+ * that call revalidateCatalog() were invalidating a tag nothing was registered
+ * under, so every one of those calls was a no-op and an edited price stayed
+ * wrong for up to 30s on each pod independently — the exact behaviour the
+ * comment in cacheTags.ts promises does not happen. Going through
+ * unstable_cache with those same tags is what makes those existing calls
+ * actually do something.
+ *
+ * Correctness now comes from the tags, not the clock, so the TTL is only a
+ * backstop for a write path that forgets to call revalidateCatalog(). It is
+ * kept short enough that such a miss is a nuisance rather than a stale-price
+ * incident.
+ *
+ * Deliberately not used for anything user-specific (saved listings, profiles,
+ * streaks, wallet, notifications, auth) — those are per-user and must never
+ * land in a shared cache.
+ */
+const CATALOG_REVALIDATE_SECONDS = 120;
 
-function ttlCache<TArgs extends unknown[], TResult>(
-  fn: (...args: TArgs) => Promise<TResult>,
-  ttlMs: number,
-): (...args: TArgs) => Promise<TResult> {
-  const results = new Map<string, { value: TResult; expiresAt: number }>();
-  const inflight = new Map<string, Promise<TResult>>();
-
-  return (...args) => {
-    const key = JSON.stringify(args);
-
-    const hit = results.get(key);
-    if (hit && hit.expiresAt > Date.now()) return Promise.resolve(hit.value);
-
-    const running = inflight.get(key);
-    if (running) return running;
-
-    const p = fn(...args);
-    inflight.set(key, p);
-    // Rejections are handled by the caller awaiting `p`; this side chain only
-    // records a successful value and cleans the in-flight slot on settle.
-    void p
-      .then((value) => {
-        if (results.size >= MAX_TTL_ENTRIES) {
-          const oldest = results.keys().next().value;
-          if (oldest !== undefined) results.delete(oldest);
-        }
-        results.set(key, { value, expiresAt: Date.now() + ttlMs });
-      })
-      .catch(() => {})
-      .finally(() => inflight.delete(key));
-    return p;
-  };
+/**
+ * Array arguments are part of the cache key, so ["a","b"] and ["b","a"] would
+ * otherwise be two entries holding identical data. Every caller of the
+ * id-list readers below looks results up by id rather than relying on
+ * position, so normalising the order is safe and roughly halves the miss rate
+ * on the compare and recently-viewed paths.
+ */
+function normalizeIds(ids: string[]): string[] {
+  return [...new Set(ids)].sort();
 }
 
 export const getSectorCategories = cache(
-  ttlCache(async (sectorSlug: string): Promise<CategoryDTO[]> => {
+  unstable_cache(async (sectorSlug: string): Promise<CategoryDTO[]> => {
     const sector = await prisma.sectorConfig.findUnique({
       where: { slug: sectorSlug },
       include: { categories: { include: { attributeSchema: { orderBy: { sortOrder: "asc" } } } } },
@@ -105,11 +101,13 @@ export const getSectorCategories = cache(
         sortOrder: a.sortOrder,
       })),
     }));
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:sector-categories"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS }),
 );
 
 export const getCategoryWithListings = cache(
-  ttlCache(async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | null> => {
+  unstable_cache(async (sectorSlug: string, categorySlug: string): Promise<CategoryWithListingsDTO | null> => {
     // Resolve sector + category in one query (relation filter on the join)
     // instead of two round-trips — the caller is already waiting on this
     // before it can render anything.
@@ -140,7 +138,9 @@ export const getCategoryWithListings = cache(
       })),
       listings: category.listings.map(toListingDTO),
     };
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:category-with-listings"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS }),
 );
 
 // Compare-page lookup by id: category + its attribute schema, with nothing
@@ -148,12 +148,18 @@ export const getCategoryWithListings = cache(
 // compare page is the one place that would otherwise re-fetch this raw on
 // every navigation from a listing.
 export const getCategorySchema = cache(
-  ttlCache(async (categoryId: string) => {
+  unstable_cache(async (categoryId: string) => {
+    // Returns the raw Prisma row rather than a DTO, which is only safe to
+    // cache because neither Category nor AttributeSchemaField has a DateTime
+    // column — unstable_cache round-trips through JSON, and a Date would come
+    // back as a string while the type still claimed Date.
     return prisma.category.findUnique({
       where: { id: categoryId },
       include: { attributeSchema: { orderBy: { sortOrder: "asc" } } },
     });
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:category-schema"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS }),
 );
 
 function median(values: number[]): number | null {
@@ -174,7 +180,7 @@ const MIN_LISTINGS_FOR_MEDIAN = 3;
  * category too thin to have a meaningful median.
  */
 export const getCategoryAttributeMedians = cache(
-  ttlCache(async (categoryId: string): Promise<Record<string, number>> => {
+  unstable_cache(async (categoryId: string): Promise<Record<string, number>> => {
     const listings = await prisma.listing.findMany({
       where: { categoryId, status: "published" },
       select: { attributes: true },
@@ -199,7 +205,9 @@ export const getCategoryAttributeMedians = cache(
       if (m !== null) medians[key] = m;
     }
     return medians;
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:category-attribute-medians"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS }),
 );
 
 export async function getTopListings(
@@ -611,8 +619,8 @@ export async function getFavoriteProductSpecials(
  * to a PriceTrend (or null if there's no history yet). Keyed by listing id
  * so callers can look up a listing's trend alongside its other data.
  */
-export const getListingPriceTrends = cache(
-  ttlCache(async (listingIds: string[]): Promise<Record<string, PriceTrend | null>> => {
+const readListingPriceTrends = unstable_cache(
+  async (listingIds: string[]): Promise<Record<string, PriceTrend | null>> => {
     if (listingIds.length === 0) return {};
 
     const rows = await prisma.listingPriceHistory.findMany({
@@ -632,7 +640,19 @@ export const getListingPriceTrends = cache(
       result[id] = computePriceTrend(grouped.get(id) ?? []);
     }
     return result;
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:listing-price-trends"],
+  // PRICE_HISTORY_TAG, not CATALOG_TAG: this reads ListingPriceHistory, which
+  // the freshness and FX jobs write on their own schedule, separately from
+  // listing edits. revalidateCatalog() clears both, so a price edit still
+  // takes effect immediately.
+  { tags: [PRICE_HISTORY_TAG], revalidate: CATALOG_REVALIDATE_SECONDS },
+);
+
+/** Keyed on the normalised id list; the result is a Record, so order never mattered. */
+export const getListingPriceTrends = cache(
+  (listingIds: string[]): Promise<Record<string, PriceTrend | null>> =>
+    readListingPriceTrends(normalizeIds(listingIds)),
 );
 
 /**
@@ -665,15 +685,32 @@ export async function logListingUpdate(params: {
   await prisma.listingUpdateLog.create({ data: params });
 }
 
-export const getListingsByIds = cache(
-  ttlCache(async (ids: string[]): Promise<ListingDTO[]> => {
+const readListingsByIds = unstable_cache(
+  async (ids: string[]): Promise<ListingDTO[]> => {
     const listings = await prisma.listing.findMany({
       where: { id: { in: ids }, status: "published" },
       include: { provider: true },
     });
     return listings.map(toListingDTO);
-  }, CATALOG_TTL_MS),
+  },
+  ["catalog:listings-by-ids"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS },
 );
+
+/**
+ * Cached on the normalised id list, but returned in the caller's own order.
+ *
+ * That distinction matters: the compare page renders this array directly, so
+ * its order is the column order the user chose. Sorting for the cache key
+ * without restoring the order would silently rearrange the comparison table.
+ * Iterating the de-duplicated input also preserves the previous behaviour of
+ * one row per distinct id.
+ */
+export const getListingsByIds = cache(async (ids: string[]): Promise<ListingDTO[]> => {
+  const listings = await readListingsByIds(normalizeIds(ids));
+  const byId = new Map(listings.map((l) => [l.id, l]));
+  return [...new Set(ids)].map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
+});
 
 export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string; pinned: boolean };
 
@@ -921,25 +958,36 @@ export type CompetitorWatchEntry = {
  * substitute" concept is identical, this just groups it per-product for a
  * business's own catalog instead of per single listing page.
  */
-export async function getCompetitorWatch(providerId: string, limitPerProduct = 3): Promise<CompetitorWatchEntry[]> {
-  const myListings = await prisma.listing.findMany({
-    where: { providerId, status: "published" },
-    include: { provider: true, category: { include: { sector: true } } },
-    orderBy: { name: "asc" },
-  });
-  if (myListings.length === 0) return [];
+export const getCompetitorWatch = cache(
+  unstable_cache(
+    async (providerId: string, limitPerProduct = 3): Promise<CompetitorWatchEntry[]> => {
+      const myListings = await prisma.listing.findMany({
+        where: { providerId, status: "published" },
+        include: { provider: true, category: { include: { sector: true } } },
+        orderBy: { name: "asc" },
+      });
+      if (myListings.length === 0) return [];
 
-  const results = await Promise.all(
-    myListings.map(async (listing) => ({
-      myListing: toListingDTO(listing),
-      categoryName: listing.category.name,
-      sectorName: listing.category.sector.name,
-      competitors: await getClosestMatches(listing.id, limitPerProduct),
-    })),
-  );
+      // One getClosestMatches per product, and each of those runs its own
+      // two queries — so an uncached call costs 2N+1 round-trips for a
+      // provider with N products, on every dashboard render.
+      const results = await Promise.all(
+        myListings.map(async (listing) => ({
+          myListing: toListingDTO(listing),
+          categoryName: listing.category.name,
+          sectorName: listing.category.sector.name,
+          competitors: await getClosestMatches(listing.id, limitPerProduct),
+        })),
+      );
 
-  return results.filter((r) => r.competitors.length > 0);
-}
+      return results.filter((r) => r.competitors.length > 0);
+    },
+    ["catalog:competitor-watch"],
+    // Keyed per provider, but nothing here is user-scoped: it is this
+    // provider's published listings plus publicly visible competing ones.
+    { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS },
+  ),
+);
 
 export type TrendingListing = { listing: ListingDTO; comparisonCount: number };
 
@@ -949,8 +997,15 @@ export type TrendingListing = { listing: ListingDTO; comparisonCount: number };
  * tally-over-Comparison-rows approach as getAlsoCompared, but time-windowed
  * and ranked across a sector rather than scoped to one listing's neighbors.
  */
-export const getTrendingListings = ttlCache<[string?, number?, number?], TrendingListing[]>(
-  async (sectorSlug?, limit = 6, windowDays = 7): Promise<TrendingListing[]> => {
+/**
+ * Driven by its TTL rather than by tags: the underlying signal is Comparison
+ * rows, which every user creates simply by comparing something. No write path
+ * calls revalidateCatalog() for that, and none should — invalidating the whole
+ * catalog on each comparison would defeat the cache entirely. CATALOG_TAG is
+ * still attached so an admin edit refreshes the listings shown here.
+ */
+export const getTrendingListings = unstable_cache(
+  async (sectorSlug?: string, limit = 6, windowDays = 7): Promise<TrendingListing[]> => {
     const since = new Date(Date.now() - windowDays * 86_400_000);
     const comparisons = await prisma.comparison.findMany({
       where: {
@@ -975,7 +1030,8 @@ export const getTrendingListings = ttlCache<[string?, number?, number?], Trendin
       .filter((l): l is ListingDTO => !!l)
       .map((listing) => ({ listing, comparisonCount: counts.get(listing.id)! }));
   },
-  CATALOG_TTL_MS,
+  ["catalog:trending-listings"],
+  { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS },
 );
 
 export type ProviderListingStats = { comparisonAppearances: number; savedCount: number };
@@ -1034,8 +1090,15 @@ export type MarketOverview = {
  * dashboards, computed entirely from existing listing/price-history data —
  * no separate aggregation tables. Pass sectorSlug to drill down into a
  * single sector (the "Explore" stage) instead of the full market.
+ *
+ * The most expensive read in the app, and until now the only uncached one of
+ * this size: it loads *every* published listing with provider, category and
+ * sector joined, then the price history for all of them. It backs two
+ * dashboards and /api/bi/v1/market-overview, which external BI tools may poll
+ * at up to 60 requests/minute per key — so an uncached copy meant one
+ * scheduled report could run a full-table scan a minute indefinitely.
  */
-export async function getMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
+async function computeMarketOverview(sectorSlug?: string): Promise<MarketOverview> {
   const rows = await prisma.listing.findMany({
     where: {
       status: "published",
@@ -1093,6 +1156,19 @@ export async function getMarketOverview(sectorSlug?: string): Promise<MarketOver
   };
 }
 
+/**
+ * Tagged with both CATALOG_TAG and PRICE_HISTORY_TAG because it genuinely
+ * reads both: listing/provider state for the rollups and trust counts, and
+ * ListingPriceHistory for the anomaly list. Either kind of write should make
+ * a dashboard show the new number.
+ */
+export const getMarketOverview = cache(
+  unstable_cache(computeMarketOverview, ["catalog:market-overview"], {
+    tags: [CATALOG_TAG, PRICE_HISTORY_TAG],
+    revalidate: CATALOG_REVALIDATE_SECONDS,
+  }),
+);
+
 export type ComplianceActivity = {
   listing: ListingDTO;
   sectorName: string;
@@ -1111,25 +1187,34 @@ export type ComplianceActivity = {
  * for Regulator" gap was about. Computed straight from Listing.status,
  * nothing invented or separately tracked.
  */
-export async function getComplianceActivity(sectorSlug?: string, limit = 50): Promise<ComplianceActivity[]> {
-  const rows = await prisma.listing.findMany({
-    where: {
-      status: "rejected",
-      category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
-    },
-    include: { provider: true, category: { include: { sector: true } } },
-    orderBy: { lastVerifiedAt: "desc" },
-    take: limit,
-  });
+export const getComplianceActivity = cache(
+  unstable_cache(
+    async (sectorSlug?: string, limit = 50): Promise<ComplianceActivity[]> => {
+      const rows = await prisma.listing.findMany({
+        where: {
+          status: "rejected",
+          category: { sector: { status: "live", ...(sectorSlug ? { slug: sectorSlug } : {}) } },
+        },
+        include: { provider: true, category: { include: { sector: true } } },
+        orderBy: { lastVerifiedAt: "desc" },
+        take: limit,
+      });
 
-  return rows.map((row) => ({
-    listing: toListingDTO(row),
-    sectorName: row.category.sector.name,
-    categoryName: row.category.name,
-    rejectionReason: row.rejectionReason,
-    rejectedAt: row.lastVerifiedAt.toISOString(),
-  }));
-}
+      return rows.map((row) => ({
+        listing: toListingDTO(row),
+        sectorName: row.category.sector.name,
+        categoryName: row.category.name,
+        rejectionReason: row.rejectionReason,
+        rejectedAt: row.lastVerifiedAt.toISOString(),
+      }));
+    },
+    ["catalog:compliance-activity"],
+    // Driven by Listing.status, which only an admin approve/reject changes —
+    // and every one of those paths calls revalidateCatalog(), so the
+    // regulator's trail updates as soon as a decision is made.
+    { tags: [CATALOG_TAG], revalidate: CATALOG_REVALIDATE_SECONDS },
+  ),
+);
 
 
 // Social intelligence feed
