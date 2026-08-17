@@ -341,3 +341,12 @@ in `catalog.ts` where one function's declaration landed in the middle of another
 Fixed and reverified (`tsc --noEmit` clean, 234/234 tests) same day — see `HANDOFF.md`'s
 2026-08-12 entry for the full account. If you're reading this soon after: confirm via `git status`
 that the fix is actually committed before trusting this paragraph.
+
+## 2026-08-17: merged-branch cleanup
+
+Deleted 8 remote branches whose commits were all already ancestors of `origin/main` (verified with
+`git merge-base --is-ancestor` before deleting, not just `git branch --merged`'s default heuristic):
+`app-line`, `claude/intelligent-babbage-nolyma`, `claude/mvp-build-g0hap4`, `database-schema`,
+`fix/dependabot-merge-breakage` (PR #17), `hardening/caching-and-rendering` (PR #18),
+`hardening/production-readiness`, `llm-provider-routing`. Nothing on these branches is unique —
+their history lives on in `main`'s log if any of it needs to be found again.
