@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { computeTraditionalComparison } from "@/lib/traditionalCompare";
+import { enforceRateLimit, clientKey, RATE_LIMITS } from "@/lib/rateLimit";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 
 const bodySchema = z.object({
@@ -17,6 +18,13 @@ const bodySchema = z.object({
  * and anonymous comparison is already supported.
  */
 export async function POST(req: Request) {
+  // Unauthenticated, and each call is a multi-row query plus a full
+  // attribute-matrix computation. No model is billed, so this is a load
+  // control rather than a spend control — hence publicRead, keyed on the
+  // best-effort client identity that is all an anonymous route has.
+  const limited = await enforceRateLimit(`traditional-comparison:${clientKey(req)}`, RATE_LIMITS.publicRead);
+  if (limited) return limited;
+
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid listing selection" }, { status: 400 });

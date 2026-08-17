@@ -3,7 +3,9 @@ import {
   checkRateLimit,
   enforceRateLimit,
   clientKey,
+  acquireConcurrencySlot,
   RATE_LIMITS,
+  CONCURRENCY_LIMITS,
   __resetRateLimits,
 } from "./rateLimit";
 
@@ -110,5 +112,75 @@ describe("RATE_LIMITS budgets", () => {
     const perSecond = (r: { limit: number; windowSeconds: number }) => r.limit / r.windowSeconds;
     expect(perSecond(RATE_LIMITS.publicAi)).toBeLessThanOrEqual(perSecond(RATE_LIMITS.authedAi));
     expect(perSecond(RATE_LIMITS.publicAi)).toBeLessThanOrEqual(perSecond(RATE_LIMITS.publicRead));
+  });
+});
+
+/**
+ * These run without REDIS_URL, so they exercise the in-process fallback. That
+ * is the path a single container and every dev machine actually takes; the
+ * shared-store path is covered by the Redis integration harness.
+ */
+describe("acquireConcurrencySlot", () => {
+  it("grants slots up to the limit and refuses the one after", async () => {
+    const a = await acquireConcurrencySlot("u1", 2);
+    const b = await acquireConcurrencySlot("u1", 2);
+    const c = await acquireConcurrencySlot("u1", 2);
+
+    expect(a.acquired).toBe(true);
+    expect(b.acquired).toBe(true);
+    expect(c.acquired).toBe(false);
+  });
+
+  it("frees the slot on release so the next request gets in", async () => {
+    const a = await acquireConcurrencySlot("u1", 1);
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(false);
+
+    await a.release();
+
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(true);
+  });
+
+  it("is safe to release twice — a double release must not mint a free slot", async () => {
+    const a = await acquireConcurrencySlot("u1", 1);
+    await a.release();
+    await a.release();
+
+    // If the second release had decremented again, two would fit here.
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(true);
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(false);
+  });
+
+  it("does not consume a slot when the request is refused", async () => {
+    const a = await acquireConcurrencySlot("u1", 1);
+    const refused = await acquireConcurrencySlot("u1", 1);
+    expect(refused.acquired).toBe(false);
+
+    // The refused attempt must not have left the counter at 2 — releasing the
+    // one real holder has to be enough to open a slot again.
+    await a.release();
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(true);
+  });
+
+  it("releasing a refused slot is a no-op rather than an underflow", async () => {
+    const a = await acquireConcurrencySlot("u1", 1);
+    const refused = await acquireConcurrencySlot("u1", 1);
+
+    await refused.release();
+
+    // If that had decremented, this second acquire would wrongly succeed while
+    // `a` is still holding the only slot.
+    expect((await acquireConcurrencySlot("u1", 1)).acquired).toBe(false);
+    await a.release();
+  });
+
+  it("tracks each user separately, so one account cannot block another", async () => {
+    await acquireConcurrencySlot("u1", 1);
+
+    expect((await acquireConcurrencySlot("u2", 1)).acquired).toBe(true);
+  });
+
+  it("allows more than one device but not an unbounded fan-out", () => {
+    expect(CONCURRENCY_LIMITS.chatStreams).toBeGreaterThan(1);
+    expect(CONCURRENCY_LIMITS.chatStreams).toBeLessThanOrEqual(5);
   });
 });

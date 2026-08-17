@@ -9,9 +9,23 @@ import { getListingPriceTrends } from "@/lib/catalog";
 import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
+import {
+  enforceRateLimit,
+  acquireConcurrencySlot,
+  RATE_LIMITS,
+  CONCURRENCY_LIMITS,
+} from "@/lib/rateLimit";
 import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
+
+/**
+ * Wall-clock ceiling on a single generation. Well past a normal 700-token
+ * reply, but bounded — without it an upstream that accepts the connection and
+ * then stalls holds a slot, a DB-free request, and a billing meter open until
+ * the platform's own (much longer) timeout fires.
+ */
+const CHAT_STREAM_TIMEOUT_MS = 120_000;
 
 const CONSUMER_SYSTEM_PROMPT =
   "You are the Kuwana Assistant — a friendly, concise AI chat assistant for Kuwana, an AI-assisted, " +
@@ -134,6 +148,13 @@ export async function POST(req: Request) {
   if ("response" in auth) return auth.response;
   const { user, role } = auth;
 
+  // Before the body is even parsed: everything below this line either queries
+  // the database or bills a model, and neither should happen for a caller
+  // already over budget. Keyed by user id rather than IP — this route is
+  // authenticated, so identity is known and not spoofable by header.
+  const limited = await enforceRateLimit(`chat:${user.id}`, RATE_LIMITS.authedAi);
+  if (limited) return limited;
+
   const parsed = postSchema.safeParse(await req.json());
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -251,94 +272,176 @@ export async function POST(req: Request) {
 
   const persistedUserContent = content || "[Image attached]";
 
+  // A cap on simultaneous streams, separate from the per-minute limit above:
+  // each open stream holds an upstream generation, so N at once costs N times
+  // as much regardless of how few requests-per-minute that represents.
+  const slot = await acquireConcurrencySlot(`chat:${user.id}`, CONCURRENCY_LIMITS.chatStreams);
+  if (!slot.acquired) {
+    return NextResponse.json(
+      { error: "You already have several chats generating. Wait for one to finish and try again." },
+      { status: 429, headers: { "Retry-After": "10" } },
+    );
+  }
+
+  /**
+   * Writes the turn and returns the client's `meta` payload.
+   *
+   * Split out of the stream body because it is now reached from two places: a
+   * generation that ran to completion, and one cut short by a disconnect or
+   * the timeout. A partial reply is still a real reply — the user watched it
+   * appear — so dropping it would lose visible history.
+   */
+  const persistTurn = async (fullText: string) => {
+    const { assistantMessage, conversationId: convId, gamification } = await prisma.$transaction(
+      async (tx) => {
+        const conv = conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
+
+        await tx.message.create({
+          data: { conversationId: conv.id, role: "user", content: persistedUserContent, listingIds: listingIds ?? [] },
+        });
+        const assistant = await tx.message.create({
+          data: { conversationId: conv.id, role: "assistant", content: fullText, listingIds: listingIds ?? [] },
+        });
+        await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
+
+        // Gamification is a consumer-only concept (see CorporateHeader's
+        // own note on this) — a corporate account's first message never
+        // awards it.
+        const gam =
+          isNewConversation && role === "consumer"
+            ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
+            : null;
+
+        return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
+      },
+      { timeout: 15_000 },
+    );
+
+    const listings = await listingSummaries(listingIds ?? []);
+    return {
+      conversationId: convId,
+      gamification,
+      message: {
+        id: assistantMessage.id,
+        role: "assistant" as const,
+        content: fullText,
+        createdAt: assistantMessage.createdAt.toISOString(),
+        listings,
+      },
+    };
+  };
+
+  // Aborted by three things: the client disconnecting (cancel below), the
+  // wall-clock timeout, and nothing else. Threaded into streamAiText so the
+  // abort reaches the provider's socket — cancelling only on our side would
+  // stop us reading the tokens, not stop the model producing and charging for
+  // them.
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), CHAT_STREAM_TIMEOUT_MS);
+
+  // Both causes abort the same signal, but they differ in one way that
+  // matters: on a timeout the client is still there and should be told, while
+  // on a disconnect there is nobody left to tell. Gating the writes on
+  // `signal.aborted` alone would silently drop the error marker in the first
+  // case, leaving the user with a reply that just stops.
+  let clientGone = false;
+
   const encoder = new TextEncoder();
   const readable = new ReadableStream<Uint8Array>({
     async start(controller) {
       let fullText = "";
-      try {
-        for await (const delta of streamAiText({
-          feature: "chat",
-          signals: {
-            feature: "chat",
-            hasImage: Boolean(image),
-            turnCount: priorMessages.length,
-            messageLength: content.length,
-            // `listingIds` is what the user asked about; grounding data for
-            // several listings is the case that needs real reasoning rather
-            // than a definition.
-            groundedListings: listingIds?.length ?? 0,
-          },
-          userId: user.id,
-          system,
-          messages: modelMessages,
-          maxTokens: 700,
-        })) {
-          // Status events (e.g. tier escalation) are forwarded to the client
-          // but must never be persisted as part of the assistant's reply.
-          if (delta.startsWith(STREAM_STATUS_MARKER)) {
-            controller.enqueue(encoder.encode(delta));
-            continue;
-          }
-          fullText += delta;
-          controller.enqueue(encoder.encode(delta));
+      // Every write goes through here so a disconnect unwinds quietly instead
+      // of raising an unhandled rejection inside the stream.
+      const send = (chunk: string) => {
+        if (clientGone) return;
+        try {
+          controller.enqueue(encoder.encode(chunk));
+        } catch {
+          /* consumer gone */
         }
-      } catch (err) {
-        // Previously swallowed silently — log so production failures are diagnosable.
-        console.error("[chat] AI stream failed:", err);
-        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
-        controller.close();
-        return;
-      }
+      };
 
-      if (!fullText.trim()) {
-        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
-        controller.close();
-        return;
-      }
+      const close = () => {
+        if (clientGone) return;
+        try {
+          controller.close();
+        } catch {
+          /* already closed by the consumer */
+        }
+      };
 
       try {
-        const { assistantMessage, conversationId: convId, gamification } = await prisma.$transaction(
-          async (tx) => {
-            const conv = conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
+        try {
+          for await (const delta of streamAiText({
+            feature: "chat",
+            signals: {
+              feature: "chat",
+              hasImage: Boolean(image),
+              turnCount: priorMessages.length,
+              messageLength: content.length,
+              // `listingIds` is what the user asked about; grounding data for
+              // several listings is the case that needs real reasoning rather
+              // than a definition.
+              groundedListings: listingIds?.length ?? 0,
+            },
+            userId: user.id,
+            system,
+            messages: modelMessages,
+            maxTokens: 700,
+            signal: abort.signal,
+          })) {
+            // Status events (e.g. tier escalation) are forwarded to the client
+            // but must never be persisted as part of the assistant's reply.
+            if (delta.startsWith(STREAM_STATUS_MARKER)) {
+              send(delta);
+              continue;
+            }
+            fullText += delta;
+            send(delta);
+          }
+        } catch (err) {
+          // An abort is expected control flow, not a failure: keep whatever
+          // was generated and fall through to persistence below.
+          if (!abort.signal.aborted) {
+            // Previously swallowed silently — log so production failures are diagnosable.
+            console.error("[chat] AI stream failed:", err);
+            send(STREAM_ERROR_MARKER);
+            close();
+            return;
+          }
+        }
 
-            await tx.message.create({
-              data: { conversationId: conv.id, role: "user", content: persistedUserContent, listingIds: listingIds ?? [] },
-            });
-            const assistant = await tx.message.create({
-              data: { conversationId: conv.id, role: "assistant", content: fullText, listingIds: listingIds ?? [] },
-            });
-            await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
+        if (!fullText.trim()) {
+          send(STREAM_ERROR_MARKER);
+          controller.close();
+          return;
+        }
 
-            // Gamification is a consumer-only concept (see CorporateHeader's
-            // own note on this) — a corporate account's first message never
-            // awards it.
-            const gam =
-              isNewConversation && role === "consumer"
-                ? await recordEvent(tx, { userId: user.id, eventType: "chat_started" })
-                : null;
-
-            return { assistantMessage: assistant, conversationId: conv.id, gamification: gam };
-          },
-          { timeout: 15_000 },
-        );
-
-        const listings = await listingSummaries(listingIds ?? []);
-        const meta = {
-          conversationId: convId,
-          gamification,
-          message: {
-            id: assistantMessage.id,
-            role: "assistant" as const,
-            content: fullText,
-            createdAt: assistantMessage.createdAt.toISOString(),
-            listings,
-          },
-        };
-        controller.enqueue(encoder.encode(STREAM_META_MARKER + JSON.stringify(meta)));
-      } catch {
-        controller.enqueue(encoder.encode(STREAM_ERROR_MARKER));
+        try {
+          send(STREAM_META_MARKER + JSON.stringify(await persistTurn(fullText)));
+        } catch (err) {
+          console.error("[chat] persisting the turn failed:", err);
+          send(STREAM_ERROR_MARKER);
+        }
+        close();
+      } finally {
+        clearTimeout(timeout);
+        await slot.release();
       }
-      controller.close();
+    },
+
+    /**
+     * Fired when the client goes away — closed tab, navigation, lost network.
+     * Aborting here is the whole point of the fix: without it the generation
+     * continued to completion and was billed in full, then discarded.
+     *
+     * `start` keeps running after this: it unwinds out of the for-await and
+     * still persists whatever was generated, so the partial reply survives in
+     * the user's history even though nothing can be written back to them.
+     */
+    cancel() {
+      clientGone = true;
+      abort.abort();
     },
   });
 
