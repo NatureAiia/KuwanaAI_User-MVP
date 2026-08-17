@@ -14,6 +14,11 @@ import { privateJson } from "@/lib/apiResponse";
  * differs — see api/auth/account-status/route.ts for the one place that
  * needs to tell the two apart, to show login a clear message instead of a
  * silent redirect loop.
+ *
+ * Unverified email is gated here for the same reason, and it matters that it
+ * is here rather than at the routes: eleven routes call requireUser()
+ * directly with no role check on top, and one of them is wallet top-up. A
+ * per-route check would have had to be right eleven times.
  */
 export async function requireUser() {
   const supabase = await createClient();
@@ -22,8 +27,22 @@ export async function requireUser() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { accountStatus: true } });
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { accountStatus: true, emailVerifiedAt: true },
+  });
   if (dbUser?.accountStatus === "suspended") return null;
+
+  // A NULL here is not the ordinary mid-signup state — /api/onboarding never
+  // writes a row without stamping this (it either confirms the emailed code
+  // or records that this deployment has no mailer, see isMailerConfigured).
+  // Existing rows were backfilled by the migration. So reaching this branch
+  // means a row was created by some path that skipped that check, which is
+  // exactly the case worth refusing.
+  //
+  // `dbUser?.` deliberately: no row at all IS the mid-signup state, and it
+  // has to pass, or onboarding could never create one.
+  if (dbUser && !dbUser.emailVerifiedAt) return null;
 
   return user;
 }

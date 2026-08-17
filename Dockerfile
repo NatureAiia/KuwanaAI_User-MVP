@@ -54,8 +54,15 @@ FROM deps AS builder
 # role key is NOT among them and is only ever injected at runtime.
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+# The Turnstile site key is read by a client component, so it has to be here
+# rather than in the Deployment's env: supplied only at runtime it inlines as
+# undefined, the widget renders nothing, and the deployment looks protected
+# while no challenge is ever issued. Optional — unset simply means no widget,
+# which is the documented "not configured" state, not a broken build.
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL} \
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY} \
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 
 COPY prisma ./prisma
 RUN npx prisma generate

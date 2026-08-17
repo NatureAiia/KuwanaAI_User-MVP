@@ -251,6 +251,20 @@ export const RATE_LIMITS = {
    * clientKey() above: a cost/abuse-shape control, not an access control.
    */
   walletTopupIp: { limit: 20, windowSeconds: 60 },
+  /**
+   * Sending a signup verification code. Every call puts a real message in a
+   * real inbox and costs the mail provider's per-message fee, so this is
+   * tighter than any other authenticated write. Five is enough for a user who
+   * mistypes their address, waits, and retries; it is not enough to use the
+   * resend button as a mail bomb.
+   */
+  emailVerificationSend: { limit: 5, windowSeconds: 900 },
+  /**
+   * Submitting a code. MAX_ATTEMPTS already bounds guesses against any single
+   * code; this bounds the rate across codes, so an attacker cannot cycle
+   * request-guess-five-times-request-again at machine speed.
+   */
+  emailVerificationVerify: { limit: 10, windowSeconds: 300 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /* -------------------------------------------------------------------------- */
