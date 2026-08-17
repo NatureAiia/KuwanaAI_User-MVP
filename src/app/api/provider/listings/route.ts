@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerCreateListingSchema } from "@/lib/providerListingSchema";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { recordEvent } from "@/lib/gamification/process-event";
 
 export async function GET() {
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { status, ...rest } = parsed.data;
+  const attrError = await validateListingAttributes(rest.categoryId, rest.attributes);
+  if (attrError) return privateJson({ error: attrError }, { status: 400 });
+
   const listing = await prisma.listing.create({
     data: {
       ...rest,

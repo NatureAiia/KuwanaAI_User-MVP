@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { AttributeFieldsEditor, attributeValuesToTyped } from "@/components/attributes/AttributeFieldsEditor";
+import type { AttributeField } from "@/components/provider/types";
 
-type CategoryOption = { id: string; name: string; sector: { name: string } };
+type CategoryOption = { id: string; name: string; sector: { name: string }; attributeSchema: AttributeField[] };
 type ProviderOption = { id: string; name: string };
 
 export function NewListingForm({
@@ -22,21 +24,17 @@ export function NewListingForm({
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [attributesJson, setAttributesJson] = useState("{}");
+  const [attributeValues, setAttributeValues] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const category = useMemo(() => categories.find((c) => c.id === categoryId) ?? null, [categories, categoryId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    let attributes: Record<string, unknown>;
-    try {
-      attributes = JSON.parse(attributesJson || "{}");
-    } catch {
-      setError("Attributes must be valid JSON, e.g. {\"data_amount\": 5}");
-      return;
-    }
+    const attributes = attributeValuesToTyped(category?.attributeSchema ?? [], attributeValues);
 
     setLoading(true);
     try {
@@ -61,7 +59,7 @@ export function NewListingForm({
       setName("");
       setPrice("");
       setSourceUrl("");
-      setAttributesJson("{}");
+      setAttributeValues({});
       router.refresh();
     } finally {
       setLoading(false);
@@ -86,7 +84,10 @@ export function NewListingForm({
 
       <select
         value={categoryId}
-        onChange={(e) => setCategoryId(e.target.value)}
+        onChange={(e) => {
+          setCategoryId(e.target.value);
+          setAttributeValues({});
+        }}
         className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       >
         {categories.map((c) => (
@@ -141,12 +142,10 @@ export function NewListingForm({
         className="tap-target w-full rounded-lg border border-border bg-bg-surface p-2 text-[13px]"
       />
 
-      <textarea
-        placeholder='Attributes JSON, e.g. {"data_amount": 5, "validity_days": 30}'
-        value={attributesJson}
-        onChange={(e) => setAttributesJson(e.target.value)}
-        rows={3}
-        className="w-full rounded-lg border border-border bg-bg-surface p-2 font-mono text-[12px]"
+      <AttributeFieldsEditor
+        fields={category?.attributeSchema ?? []}
+        values={attributeValues}
+        onChange={(key, value) => setAttributeValues((prev) => ({ ...prev, [key]: value }))}
       />
 
       {error && <p className="text-[12px] text-accent-coral">{error}</p>}

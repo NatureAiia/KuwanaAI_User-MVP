@@ -8,6 +8,7 @@ import { CategoryStep } from "@/components/provider/steps/CategoryStep";
 import { DetailsStep } from "@/components/provider/steps/DetailsStep";
 import { SpecsStep } from "@/components/provider/steps/SpecsStep";
 import { ReviewStep } from "@/components/provider/steps/ReviewStep";
+import { attributeValuesToTyped } from "@/components/attributes/AttributeFieldsEditor";
 import type { CategoryOption, ExistingListing } from "@/components/provider/types";
 import type { CurrencyCode } from "@/lib/currency";
 
@@ -78,13 +79,7 @@ export function ProviderListingForm({
     setError(null);
     setLoading(status);
     try {
-      const attributes: Record<string, unknown> = {};
-      for (const field of category?.attributeSchema ?? []) {
-        const raw = attributeValues[field.key];
-        if (raw === undefined || raw === "") continue;
-        attributes[field.key] =
-          field.dataType === "number" ? Number(raw) : field.dataType === "boolean" ? raw === "yes" : raw;
-      }
+      const attributes = attributeValuesToTyped(category?.attributeSchema ?? [], attributeValues);
 
       const trimmedDescription = description.trim() || null;
       const body =

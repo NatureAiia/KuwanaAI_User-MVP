@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireAdmin } from "@/lib/auth";
 import { boundedJsonRecord } from "@/lib/zodShared";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { logAdminAction } from "@/lib/adminAudit";
 
 /**
@@ -44,6 +45,9 @@ export async function POST(req: Request) {
 
   const parsed = createSchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
+
+  const attrError = await validateListingAttributes(parsed.data.categoryId, parsed.data.attributes);
+  if (attrError) return privateJson({ error: attrError }, { status: 400 });
 
   const listing = await prisma.listing.create({
     data: {

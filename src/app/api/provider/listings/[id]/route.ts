@@ -4,6 +4,7 @@ import { privateJson } from "@/lib/apiResponse";
 import { revalidateCatalog } from "@/lib/cacheTags";
 import { requireOwnProvider } from "@/lib/providerAuth";
 import { providerUpdateListingSchema } from "@/lib/providerListingSchema";
+import { validateListingAttributes } from "@/lib/attributeValidation";
 import { recordPriceChange } from "@/lib/catalog";
 import { recordEvent } from "@/lib/gamification/process-event";
 
@@ -41,6 +42,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
 
   const { attributes, status: requestedStatus, ...rest } = parsed.data;
+  const attrError = await validateListingAttributes(existing.categoryId, attributes);
+  if (attrError) return privateJson({ error: attrError }, { status: 400 });
+
   const priceChanged = rest.price !== undefined && Number(existing.price) !== rest.price;
 
   const listing = await prisma.listing.update({
