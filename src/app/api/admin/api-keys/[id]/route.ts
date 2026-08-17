@@ -8,12 +8,16 @@ export async function PATCH(_req: Request, { params }: { params: Promise<{ id: s
   const admin = await requireAdmin();
   if (!admin) return privateJson({ error: "Not authorised" }, { status: 403 });
 
+  // Never select hashedKey — same reasoning as the sibling GET in
+  // api-keys/route.ts, this response must not carry key material back out.
+  const select = { id: true, label: true, scopes: true, createdAt: true, lastUsedAt: true, revokedAt: true } as const;
+
   const { id } = await params;
-  const apiKey = await prisma.apiKey.findUnique({ where: { id } });
+  const apiKey = await prisma.apiKey.findUnique({ where: { id }, select });
   if (!apiKey) return privateJson({ error: "Not found" }, { status: 404 });
   if (apiKey.revokedAt) return privateJson({ apiKey });
 
-  const revoked = await prisma.apiKey.update({ where: { id }, data: { revokedAt: new Date() } });
+  const revoked = await prisma.apiKey.update({ where: { id }, data: { revokedAt: new Date() }, select });
 
   await logAdminAction({
     adminEmail: admin.email,
