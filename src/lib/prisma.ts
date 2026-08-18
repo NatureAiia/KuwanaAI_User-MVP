@@ -6,7 +6,7 @@ declare global {
 }
 
 // Prisma service-role is the trust boundary - no RLS
-// Supabase Auth owns identity, users table mirrors it via supabaseAuthId
+// users.id is the authoritative identity (Auth.js JWT sub claim), not a mirror of an external provider
 export const prisma =
   global.prisma ||
   new PrismaClient({

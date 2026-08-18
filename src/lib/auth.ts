@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/nextAuth";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 
@@ -21,11 +21,9 @@ import { privateJson } from "@/lib/apiResponse";
  * per-route check would have had to be right eleven times.
  */
 export async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await auth();
+  const user = session?.user;
+  if (!user?.id || !user.email) return null;
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
@@ -44,7 +42,7 @@ export async function requireUser() {
   // has to pass, or onboarding could never create one.
   if (dbUser && !dbUser.emailVerifiedAt) return null;
 
-  return user;
+  return { id: user.id, email: user.email };
 }
 
 /** Same role lookup dashboard/corporate/regulator pages already do server-side — shared here for API routes. */

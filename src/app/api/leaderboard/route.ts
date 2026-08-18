@@ -29,6 +29,7 @@ export async function GET() {
     where: {
       user: {
         consents: { some: { consentType: "leaderboard_participation", granted: true } },
+        onboardingCompletedAt: { not: null },
       },
     },
     include: { user: { include: { profile: true } } },

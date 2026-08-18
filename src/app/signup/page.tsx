@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { signIn } from "next-auth/react";
+import { passwordSchema } from "@/lib/authSchema";
 import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
@@ -361,27 +362,19 @@ export default function SignupPage() {
 
     (async () => {
       setProcessingStage("account");
-      const supabase = createClient();
-      // Supabase verifies captchaToken itself, but ONLY once CAPTCHA is
-      // enabled in the project's Auth settings with the matching secret —
-      // passing a token to a project with it switched off is silently ignored.
-      // See DEPLOYMENT.md; the code here is half of the control.
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        // Read via ref so this effect keeps its run-once dependency list — the
-        // widget resolves its token asynchronously and would otherwise be a
-        // dependency of an effect that must not re-enter.
-        ...(captchaTokenRef.current ? { options: { captchaToken: captchaTokenRef.current } } : {}),
+      const registerRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (signUpError) {
-        const alreadyRegistered = /already registered|already exists|already been used|taken/i.test(
-          signUpError.message,
-        );
+      if (!registerRes.ok) {
+        const errBody = await registerRes.json().catch(() => ({}));
         setError(
-          alreadyRegistered
+          registerRes.status === 409
             ? "This email can only be used once. If you already have an account, please log in instead."
-            : signUpError.message,
+            : typeof errBody?.error === "string"
+              ? errBody.error
+              : "Something went wrong creating your account. Please try again.",
         );
         setStep("account");
         // The account was not created, so let a corrected retry run this again.
@@ -416,6 +409,13 @@ export default function SignupPage() {
 
       if (required) {
         setStep("verify");
+        return;
+      }
+
+      const signInResult = await signIn("credentials", { email, password, redirect: false });
+      if (signInResult?.error) {
+        setError("Your account was created, but signing you in failed. Please try logging in.");
+        setStep("account");
         return;
       }
       setProcessingStage("profile");
@@ -515,7 +515,7 @@ export default function SignupPage() {
           res.status === 403 && typeof errBody?.error === "string"
             ? errBody.error
             : errBody?.error
-              ? "We couldn't save your profile. Check your email to confirm your account, then log in."
+              ? "We couldn't save your profile. Please try logging in and completing your profile again."
               : "Something went wrong saving your profile.",
         );
         return;
@@ -560,14 +560,18 @@ export default function SignupPage() {
           ? "Use 3–20 letters, numbers, or underscores only."
           : null,
       email: email && !email.includes("@") ? "Email must include an @ symbol." : null,
-      password: password && password.length < 6 ? "Password needs at least 6 characters." : null,
+      password: password ? (passwordSchema.safeParse(password).error?.issues[0]?.message ?? null) : null,
     };
   }
 
   function canContinue(s: ConsumerStep | "orgDetails" | "industry") {
     switch (s) {
       case "account":
-        return !!(/^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) && email.trim() && password.length >= 6);
+        return !!(
+          /^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) &&
+          email.trim() &&
+          passwordSchema.safeParse(password).success
+        );
       case "personal":
         return !!(ageRange && occupation);
       case "telecom":

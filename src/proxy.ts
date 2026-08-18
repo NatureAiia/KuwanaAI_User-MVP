@@ -1,6 +1,7 @@
-import { createServerClient } from "@supabase/ssr";
+import { getToken } from "next-auth/jwt";
 import { NextResponse, type NextRequest } from "next/server";
 import { contentSecurityPolicy, STATIC_SECURITY_HEADERS } from "@/lib/securityHeaders";
+import { SESSION_COOKIE_NAME } from "@/lib/authConfig";
 
 // The matcher now runs on every page request (static assets and image
 // optimization excluded) so the nonce-based CSP and static security headers
@@ -9,10 +10,10 @@ import { contentSecurityPolicy, STATIC_SECURITY_HEADERS } from "@/lib/securityHe
 // headers at all. /explore itself is still intentionally NOT auth-gated —
 // pre-signup visitors can browse read-only (Section 7.1); compare/save/action
 // routes gate client-side. What the matcher used to buy by excluding public
-// routes was skipping the Supabase auth round-trip (several hundred ms to
-// several seconds in the proxy, see the dev logs) for pages that don't need
-// it; that's now handled by only running the auth check for PROTECTED_PREFIXES
-// below, not by keeping those routes out of the matcher.
+// routes was skipping the session check (a local JWE decrypt, cheap, but not
+// free) for pages that don't need it; that's now handled by only running the
+// auth check for PROTECTED_PREFIXES below, not by keeping those routes out
+// of the matcher.
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
@@ -61,70 +62,43 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("Content-Security-Policy", csp);
 
-  let response = NextResponse.next({ request: { headers: requestHeaders } });
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // Public routes get the nonce + security headers above and nothing else —
-  // no Supabase round-trip, since there's no session to check.
+  // no session check, since there's no session to verify.
   if (!isProtectedPath(request.nextUrl.pathname)) {
     return withSecurityHeaders(response, csp);
   }
 
-  // Fast anonymous short-circuit: with no Supabase auth cookie on the
-  // request there can't be a session, so redirect without the network
-  // round-trip to Supabase that getUser() would otherwise perform.
-  const hasAuthCookie = request.cookies
-    .getAll()
-    .some(({ name }) => name.startsWith("sb-") && name.endsWith("-auth-token"));
-
-  if (!hasAuthCookie) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", request.nextUrl.pathname);
-    return withSecurityHeaders(NextResponse.redirect(url), csp);
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error(
-      "Missing Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-    );
-  }
-
-  const supabase = createServerClient(
-    supabaseUrl,
-    supabaseKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          // Rebuilding the response here drops any header already set on it,
-          // so the nonce-carrying request headers must be re-attached.
-          response = NextResponse.next({ request: { headers: requestHeaders } });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
-          );
-        },
-      },
-    },
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  function redirectToLogin() {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     // Only ever a same-origin path — `nextUrl.pathname` cannot carry a host,
     // so this cannot be turned into an open redirect by a crafted request.
     url.searchParams.set("next", request.nextUrl.pathname);
     return withSecurityHeaders(NextResponse.redirect(url), csp);
+  }
+
+  // Fast anonymous short-circuit: with no session cookie on the request
+  // there can't be a session, so redirect without the local JWE-decrypt
+  // getToken() would otherwise perform.
+  if (!request.cookies.has(SESSION_COOKIE_NAME)) {
+    return redirectToLogin();
+  }
+
+  // getToken(), not the auth() wrapper: auth() would pull nextAuth.ts (and
+  // therefore Prisma + bcryptjs) into this Edge-runtime bundle, which fails
+  // to build. getToken() only needs `jose`. secureCookie must match how
+  // SESSION_COOKIE_NAME decided the cookie's own prefix — mismatched here,
+  // getToken() silently returns null and every request bounces to /login.
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET,
+    secureCookie: SESSION_COOKIE_NAME.startsWith("__Secure-"),
+  });
+
+  if (!token?.sub) {
+    return redirectToLogin();
   }
 
   return withSecurityHeaders(response, csp);

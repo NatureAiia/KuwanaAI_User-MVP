@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { clsx } from "clsx";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "next-auth/react";
 import { Button } from "@/components/ui/Button";
 
 async function signOutTo(to: string, router: ReturnType<typeof useRouter>) {
-  await createClient().auth.signOut();
+  await signOut({ redirect: false });
   router.push(to);
   router.refresh();
 }

@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProviderLogo } from "@/components/ProviderLogo";
-import { createClient } from "@/lib/supabase/client";
 import { useCompareTray } from "@/lib/useCompareTray";
 import { MIN_COMPARE, MAX_COMPARE } from "@/lib/compareTray";
 import { stashPendingChatImage } from "@/lib/chatHandoff";
@@ -25,9 +24,9 @@ export function CompareTrayBar() {
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => setIsAuthed(!!data.user));
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((session) => setIsAuthed(!!session?.user));
   }, []);
 
   if (!tray || tray.items.length === 0) return null;
