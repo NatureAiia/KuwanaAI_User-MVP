@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/authSchema";
 import { enforceRateLimit, clientKey, RATE_LIMITS } from "@/lib/rateLimit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import { SESSION_MAX_AGE } from "@/lib/authConfig";
 
 // A real bcrypt hash (cost 12) of an arbitrary fixed string, generated once
@@ -22,6 +23,10 @@ class TooManyAttemptsError extends CredentialsSignin {
   code = "too_many_attempts";
 }
 
+class BotCheckFailedError extends CredentialsSignin {
+  code = "bot_check_failed";
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   // No public ingress hostname is fixed ahead of time on the k3s target (and
@@ -31,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/login" },
   providers: [
     Credentials({
-      credentials: { email: {}, password: {} },
+      credentials: { email: {}, password: {}, turnstileToken: {} },
       async authorize(credentials, request) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) throw new InvalidCredentialsError();
@@ -42,6 +47,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // without also tripping this per-email half of the key.
         const limited = await enforceRateLimit(`login:${clientKey(request)}:${email}`, RATE_LIMITS.login);
         if (limited) throw new TooManyAttemptsError();
+
+        // The direct replacement for what Supabase's signInWithPassword({
+        // options: { captchaToken } }) used to verify implicitly — there's no
+        // Supabase Auth backend left to hand the token to, so it's checked
+        // here instead. Skips entirely when TURNSTILE_SECRET_KEY isn't set
+        // (see src/lib/turnstile.ts), so local dev without real Cloudflare
+        // keys is unaffected.
+        const turnstileToken =
+          typeof credentials.turnstileToken === "string" ? credentials.turnstileToken : undefined;
+        const turnstile = await verifyTurnstileToken(turnstileToken, clientKey(request));
+        if (!turnstile.ok) throw new BotCheckFailedError();
 
         const user = await prisma.user.findUnique({
           where: { email },

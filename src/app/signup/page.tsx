@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { Turnstile } from "@/components/Turnstile";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { LoadingFacts } from "@/components/loading/LoadingFacts";
@@ -98,7 +99,7 @@ const CONSUMER_STEPS = [
   "consent",
 ] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "processing";
+type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "verify" | "processing";
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -201,6 +202,15 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Empty when Turnstile isn't configured for this deployment; authorize()
+  // (src/lib/nextAuth.ts) treats a missing token as "skip" in that case, so
+  // the flow is unchanged. Held in a ref rather than state because the
+  // account-creation effect reads it without wanting it as a dependency (see
+  // the signIn call).
+  const captchaTokenRef = useRef("");
+  const setCaptchaToken = (token: string) => {
+    captchaTokenRef.current = token;
+  };
 
   // Corporate/Provider share a free-text org name; Regulator is a closed
   // dropdown (REGULATOR_NAMES) since its self-service safety depends on the
@@ -259,7 +269,22 @@ export default function SignupPage() {
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
 
-  const startedProcessing = useRef(false);
+  // The emailed one-time code (see /api/auth/email-verification). Only ever
+  // reached when the deployment has a mailer configured — without one the
+  // send route answers `verificationRequired: false` and the flow skips
+  // straight from account creation to saving the profile, exactly as it did
+  // before this existed.
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
+
+  // Account creation and profile saving are two separate one-shot effects
+  // rather than one, because verification now sits between them and the
+  // second half has to be resumable after an arbitrary pause on the code
+  // screen. Each has its own re-entry guard.
+  const startedAccount = useRef(false);
+  const startedProfile = useRef(false);
+  const [accountReady, setAccountReady] = useState(false);
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -329,9 +354,20 @@ export default function SignupPage() {
     setStep(prev ?? "role");
   }
 
+  // Stage one: create the account row, then ask the server to mail a
+  // verification code. Deliberately depends only on the credentials, so the
+  // profile answers changing underneath it can never re-enter it.
+  //
+  // Turnstile is deliberately NOT verified here: a Cloudflare token is
+  // single-use, and the sign-in call a few lines down (or the one on the
+  // "verify" step's success path) is the one that actually verifies it, via
+  // authorize() in src/lib/nextAuth.ts. Checking it twice against Cloudflare
+  // would fail the second call. Row creation on its own can't grant a
+  // session, so it's an acceptable target to leave unchecked here — it's
+  // still bounded by RATE_LIMITS.publicWrite.
   useEffect(() => {
-    if (step !== "processing" || startedProcessing.current) return;
-    startedProcessing.current = true;
+    if (step !== "processing" || startedAccount.current) return;
+    startedAccount.current = true;
 
     (async () => {
       setProcessingStage("account");
@@ -350,17 +386,74 @@ export default function SignupPage() {
               : "Something went wrong creating your account. Please try again.",
         );
         setStep("account");
+        // The account was not created, so let a corrected retry run this again.
+        startedAccount.current = false;
         return;
       }
 
-      const signInResult = await signIn("credentials", { email, password, redirect: false });
+      // Establish a session right away — this is the direct analogue of
+      // Supabase's signUp() minting a session immediately, before its own
+      // "email confirmed" state was ever true. Email verification is purely
+      // an app-level gate (requireUser(), see src/lib/auth.ts) checked on
+      // every subsequent request, not a precondition for having a session at
+      // all — that's what lets the send/verify routes below authenticate via
+      // the raw session (auth()) while still being blocked by requireUser()
+      // everywhere else until the code is confirmed.
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        turnstileToken: captchaTokenRef.current || undefined,
+        redirect: false,
+      });
       if (signInResult?.error) {
         setError("Your account was created, but signing you in failed. Please try logging in.");
         setStep("account");
         return;
       }
-      setProcessingStage("profile");
 
+      // Anything short of an explicit `verificationRequired: false` sends the
+      // user to the code screen. That is the fail-safe direction: if the mail
+      // did go out, skipping the screen would only earn a 403 from
+      // /api/onboarding, and if it did not, the resend button on that screen
+      // gets the definitive answer and moves on by itself.
+      let required = true;
+      try {
+        const res = await fetch("/api/auth/email-verification/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        const body = await res.json().catch(() => ({}));
+        if (body?.verificationRequired === false) required = false;
+        else if (!res.ok) {
+          setError(
+            typeof body?.error === "string"
+              ? body.error
+              : "We couldn't send your verification code. Try requesting a new one.",
+          );
+        }
+      } catch {
+        setError("We couldn't reach the server to send your code. Try requesting a new one.");
+      }
+
+      if (required) {
+        setStep("verify");
+        return;
+      }
+
+      setProcessingStage("profile");
+      setAccountReady(true);
+    })();
+  }, [step, email, password]);
+
+  // Stage two: save the profile. Gated on `accountReady` rather than on the
+  // step, so it starts either straight after account creation (no mailer) or
+  // whenever the emailed code is finally accepted.
+  useEffect(() => {
+    if (!accountReady || startedProfile.current) return;
+    startedProfile.current = true;
+
+    (async () => {
       const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
       // Replace the "Other" marker with whatever the user typed, if anything
       // — otherwise keep "Other" so the selection still round-trips.
@@ -429,6 +522,18 @@ export default function SignupPage() {
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
+        // The server refused because this signup never confirmed its code —
+        // reachable if the mailer was switched on between stage one and here,
+        // or if the code was consumed against a different address. Put the
+        // user back on the code screen instead of a dead end, and let stage
+        // two run again once they get through it.
+        if (errBody?.reason === "email_unverified") {
+          startedProfile.current = false;
+          setAccountReady(false);
+          setStep("verify");
+          setError(null);
+          return;
+        }
         setError(
           res.status === 403 && typeof errBody?.error === "string"
             ? errBody.error
@@ -444,10 +549,8 @@ export default function SignupPage() {
       router.refresh();
     })();
   }, [
-    step,
+    accountReady,
     role,
-    email,
-    password,
     username,
     organizationName,
     organizationDescription,
@@ -518,6 +621,61 @@ export default function SignupPage() {
 
   function startProcessing() {
     go("processing");
+  }
+
+  async function submitCode() {
+    setVerifying(true);
+    setError(null);
+    setResendNotice(null);
+    try {
+      const res = await fetch("/api/auth/email-verification/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body?.error === "string" ? body.error : "That code isn't right.");
+        return;
+      }
+      setStep("processing");
+      setProcessingStage("profile");
+      setAccountReady(true);
+    } catch {
+      setError("We couldn't reach the server. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function resendCode() {
+    setError(null);
+    setResendNotice(null);
+    try {
+      const res = await fetch("/api/auth/email-verification/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const body = await res.json().catch(() => ({}));
+      // The deployment turns out to have no mailer after all — stage one only
+      // landed here because it could not get a definitive answer. Carry on
+      // rather than leaving the user waiting for mail nobody is sending.
+      if (body?.verificationRequired === false) {
+        setStep("processing");
+        setProcessingStage("profile");
+        setAccountReady(true);
+        return;
+      }
+      if (!res.ok) {
+        setError(typeof body?.error === "string" ? body.error : "We couldn't send a new code.");
+        return;
+      }
+      setCode("");
+      setResendNotice("We've sent a new code — check your inbox.");
+    } catch {
+      setError("We couldn't reach the server. Please try again.");
+    }
   }
 
   return (
@@ -656,6 +814,11 @@ export default function SignupPage() {
                   : "We only use this to secure your account — never shared with providers."}
             </p>
             {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            {/* Solved here rather than on the final step: the token is
+                short-lived and single-use, so challenging immediately before
+                the account is actually created would mean re-challenging
+                anyone who spends time on the profile questions. */}
+            <Turnstile onToken={setCaptchaToken} />
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
@@ -1170,6 +1333,50 @@ export default function SignupPage() {
                   {role === "consumer" ? "Save my profile" : "Create account"}
                 </Button>
               )}
+            </div>
+          </div>
+        )}
+
+        {step === "verify" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Check your email</h1>
+            <p className="text-[14px] leading-relaxed text-text-secondary">
+              We sent a 6-digit code to <span className="font-semibold text-text-primary">{email}</span>.
+              Enter it below to finish creating your account.
+            </p>
+            <label className="block">
+              <span className="text-[13px] font-medium text-text-secondary">Verification code</span>
+              <input
+                value={code}
+                // `one-time-code` is what lets iOS and Android offer the code
+                // straight from the notification, and the numeric inputMode
+                // brings up a digits keypad instead of a full keyboard.
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                autoFocus
+                placeholder="000000"
+                aria-label="6-digit verification code"
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && code.length === 6 && !verifying) void submitCode();
+                }}
+                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-center font-mono text-[24px] tracking-[0.4em] outline-none focus:border-accent-sky"
+              />
+            </label>
+            <p className="text-[12px] text-text-muted">
+              The code expires in 10 minutes and can only be used once.
+            </p>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            {resendNotice && <p className="text-[13px] text-accent-teal">{resendNotice}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={resendCode} disabled={verifying} className="flex-1">
+                Send a new code
+              </Button>
+              <Button onClick={submitCode} disabled={code.length !== 6 || verifying} className="flex-1">
+                {verifying ? "Checking…" : "Verify"}
+              </Button>
             </div>
           </div>
         )}

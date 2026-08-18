@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumer } from "@/lib/auth";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import type { Sector } from "@prisma/client";
 
 const bodySchema = z.object({ listingId: z.string() });
@@ -11,6 +12,9 @@ export async function POST(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  const limited = await enforceRateLimit(`saved:${user.id}`, RATE_LIMITS.authedWrite);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
@@ -46,6 +50,9 @@ export async function DELETE(req: Request) {
   const auth = await requireConsumer();
   if ("response" in auth) return auth.response;
   const { user } = auth;
+
+  const limited = await enforceRateLimit(`saved:${user.id}`, RATE_LIMITS.authedWrite);
+  if (limited) return limited;
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });

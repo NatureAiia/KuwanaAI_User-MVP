@@ -24,3 +24,31 @@ data:
   # `database.connectionLimit` value so the render-time budget check in
   # _helpers.tpl stays a true statement about what pods will open.
   DATABASE_POOL_MAX: {{ .Values.database.connectionLimit | quote }}
+  {{- /*
+    Signup email verification (src/lib/email/mailer.ts). Non-secret half only
+    — SMTP_PASSWORD and EMAIL_VERIFICATION_SECRET live in the Secret.
+
+    Emitted only when set, because "no SMTP host" is a supported state that
+    means verification is not in force. A blank string here would be read as
+    configured-and-broken instead, which is the harder failure to diagnose.
+  */}}
+  {{- with .Values.config.smtpHost }}
+  SMTP_HOST: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.smtpPort }}
+  SMTP_PORT: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.smtpUser }}
+  SMTP_USER: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.emailFrom }}
+  EMAIL_FROM: {{ . | quote }}
+  {{- end }}
+  {{- /*
+    Hops in front of the app that append to x-forwarded-for. Decides which
+    entry src/lib/rateLimit.ts trusts as the caller — set too low, a client
+    can inject its own hop and walk past every IP-keyed rate limit.
+  */}}
+  {{- with .Values.config.trustedProxyCount }}
+  TRUSTED_PROXY_COUNT: {{ . | quote }}
+  {{- end }}

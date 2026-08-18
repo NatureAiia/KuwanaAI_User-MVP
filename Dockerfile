@@ -29,7 +29,15 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NPM_CONFIG_AUDIT=false
 # openssl: required by the Prisma query engine. tini: a real init, so a
 # SIGTERM from the kubelet reaches the server and zombies get reaped.
+#
+# `upgrade` is not redundant with a fresh base image. The node images are
+# rebuilt on their own cadence, so they lag Debian security updates — at the
+# time of writing node:24.13.1-bookworm-slim shipped libgnutls30
+# 3.7.9-2+deb12u5 against a published fix in deb12u7, which is two fixable
+# CRITICALs (CVE-2026-33845, CVE-2026-42010) that CI's Trivy gate fails on.
+# Patching at build time is what keeps the image current between base respins.
 RUN apt-get update \
+ && apt-get upgrade -y \
  && apt-get install -y --no-install-recommends openssl ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -54,8 +62,15 @@ FROM deps AS builder
 # role key is NOT among them and is only ever injected at runtime.
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+# The Turnstile site key is read by a client component, so it has to be here
+# rather than in the Deployment's env: supplied only at runtime it inlines as
+# undefined, the widget renders nothing, and the deployment looks protected
+# while no challenge is ever issued. Optional — unset simply means no widget,
+# which is the documented "not configured" state, not a broken build.
+ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL} \
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY} \
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -80,6 +95,21 @@ ENV NODE_ENV=production \
 
 ARG APP_VERSION=dev
 ENV APP_VERSION=${APP_VERSION}
+
+# The web image runs `node server.js` and nothing else — the standalone
+# output bundles its own dependencies, and the healthcheck below is plain
+# `node -e`. npm is never invoked here, but the base image ships it, and the
+# copy of `tar` vendored inside it (7.5.4 against a fix in 7.5.19) is a
+# fixable CRITICAL that CI's Trivy gate fails on.
+#
+# Removing it drops that CVE and a chunk of unused attack surface. This does
+# not shrink the pull, since deleting in a later layer only writes whiteouts
+# (see migrate-deps below for where that distinction actually matters) —
+# Trivy scans the merged filesystem, so what it removes is the finding and
+# the ability to run a package manager inside a production container.
+RUN rm -rf /usr/local/lib/node_modules/npm \
+           /usr/local/bin/npm \
+           /usr/local/bin/npx
 
 # Runs as the image's existing unprivileged `node` user (uid 1000). The
 # Deployment additionally pins runAsUser/runAsNonRoot so a future base-image

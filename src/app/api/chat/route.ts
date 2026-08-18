@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireConsumerOrCorporate } from "@/lib/auth";
+import { privateJson } from "@/lib/apiResponse";
 import { emailDomain } from "@/lib/orgVerification";
 import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
@@ -130,7 +131,7 @@ export async function GET(req: Request) {
   const summaries = await listingSummaries(distinctListingIds);
   const summaryById = new Map(summaries.map((s) => [s.id, s]));
 
-  return NextResponse.json({
+  return privateJson({
     conversationId: conversation?.id ?? null,
     messages:
       conversation?.messages.map((m) => ({

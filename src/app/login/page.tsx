@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import WaterButton from "@/components/ui/WaterButton";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { Turnstile } from "@/components/Turnstile";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { markHardNav } from "@/components/SoftNavTracker";
 
@@ -21,24 +22,32 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Empty when Turnstile isn't configured; Supabase ignores the option then.
+  const [captchaToken, setCaptchaToken] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await signIn("credentials", { email, password, redirect: false });
+    // Login matters as much as signup for bot/credential-stuffing traffic —
+    // the Turnstile token is verified server-side inside authorize() itself
+    // (see src/lib/nextAuth.ts), since there's no Supabase Auth backend left
+    // to do that verification implicitly.
+    const result = await signIn("credentials", { email, password, turnstileToken: captchaToken, redirect: false });
     if (result?.error) {
       setLoading(false);
       // authorize() masks every failure reason as CredentialsSignin — wrong
       // password, unknown email, and a rate limit all land here identically
-      // by design (see src/lib/nextAuth.ts), except the rate-limit code,
-      // which gets its own message since "wrong password" would be
-      // misleading in that case.
+      // by design (see src/lib/nextAuth.ts), except too_many_attempts and
+      // bot_check_failed, which get their own messages since "wrong
+      // password" would be misleading for either.
       setError(
         result.code === "too_many_attempts"
           ? "Too many attempts — please wait a few minutes and try again."
-          : "That email and password don't match. Check for typos, or reset your password.",
+          : result.code === "bot_check_failed"
+            ? "We couldn't verify you're human. Please try again."
+            : "That email and password don't match. Check for typos, or reset your password.",
       );
       return;
     }
@@ -99,6 +108,8 @@ function LoginForm() {
         </label>
 
         {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+
+        <Turnstile onToken={setCaptchaToken} />
 
         {isDesktop ? (
           <WaterButton

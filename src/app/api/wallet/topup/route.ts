@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
-import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { enforceRateLimit, RATE_LIMITS, clientKey } from "@/lib/rateLimit";
 import { initiateTransaction } from "@/lib/paynow";
 
 const topUpSchema = z.object({
@@ -17,6 +17,8 @@ export async function POST(req: Request) {
 
   const limited = await enforceRateLimit(`wallet-topup:${user.id}`, RATE_LIMITS.authedWrite);
   if (limited) return limited;
+  const ipLimited = await enforceRateLimit(`wallet-topup-ip:${clientKey(req)}`, RATE_LIMITS.walletTopupIp);
+  if (ipLimited) return ipLimited;
 
   const parsed = topUpSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return privateJson({ error: parsed.error.flatten() }, { status: 400 });
