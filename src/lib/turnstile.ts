@@ -4,9 +4,12 @@
  *   - Signup/login previously handed their token to
  *     `supabase.auth.signUp({ options: { captchaToken } })`, which Supabase
  *     verified server-side. Auth.js's Credentials provider has no equivalent
- *     hook, so as of the move off Supabase the widget on those two pages is
- *     unwired — it still renders and captures a token, but nothing checks
- *     it. See .env.example's Turnstile section and DEPLOYMENT.md.
+ *     hook, so it's verified explicitly in authorize() (src/lib/nextAuth.ts)
+ *     instead — the single point both pages' signIn() calls go through.
+ *     Registration (/api/auth/register) deliberately does NOT verify it: a
+ *     Cloudflare token is single-use, and the signIn() call right after
+ *     registration is what actually verifies it. See .env.example's
+ *     Turnstile section and DEPLOYMENT.md.
  *
  *   - Our own unauthenticated routes (waitlist, and anything added later).
  *     Those verify here, against Cloudflare directly, which is entirely

@@ -68,4 +68,8 @@ export const registerSchema = z
 export const loginSchema = z.object({
   email: z.email().max(254),
   password: z.string().min(1).max(72),
+  // Enforced in authorize() whenever a Turnstile secret is configured (see
+  // verifyTurnstileToken) — optional here so a deployment without one keeps
+  // working unchanged.
+  turnstileToken: z.string().max(4096).optional(),
 });

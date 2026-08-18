@@ -441,12 +441,11 @@ export default function SignupPage() {
         return;
       }
 
-      const postVerifySignInResult = await signIn("credentials", { email, password, redirect: false });
-      if (postVerifySignInResult?.error) {
-        setError("Your account was created, but signing you in failed. Please try logging in.");
-        setStep("account");
-        return;
-      }
+      // No second signIn() here: the one above already established a session
+      // (and, when Turnstile is configured, already spent the one-time
+      // token — a Cloudflare token cannot be verified twice). submitCode()
+      // below reaches "profile" the same way, off that same session, once
+      // the emailed code is confirmed instead.
       setProcessingStage("profile");
       setAccountReady(true);
     })();
