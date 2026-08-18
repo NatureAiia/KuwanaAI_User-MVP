@@ -26,7 +26,12 @@ export function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     // Note that under CSP3 'strict-dynamic' causes the hash to be ignored for
     // *dynamically inserted* scripts, but a hash still authorises a parser-
     // inserted inline script like this one — which is exactly how it ships.
-    `script-src 'self' 'nonce-${nonce}' ${THEME_INIT_SCRIPT_CSP_HASH} 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ""}`,
+    // challenges.cloudflare.com is listed for Turnstile. Under CSP3
+    // 'strict-dynamic' the host is ignored — the widget script is loaded by
+    // Next's own nonced bootstrap, so it is already authorised by propagation
+    // — but it is kept for browsers that do not implement 'strict-dynamic',
+    // where the host allowlist is what applies instead.
+    `script-src 'self' 'nonce-${nonce}' ${THEME_INIT_SCRIPT_CSP_HASH} 'strict-dynamic' https://challenges.cloudflare.com ${isDev ? "'unsafe-eval'" : ""}`,
     `style-src 'self' 'unsafe-inline'`,
     // Provider logos are arbitrary operator-supplied URLs (Provider.logoUrl),
     // so images cannot be locked to 'self'. data: covers inline SVG/blur
@@ -37,6 +42,12 @@ export function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     // browser SDK still talks to the project URL directly on token refresh.
     `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} ${isDev ? "ws: http://localhost:*" : ""}`,
     `frame-ancestors 'none'`,
+    // Turnstile renders its challenge in an iframe. Unlike script-src this is
+    // NOT covered by 'strict-dynamic' — without an explicit frame-src the
+    // widget is blocked and the CAPTCHA silently never appears, which would
+    // look like "bot protection is on" while nothing is being checked.
+    // default-src 'self' would otherwise deny it.
+    `frame-src 'self' https://challenges.cloudflare.com`,
     `base-uri 'self'`,
     `form-action 'self'`,
     `object-src 'none'`,

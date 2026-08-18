@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
+import { Turnstile } from "@/components/Turnstile";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { LoadingFacts } from "@/components/loading/LoadingFacts";
@@ -200,6 +201,14 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Empty when Turnstile isn't configured for this deployment; Supabase
+  // ignores the option in that case, so the flow is unchanged. Held in a ref
+  // as well because the account-creation effect reads it without wanting it as
+  // a dependency (see the signUp call).
+  const captchaTokenRef = useRef("");
+  const setCaptchaToken = (token: string) => {
+    captchaTokenRef.current = token;
+  };
 
   // Corporate/Provider share a free-text org name; Regulator is a closed
   // dropdown (REGULATOR_NAMES) since its self-service safety depends on the
@@ -335,7 +344,18 @@ export default function SignupPage() {
     (async () => {
       setProcessingStage("account");
       const supabase = createClient();
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      // Supabase verifies captchaToken itself, but ONLY once CAPTCHA is
+      // enabled in the project's Auth settings with the matching secret —
+      // passing a token to a project with it switched off is silently ignored.
+      // See DEPLOYMENT.md; the code here is half of the control.
+      const { error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        // Read via ref so this effect keeps its run-once dependency list — the
+        // widget resolves its token asynchronously and would otherwise be a
+        // dependency of an effect that must not re-enter.
+        ...(captchaTokenRef.current ? { options: { captchaToken: captchaTokenRef.current } } : {}),
+      });
       if (signUpError) {
         const alreadyRegistered = /already registered|already exists|already been used|taken/i.test(
           signUpError.message,
@@ -641,6 +661,11 @@ export default function SignupPage() {
                   : "We only use this to secure your account — never shared with providers."}
             </p>
             {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            {/* Solved here rather than on the final step: the token is
+                short-lived and single-use, so challenging immediately before
+                the account is actually created would mean re-challenging
+                anyone who spends time on the profile questions. */}
+            <Turnstile onToken={setCaptchaToken} />
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back

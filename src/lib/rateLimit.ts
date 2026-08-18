@@ -77,17 +77,50 @@ export function checkRateLimit(key: string, { limit, windowSeconds }: RateLimitR
 }
 
 /**
+ * Number of proxies between the internet and this process that append to
+ * `x-forwarded-for`. 1 covers the usual single ingress/CDN hop; raise it if
+ * traffic passes through both a CDN and an ingress controller.
+ *
+ * Getting this wrong is safe in one direction and not the other. Too high and
+ * everyone collapses onto one key (limits become global — noisy but not a
+ * bypass). Too low and clients can inject their own hop, which *is* a bypass.
+ */
+function trustedProxyCount(): number {
+  const configured = Number(process.env.TRUSTED_PROXY_COUNT);
+  return Number.isInteger(configured) && configured >= 0 ? configured : 1;
+}
+
+/**
  * Best-effort client identity for unauthenticated routes.
  *
- * `x-forwarded-for` is client-controllable in general, so this is only
- * trustworthy behind a proxy that overwrites it (Vercel does). Behind
- * nothing, an attacker can rotate the header and evade the limit — which is
- * precisely why authenticated routes key on the user id instead, and why
- * this is a cost-control measure rather than an access control.
+ * `x-forwarded-for` is a list appended to by each hop, so it is part attacker
+ * input and part infrastructure fact. Everything the client sent arrives on
+ * the LEFT; each proxy appends the address it actually saw on the RIGHT. Only
+ * the rightmost entries — the ones our own infrastructure wrote — are trustworthy.
+ *
+ * This used to read `split(",")[0]`, the leftmost entry, which is the half a
+ * client fully controls: sending `X-Forwarded-For: <random>` produced a fresh
+ * rate-limit key per request and bypassed every IP-keyed limit in the app,
+ * including the Paynow webhook limiter and the public AI routes. Now it counts
+ * back from the right by the number of hops we actually run.
+ *
+ * Still not an access control — a determined attacker has many IPs. It is a
+ * cost and flood control, which is why authenticated routes key on user id.
  */
 export function clientKey(req: Request): string {
   const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]!.trim();
+  if (forwarded) {
+    const hops = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    // The hop our own edge observed: one in from the right per trusted proxy.
+    const index = hops.length - trustedProxyCount();
+    const candidate = hops[index >= 0 ? index : 0];
+    if (candidate) return candidate;
+  }
+  // Set by the proxy itself rather than forwarded from the client, so it does
+  // not carry the same list-position problem.
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
