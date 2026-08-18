@@ -38,9 +38,10 @@ export function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     // placeholders; blob: covers the chat composer's local image preview.
     `img-src 'self' https: data: blob:`,
     `font-src 'self' data:`,
-    // Supabase auth/realtime is same-origin-proxied in this app, but the
-    // browser SDK still talks to the project URL directly on token refresh.
-    `connect-src 'self' ${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""} ${isDev ? "ws: http://localhost:*" : ""}`,
+    // Auth.js (NextAuth v5) is same-origin only — no browser code talks to
+    // an external auth provider anymore, so this no longer needs Supabase's
+    // project URL (that URL is still used server-side only, by Storage).
+    `connect-src 'self' ${isDev ? "ws: http://localhost:*" : ""}`,
     `frame-ancestors 'none'`,
     // Turnstile renders its challenge in an iframe. Unlike script-src this is
     // NOT covered by 'strict-dynamic' — without an explicit frame-src the
