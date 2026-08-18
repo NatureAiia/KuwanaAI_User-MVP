@@ -179,6 +179,25 @@ config:
   supabaseUrl: ""
   supabasePublishableKey: ""
 
+  # --- signup email verification (src/lib/email/mailer.ts) ---
+  # Leaving smtpHost/emailFrom empty is a supported state: verification is not
+  # in force, and signup behaves as it did before the feature existed. Set both
+  # (plus secrets.smtpPassword below) to switch it on. Any provider's SMTP
+  # endpoint works — Resend, SES, Postmark, SendGrid, Mailgun.
+  smtpHost: ""
+  smtpPort: ""
+  smtpUser: ""
+  # Envelope sender, e.g. "Kuwana <no-reply@kuwana.ai>". Must be an address the
+  # provider has verified for the domain, or every code bounces.
+  emailFrom: ""
+
+  # Proxies in front of the app that append to x-forwarded-for. 1 covers a
+  # single ingress; raise it if traffic passes through a CDN *and* an ingress
+  # controller. Too low is a rate-limit bypass — a client can inject its own
+  # hop and be treated as a new caller on every request. Too high only
+  # over-groups callers. Empty leaves src/lib/rateLimit.ts on its default of 1.
+  trustedProxyCount: ""
+
 # Arbitrary extra env, e.g. feature flags.
 extraEnv: []
 # - name: SOME_FLAG
@@ -215,6 +234,22 @@ secrets:
   paynowIntegrationKey: ""
   paynowIntegrationIdZig: ""
   paynowIntegrationKeyZig: ""
+  # SMTP credential for signup verification mail. Pairs with config.smtpHost /
+  # config.smtpUser above.
+  smtpPassword: ""
+  # Optional. Keys the HMAC over verification codes; derived from
+  # supabaseServiceRoleKey via HKDF when empty, which is fine. Setting it
+  # rotates code hashing independently — at the cost of invalidating every
+  # code currently in flight.
+  emailVerificationSecret: ""
+  # Turnstile's SERVER-side key. The site key is a build arg on the image
+  # (NEXT_PUBLIC_TURNSTILE_SITE_KEY), not a runtime value — setting it here
+  # would do nothing, since client bundles are inlined at build time.
+  #
+  # For signup and login the token is verified by SUPABASE, which only happens
+  # once CAPTCHA is enabled in the project's Auth settings with this same
+  # secret. Setting it here alone protects the waitlist and nothing else.
+  turnstileSecretKey: ""
 
 externalSecret:
   enabled: false
@@ -319,6 +354,13 @@ cronJobs:
     - name: fx-refresh
       path: /api/cron/fx-refresh
       schedule: "10 3 * * *"
+    - name: verification-sweep
+      path: /api/cron/verification-sweep
+      schedule: "40 3 * * *"
+  # NOTE: vercel.json also schedules /api/cron/scrape and
+  # /api/cron/subscription-reset, which this list does not carry. That
+  # predates the entry above and is left alone deliberately — turning the
+  # scraper loose on a cluster is a deployment decision, not a chart fix.
 
 # --- network policy -------------------------------------------------------
 networkPolicy:

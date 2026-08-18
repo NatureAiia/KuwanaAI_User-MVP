@@ -21,6 +21,7 @@ re-derived.
 | **Upload validation** | The three image routes trusted `file.type`, which is the client's claim about the bytes. Arbitrary content could be stored under an image label in a public bucket served from our own domain. | `src/lib/uploadValidation.ts` |
 | **Row Level Security** | Not enabled anywhere. Supabase hands every browser a publishable key that reaches PostgREST as `anon`/`authenticated`; nothing stood between those roles and the tables. | `prisma/migrations/20260818000000_enable_row_level_security` |
 | **Bot protection** | None. Signup and login call Supabase directly from the browser, so this app's limiter never sees them. | `src/lib/turnstile.ts`, `src/components/Turnstile.tsx` |
+| **Email verification** | Nothing proved a signup controlled the address it registered. | `src/lib/email/*`, `src/app/api/auth/email-verification/*` |
 
 ### RLS: what it does and does not do
 
@@ -50,6 +51,61 @@ silently ignored. For **our own routes** (waitlist), verification happens in
 `src/lib/turnstile.ts` against Cloudflare directly.
 
 Fails closed when a secret is configured, skips entirely when one is not.
+
+One deployment detail that is easy to get wrong: `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+is inlined into the client bundle at **image build time**, so supplying it in
+the Deployment's env does nothing — the widget renders nothing and the deploy
+looks protected while no challenge is ever issued. It is a Docker build arg
+(added here); only `TURNSTILE_SECRET_KEY` is a runtime secret.
+
+### Two-step signup verification
+
+A six-digit code, mailed at signup, that must come back before the account
+gets a `User` row.
+
+**The code is never stored.** What goes in `email_verification_codes.code_hash`
+is an HMAC-SHA256 of `userId:email:code` under a server-held key, derived from
+`EMAIL_VERIFICATION_SECRET` or, failing that, from `SUPABASE_SERVICE_ROLE_KEY`
+via HKDF with its own `info` string. This is the part worth being deliberate
+about: six digits is a 10^6 space, which an unkeyed SHA-256 column surrenders
+in well under a second on a laptop if the database is ever disclosed. The
+message binds the hash to the account and address, so a code cannot be replayed
+against another account or redeemed after an address change.
+
+Properties, each with a test: single-use (enforced by a filtered `updateMany`,
+so two requests racing the same correct code produce exactly one winner),
+10-minute expiry, five attempts per code, constant-time comparison, per-user
+*and* per-IP rate limits on both send and verify, and a malformed code rejected
+before it can spend one of the five attempts.
+
+Two gates, because neither alone is enough:
+
+- **`/api/onboarding`** refuses to create the `User` row without a consumed
+  code. At that moment the row does not exist yet, so the proof has to come
+  from the code table rather than from a column on the user.
+- **`requireUser()`** rejects a row with a null `emailVerifiedAt`. This is
+  where it belongs rather than at the routes: eleven routes call
+  `requireUser()` directly with no role check on top, and one of them is
+  wallet top-up. A per-route check would have had to be right eleven times.
+
+Failure states are collapsed at the API boundary — wrong, expired and
+never-issued all return one message, since telling them apart is a probe for
+which addresses are mid-signup. "Attempts exhausted" is the exception, because
+it is the one state where retrying is futile.
+
+Same configured-or-skip policy as Turnstile: with no `SMTP_HOST`/`EMAIL_FROM`,
+nothing is sent, nothing is required, and signup behaves exactly as it did
+before. **So setting them is what turns the control on.** Hard-requiring a
+mailer would have broken every existing deploy and local development the moment
+this merged.
+
+Verified against a real Postgres: the migration's backfill sets
+`email_verified_at = created_at` for every pre-existing row (0 nulls left), so
+deploying it does not sign out the existing user base — which is what would
+happen if the backfill were missing, since `requireUser()` refuses a null.
+RLS holds on the new table too (`OWNER_SEES=1`, `PROBE_SEES=0` against a role
+holding `GRANT SELECT ON ALL TABLES`), and all 56 tables now report
+`rowsecurity`.
 
 ---
 
@@ -136,6 +192,32 @@ directly.
   migration.
 - **Edge/WAF DDoS protection.** Everything here is application-level. A volumetric
   attack is absorbed upstream (Cloudflare/ingress), not by this code.
-- **Two-step email verification** is a separate piece of work.
 - **`TRUSTED_PROXY_COUNT` must match the deployment.** Default 1. Setting it
-  too low is a spoofing bypass; too high only over-groups callers.
+  too low is a spoofing bypass; too high only over-groups callers. Now
+  settable through the chart (`config.trustedProxyCount`).
+- **Login is single-factor.** Verification proves control of the address at
+  signup; it is not 2FA on every sign-in. A second factor at login is a
+  separate piece of work with a different UX cost.
+- **Nothing rejects disposable-domain signups.** Verification proves the
+  mailbox is reachable, not that it is durable or that it belongs to a
+  distinct person.
+
+---
+
+## Found in passing, fixed here
+
+Not part of the requested list — surfaced by diffing a freshly migrated
+Postgres against `schema.prisma` while proving the verification migration.
+
+**Four `AdminAuditAction` enum variants existed in `schema.prisma` and in
+`src/lib/adminAudit.ts` but in no migration**, so the database enum never had
+them. `logAdminAction()` is awaited and uncaught, which made four admin write
+paths — `POST`/`DELETE` on `/api/admin/discount-rules` and
+`/api/admin/economic-drivers` — create or delete their row and *then* 500 with
+`invalid input value for enum "AdminAuditAction"`. The admin saw a failure for
+an operation that had already succeeded, and the action went unaudited.
+
+Fixed in its own migration (`20260818020000_add_missing_admin_audit_actions`)
+so it can be reverted independently. `prisma migrate diff` now reports "No
+difference detected" between the migration history and the datamodel, which it
+did not before.

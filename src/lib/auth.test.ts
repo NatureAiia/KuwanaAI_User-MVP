@@ -34,6 +34,34 @@ describe("requireUser", () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
     expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
   });
+
+  it("returns the user when their row exists and the email is verified", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date() });
+    expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
+  });
+
+  it("rejects a row whose email was never verified", async () => {
+    // Gated here rather than per route: eleven routes call requireUser()
+    // directly with no role check on top, wallet top-up among them.
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: null });
+    expect(await requireUser()).toBeNull();
+  });
+
+  it("still admits a session with no row at all — that is mid-signup", async () => {
+    // /api/onboarding is the thing that creates the row, and it calls
+    // requireUser() first. Refusing here would make signup impossible.
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue(null);
+    expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
+  });
+
+  it("rejects a suspended account even when its email is verified", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ accountStatus: "suspended", emailVerifiedAt: new Date() });
+    expect(await requireUser()).toBeNull();
+  });
 });
 
 describe("getUserRole", () => {
@@ -56,9 +84,12 @@ describe("requireConsumer", () => {
     if ("response" in result) expect(result.response.status).toBe(401);
   });
 
+  // One `findUnique` mock serves both lookups requireConsumer makes — the
+  // account-status/verification read in requireUser and the role read in
+  // getUserRole — so the fixture has to satisfy both.
   it("returns a 403 response when authenticated but not a consumer", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    findUnique.mockResolvedValue({ role: "regulator" });
+    findUnique.mockResolvedValue({ role: "regulator", accountStatus: "active", emailVerifiedAt: new Date() });
     const result = await requireConsumer();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(403);
@@ -66,10 +97,18 @@ describe("requireConsumer", () => {
 
   it("returns the user when authenticated as a consumer", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    findUnique.mockResolvedValue({ role: "consumer" });
+    findUnique.mockResolvedValue({ role: "consumer", accountStatus: "active", emailVerifiedAt: new Date() });
     const result = await requireConsumer();
     expect("user" in result).toBe(true);
     if ("user" in result) expect(result.user.id).toBe("u1");
+  });
+
+  it("returns a 401, not a 403, for a consumer whose email is unverified", async () => {
+    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    findUnique.mockResolvedValue({ role: "consumer", accountStatus: "active", emailVerifiedAt: null });
+    const result = await requireConsumer();
+    expect("response" in result).toBe(true);
+    if ("response" in result) expect(result.response.status).toBe(401);
   });
 });
 
