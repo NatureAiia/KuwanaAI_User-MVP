@@ -12,8 +12,22 @@ data:
   ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}
   # MinIO (self-hosted S3-compatible Storage — see src/lib/storage/minio.ts).
   # Non-secret half only; MINIO_ACCESS_KEY/MINIO_SECRET_KEY live in the Secret.
-  MINIO_ENDPOINT: {{ .Values.config.minioEndpoint | quote }}
-  MINIO_BUCKET: {{ .Values.config.minioBucket | quote }}
+  #
+  # Defaulted to the Service this chart deploys (minio.yaml) when
+  # minio.enabled=true and left unset here — same reasoning as the composed
+  # DATABASE_URL in postgres.yaml, so nothing has to hand-maintain a hostname
+  # pointing at a Service this same chart named. Pointing at an external MinIO
+  # instead means setting these explicitly (and minio.enabled=false).
+  {{- $minioEndpoint := .Values.config.minioEndpoint }}
+  {{- if and (not $minioEndpoint) .Values.minio.enabled }}
+  {{- $minioEndpoint = printf "http://%s:9000" (include "kuwana.minioFullname" .) }}
+  {{- end }}
+  MINIO_ENDPOINT: {{ $minioEndpoint | quote }}
+  {{- $minioBucket := .Values.config.minioBucket }}
+  {{- if and (not $minioBucket) .Values.minio.enabled }}
+  {{- $minioBucket = "kuwana" }}
+  {{- end }}
+  MINIO_BUCKET: {{ $minioBucket | quote }}
   {{- with .Values.config.minioPublicUrl }}
   MINIO_PUBLIC_URL: {{ . | quote }}
   {{- end }}

@@ -176,6 +176,10 @@ config:
   nodeEnv: production
   # Self-hosted MinIO (S3-compatible Storage — see src/lib/storage/minio.ts).
   # Non-secret half; minioAccessKey/minioSecretKey live under secrets below.
+  # Leave both empty to use the in-cluster MinIO this chart deploys by default
+  # (see the `minio` block below and minio.yaml) — they default to that
+  # Service's DNS name and a "kuwana" bucket. Set explicitly, with
+  # minio.enabled=false, to point at a MinIO you run outside this chart.
   minioEndpoint: ""
   minioBucket: ""
   # Optional — the browser-facing base URL objects are served from, if
@@ -227,7 +231,12 @@ secrets:
   databaseUrl: ""
   # Auth.js (NextAuth v5) — generate with `openssl rand -base64 32`.
   authSecret: ""
-  # Self-hosted MinIO credentials — pairs with config.minioEndpoint/minioBucket above.
+  # Self-hosted MinIO credentials — pairs with config.minioEndpoint/minioBucket
+  # above. With minio.enabled=true (the default) these are optional overrides
+  # for the root credentials minio.yaml generates, exactly like
+  # postgresql.auth.password is for the generated database password. With
+  # minio.enabled=false they are required — the chart has nothing to generate
+  # a credential for and needs the external instance's real ones.
   minioAccessKey: ""
   minioSecretKey: ""
   anthropicApiKey: ""
@@ -499,3 +508,43 @@ postgresql:
     schedule: "0 1 * * *"
     retentionDays: 7
     size: 20Gi
+
+# --- self-hosted object storage (MinIO) ------------------------------------
+# On by default: the same shape as postgresql.enabled above (see there for
+# the escape hatch). Set enabled: false and fill in config.minioEndpoint +
+# secrets.minioAccessKey/minioSecretKey to point at a MinIO (or other
+# S3-compatible store) you run outside this chart.
+minio:
+  enabled: true
+  image: minio/minio:RELEASE.2025-04-08T15-41-24Z
+  # Read root credentials from a Secret created out of band instead of the one
+  # minio.yaml generates — same escape hatch postgresql.auth/valkey.auth offer.
+  existingSecret: ""
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+  # Separate from ingress.* above on purpose: the S3 API needs its own public
+  # hostname (browsers load listing images directly from it), not a path
+  # under the app's own domain. The admin console (port 9001) has no
+  # equivalent block at all — see minio.yaml for why it stays cluster-internal.
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: storage.kuwana.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kuwana-minio-tls
+        hosts:
+          - storage.kuwana.example.com

@@ -40,7 +40,7 @@ spec:
           port: {{ .Values.service.targetPort }}
   egress:
     # DNS. Everything else here fails without it, including the Postgres and
-    # Supabase hostnames.
+    # MinIO Service hostnames.
     - to:
         - namespaceSelector:
             matchLabels:
@@ -60,12 +60,23 @@ spec:
         - protocol: TCP
           port: 5432
     {{- end }}
+    {{- if .Values.minio.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: minio
+      ports:
+        - protocol: TCP
+          port: 9000
+    {{- end }}
     {{- if .Values.networkPolicy.allowExternalEgress }}
-    # Supabase (auth + managed Postgres) and the Anthropic API are public
-    # endpoints on rotating IPs, so egress cannot be pinned to a CIDR. RFC1918
-    # and link-local are excluded instead, which is what actually matters: a
-    # compromised pod still cannot reach the cluster's internal services or
-    # the cloud metadata endpoint at 169.254.169.254.
+    # The Anthropic API and any external services the app calls (Paynow,
+    # OpenRouter, Firecrawl) are public endpoints on rotating IPs, so egress
+    # cannot be pinned to a CIDR. RFC1918 and link-local are excluded instead,
+    # which is what actually matters: a compromised pod still cannot reach the
+    # cluster's internal services or the cloud metadata endpoint at
+    # 169.254.169.254.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0

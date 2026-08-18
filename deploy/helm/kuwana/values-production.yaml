@@ -76,12 +76,19 @@ ingress:
 
 config:
   adminEmails: "arthur@rubiem.com"
-  minioEndpoint: "http://minio.kuwana.svc.cluster.local:9000"
+  # minioEndpoint deliberately unset: it defaults to this release's in-cluster
+  # MinIO Service (see configmap.yaml) rather than to a hand-written hostname
+  # that would need to be kept in sync with whatever the release is named.
   minioBucket: "kuwana"
+  # The public S3 Ingress hostname below (minio.ingress.hosts) — this is what
+  # browsers actually fetch listing images from.
   minioPublicUrl: "https://storage.kuwana.example.com"
 
 # Vault-backed, via the External Secrets Operator. Nothing sensitive is ever
-# written into this file or into the release's stored values.
+# written into this file or into the release's stored values. MinIO's root
+# credentials are NOT listed here: with minio.enabled=true (the chart
+# default) minio.yaml generates and owns them, the same way postgresql.enabled
+# owns DATABASE_URL — there is nothing for Vault to hold for either.
 externalSecret:
   enabled: true
   secretStoreRef:
@@ -97,14 +104,6 @@ externalSecret:
       remoteRef:
         key: kuwana/production
         property: auth_secret
-    - secretKey: MINIO_ACCESS_KEY
-      remoteRef:
-        key: kuwana/production
-        property: minio_access_key
-    - secretKey: MINIO_SECRET_KEY
-      remoteRef:
-        key: kuwana/production
-        property: minio_secret_key
     - secretKey: ANTHROPIC_API_KEY
       remoteRef:
         key: kuwana/production
@@ -113,6 +112,22 @@ externalSecret:
       remoteRef:
         key: kuwana/production
         property: cron_secret
+
+# minio.enabled stays at the chart default (true) — restated here only to
+# override the public S3 Ingress hostname and give it a real TLS secret name.
+minio:
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: storage.kuwana.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kuwana-minio-tls
+        hosts:
+          - storage.kuwana.example.com
 
 postgresql:
   enabled: false

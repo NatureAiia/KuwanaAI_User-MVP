@@ -1,0 +1,257 @@
+{{- if .Values.minio.enabled }}
+{{- $name := include "kuwana.minioFullname" . -}}
+{{/*
+Root credentials, generated once and read back from the live Secret on every
+subsequent render — the same pattern as postgres.yaml/valkey.yaml, and for the
+same reason: rotating them out from under a running MinIO would leave every
+pod holding a key the server no longer accepts.
+
+secrets.minioAccessKey/secrets.minioSecretKey double as an explicit override
+here, exactly as postgresql.auth.password overrides the generated Postgres
+password — so fixing the root credentials (rather than letting the chart
+generate them) doesn't require a second, minio-specific values path.
+*/}}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $name -}}
+{{- $storedAccess := "" -}}
+{{- $storedSecret := "" -}}
+{{- if and $existing $existing.data (hasKey $existing.data "access-key") -}}
+{{- $storedAccess = index $existing.data "access-key" | b64dec -}}
+{{- end -}}
+{{- if and $existing $existing.data (hasKey $existing.data "secret-key") -}}
+{{- $storedSecret = index $existing.data "secret-key" | b64dec -}}
+{{- end -}}
+{{- $accessKey := default (default (randAlphaNum 20) $storedAccess) .Values.secrets.minioAccessKey -}}
+{{- $secretKey := default (default (randAlphaNum 40) $storedSecret) .Values.secrets.minioSecretKey -}}
+{{- if not .Values.minio.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+type: Opaque
+stringData:
+  access-key: {{ $accessKey | quote }}
+  secret-key: {{ $secretKey | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  # Headless: the StatefulSet needs stable per-pod DNS, and there is exactly
+  # one replica to load-balance across anyway. Console (9001) is listed here
+  # only so an operator can `kubectl port-forward` it directly — nothing else
+  # in or out of the cluster ever addresses it, and no Ingress exists for it
+  # at all (see the comment on that below). The admin console being reachable
+  # from the internet is a very different exposure than the object store's
+  # public read API, and this chart does not make that mistake by accident.
+  clusterIP: None
+  ports:
+    - port: 9000
+      targetPort: s3
+      name: s3
+    - port: 9001
+      targetPort: console
+      name: console
+  selector:
+    app.kubernetes.io/name: {{ include "kuwana.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: minio
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  serviceName: {{ $name }}
+  # Single instance, no erasure coding or distributed mode. This is a
+  # portability/single-VPS option, not an HA object store — losing the node
+  # loses the bucket contents along with everything else on it, which is why
+  # persistence.enabled defaults on and the backup gap gets called out in
+  # DEPLOYMENT.md rather than assumed away.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kuwana.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "kuwana.labels" . | nindent 8 }}
+        app.kubernetes.io/component: minio
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image }}
+          args: ["server", "/data", "--console-address", ":9001"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            # The only paths MinIO writes to are the PVC at /data and the
+            # scratch space it wants at /tmp — both mounted below. Nothing is
+            # left on the root filesystem.
+            readOnlyRootFilesystem: true
+          ports:
+            - name: s3
+              containerPort: 9000
+            - name: console
+              containerPort: 9001
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default $name .Values.minio.existingSecret }}
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default $name .Values.minio.existingSecret }}
+                  key: secret-key
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: s3
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: s3
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.minio.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.minio.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.minio.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.minio.persistence.size }}
+  {{- end }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kuwana.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    # The web pods, for uploads — src/lib/storage/minio.ts talks to
+    # MINIO_ENDPOINT (this Service) directly, it does not go out through the
+    # public Ingress hostname and back in.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              app.kubernetes.io/component: web
+      ports:
+        - protocol: TCP
+          port: 9000
+    {{- if .Values.minio.ingress.enabled }}
+    # The ingress controller, only when the public S3 Ingress below is
+    # actually enabled — otherwise nothing outside the web pods has any
+    # business reaching this Service at all. Note there is no equivalent rule
+    # for port 9001: the admin console has no Ingress and is reachable only
+    # by a port-forward straight to the pod, never through this policy.
+    {{- with $.Values.networkPolicy.ingressNamespaceSelectors }}
+    - from:
+        {{- range . }}
+        - namespaceSelector:
+            {{- toYaml . | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 9000
+    {{- end }}
+    {{- end }}
+---
+{{- if .Values.minio.ingress.enabled }}
+# The S3 API only (port 9000) — a separate public hostname from ingress.*
+# above, not a path under the app's own domain. There is deliberately no
+# equivalent Ingress for the admin console (port 9001): that stays reachable
+# only inside the cluster, because an admin console on the open internet is a
+# very different risk than a bucket of already-public listing images.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "kuwana.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio
+  {{- with .Values.minio.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.minio.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.minio.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.minio.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ $name }}
+                port:
+                  number: 9000
+          {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

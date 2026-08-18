@@ -65,6 +65,7 @@ spec:
           env:
             {{- include "kuwana.databaseEnv" . | nindent 12 }}
             {{- include "kuwana.redisEnv" . | nindent 12 }}
+            {{- include "kuwana.minioEnv" . | nindent 12 }}
             - name: APP_VERSION
               value: {{ default .Chart.AppVersion .Values.image.tag | quote }}
             - name: POD_NAME

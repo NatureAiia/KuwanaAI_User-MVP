@@ -52,15 +52,21 @@ ingress:
 
 config:
   adminEmails: "arthur@rubiem.com"
-  minioEndpoint: "http://minio.kuwana-staging.svc.cluster.local:9000"
+  # minioEndpoint deliberately unset: it defaults to this release's in-cluster
+  # MinIO Service (minio.enabled=true below is really just the chart default,
+  # restated for clarity) rather than to a hand-written hostname that has to
+  # be kept in sync with whatever `helm install` named the release.
   minioBucket: "kuwana-staging"
+  minioPublicUrl: "https://storage.staging.kuwana.example.com"
 
-# Secrets still come from a Secret created out of band — staging holds real
-# MinIO and Anthropic credentials, which cost real money if leaked.
+# Secrets still come from a Secret created out of band — staging holds a real
+# Anthropic credential, which costs real money if leaked. MinIO's own root
+# credentials are NOT listed here: with minio.enabled=true (the chart
+# default) minio.yaml generates and owns them, the same way postgresql.enabled
+# owns DATABASE_URL — this Secret only needs to cover what the chart cannot
+# generate for itself.
 #   kubectl -n kuwana-staging create secret generic kuwana-app \
 #     --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
-#     --from-literal=MINIO_ACCESS_KEY=... \
-#     --from-literal=MINIO_SECRET_KEY=... \
 #     --from-literal=ANTHROPIC_API_KEY=... \
 #     --from-literal=CRON_SECRET="$(openssl rand -hex 32)"
 existingSecret: "kuwana-app"
@@ -78,6 +84,26 @@ postgresql:
       memory: 1Gi
   backup:
     enabled: false
+
+# minio.enabled stays at the chart default (true) — restated here only to
+# override the public S3 Ingress hostname, which staging needs its own of.
+minio:
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-staging
+      # Same reasoning as the app's own Ingress above: staging buckets are not
+      # for search engines either.
+      nginx.ingress.kubernetes.io/configuration-snippet: |
+        more_set_headers "X-Robots-Tag: noindex, nofollow";
+    hosts:
+      - host: storage.staging.kuwana.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kuwana-staging-minio-tls
+        hosts:
+          - storage.staging.kuwana.example.com
 
 cronJobs:
   enabled: true
