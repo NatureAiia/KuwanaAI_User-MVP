@@ -95,7 +95,7 @@ export default function LandingPage() {
               <div className="mt-8 flex flex-col gap-3 border-t border-border pt-6">
                 <FeatureStripItem
                   title="AI recommendations"
-                  desc="Claude-explained, personalised to your footprint"
+                  desc="Personalised to your footprint"
                 />
                 <FeatureStripItem title="Live listings" desc="Comparisons reflect current pricing" />
                 <FeatureStripItem title="Transparent scoring" desc="See exactly why one option won" />
