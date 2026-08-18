@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/authSchema";
 import { enforceRateLimit, clientKey, RATE_LIMITS } from "@/lib/rateLimit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import { SESSION_MAX_AGE } from "@/lib/authConfig";
 
 // A real bcrypt hash (cost 12) of an arbitrary fixed string, generated once
@@ -22,6 +23,10 @@ class TooManyAttemptsError extends CredentialsSignin {
   code = "too_many_attempts";
 }
 
+class CaptchaError extends CredentialsSignin {
+  code = "captcha_failed";
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   // No public ingress hostname is fixed ahead of time on the k3s target (and
@@ -31,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: "/login" },
   providers: [
     Credentials({
-      credentials: { email: {}, password: {} },
+      credentials: { email: {}, password: {}, turnstileToken: {} },
       async authorize(credentials, request) {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) throw new InvalidCredentialsError();
@@ -42,6 +47,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // without also tripping this per-email half of the key.
         const limited = await enforceRateLimit(`login:${clientKey(request)}:${email}`, RATE_LIMITS.login);
         if (limited) throw new TooManyAttemptsError();
+
+        // Restores the check Supabase used to run (`signInWithPassword`'s
+        // captchaToken option) — Auth.js's Credentials provider has no
+        // built-in equivalent, so it's verified explicitly here, before ever
+        // touching the database. No-ops entirely when TURNSTILE_SECRET_KEY is
+        // unset (see verifyTurnstileToken), so a deployment without one keeps
+        // working unchanged.
+        const captcha = await verifyTurnstileToken(parsed.data.turnstileToken, clientKey(request));
+        if (!captcha.ok) throw new CaptchaError();
 
         const user = await prisma.user.findUnique({
           where: { email },

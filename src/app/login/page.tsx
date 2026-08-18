@@ -22,7 +22,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // Empty when Turnstile isn't configured; Supabase ignores the option then.
+  // Empty when Turnstile isn't configured; verifyTurnstileToken no-ops then.
   const [captchaToken, setCaptchaToken] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -30,18 +30,20 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const result = await signIn("credentials", { email, password, redirect: false });
+    const result = await signIn("credentials", { email, password, turnstileToken: captchaToken, redirect: false });
     if (result?.error) {
       setLoading(false);
       // authorize() masks every failure reason as CredentialsSignin — wrong
       // password, unknown email, and a rate limit all land here identically
-      // by design (see src/lib/nextAuth.ts), except the rate-limit code,
-      // which gets its own message since "wrong password" would be
-      // misleading in that case.
+      // by design (see src/lib/nextAuth.ts), except the rate-limit and
+      // captcha codes, which get their own messages since "wrong password"
+      // would be misleading in either case.
       setError(
         result.code === "too_many_attempts"
           ? "Too many attempts — please wait a few minutes and try again."
-          : "That email and password don't match. Check for typos, or reset your password.",
+          : result.code === "captcha_failed"
+            ? "Couldn't verify you're human — please try again."
+            : "That email and password don't match. Check for typos, or reset your password.",
       );
       return;
     }

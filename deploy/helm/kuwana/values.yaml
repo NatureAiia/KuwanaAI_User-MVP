@@ -295,10 +295,10 @@ secrets:
   # (NEXT_PUBLIC_TURNSTILE_SITE_KEY), not a runtime value — setting it here
   # would do nothing, since client bundles are inlined at build time.
   #
-  # Since the move to Auth.js, nothing verifies this token for signup/login —
-  # Supabase used to, and Auth.js's Credentials provider has no equivalent
-  # hook (see src/lib/turnstile.ts). Setting it here protects the waitlist
-  # and nothing else.
+  # Verified in authorize() (src/lib/nextAuth.ts) for both signup and login —
+  # Auth.js's Credentials provider has no built-in equivalent to Supabase's
+  # captchaToken option, so it's checked explicitly there instead — plus the
+  # waitlist route, which always verified it directly against Cloudflare.
   turnstileSecretKey: ""
 
 externalSecret:
