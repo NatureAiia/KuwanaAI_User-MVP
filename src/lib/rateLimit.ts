@@ -267,8 +267,6 @@ export const RATE_LIMITS = {
    * request-guess-five-times-request-again at machine speed.
    */
   emailVerificationVerify: { limit: 10, windowSeconds: 300 },
-  /** Credentials authorize(), keyed by IP+email — bounds password-guessing without locking an account out from other IPs. */
-  login: { limit: 10, windowSeconds: 600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /* -------------------------------------------------------------------------- */

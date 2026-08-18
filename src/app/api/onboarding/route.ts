@@ -10,7 +10,7 @@ import { hasVerifiedEmail } from "@/lib/email/verification";
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
-  const user = await requireUser();
+  const user = await requireUser({ allowUnverifiedEmail: true });
   if (!user?.email) {
     return privateJson({ error: "Not authenticated" }, { status: 401 });
   }

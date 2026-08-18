@@ -20,26 +20,23 @@ import { privateJson } from "@/lib/apiResponse";
  * directly with no role check on top, and one of them is wallet top-up. A
  * per-route check would have had to be right eleven times.
  */
-export async function requireUser() {
+export async function requireUser(opts?: { allowUnverifiedEmail?: boolean }) {
   const session = await auth();
   const user = session?.user;
   if (!user?.id || !user.email) return null;
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { accountStatus: true, emailVerifiedAt: true, onboardingCompletedAt: true },
+    select: { accountStatus: true, emailVerifiedAt: true },
   });
   if (dbUser?.accountStatus === "suspended") return null;
 
-  // Gated on onboardingCompletedAt, not on row-existence: unlike main's
-  // Supabase-era flow (where /api/onboarding created the row, so "no row"
-  // was the only mid-signup state), /api/auth/register already creates the
-  // row before onboarding ever runs — so a mid-signup account here has a
-  // real row with emailVerifiedAt still null. Refusing on row-existence
-  // alone would make onboarding itself return "Not authenticated" and could
-  // never be completed. Once onboardingCompletedAt is set, the row is a real
-  // account and an unverified email is refused from then on.
-  if (dbUser?.onboardingCompletedAt && !dbUser.emailVerifiedAt) return null;
+  // `/api/auth/register` creates the row up front, before onboarding ever
+  // runs, so a mid-signup account has a real row with emailVerifiedAt still
+  // null. Only the onboarding route itself — which does its own explicit
+  // verification check against the emailed code — passes
+  // allowUnverifiedEmail; every other caller is refused here.
+  if (!opts?.allowUnverifiedEmail && dbUser && !dbUser.emailVerifiedAt) return null;
 
   return { id: user.id, email: user.email };
 }
