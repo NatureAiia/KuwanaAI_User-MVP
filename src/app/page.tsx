@@ -12,6 +12,13 @@ import { LandingFooter } from "@/components/landing/LandingFooter";
 import { LinkButton } from "@/components/ui/Button";
 import Typewriter from "@/components/ui/Typewriter";
 
+// Nonce-based CSP (src/proxy.ts) requires dynamic rendering: a statically
+// prerendered page bakes in whatever nonce existed at build time, which never
+// matches the fresh per-request nonce in the CSP header, so every script tag
+// gets silently blocked and the page never hydrates. See
+// node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md.
+export const dynamic = "force-dynamic";
+
 const WEEKLY_PICKS = [
   { title: "Best value data bundles this week", sub: "Econet · NetOne · Telecel", score: 92 },
   { title: "Savings accounts with the lowest fees", sub: "CBZ · Steward · FBC · Nedbank", score: 87 },

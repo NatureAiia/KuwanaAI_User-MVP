@@ -3,6 +3,9 @@ import { Sparkles } from "lucide-react";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
+// See src/app/page.tsx for why this route must opt out of static rendering.
+export const dynamic = "force-dynamic";
+
 const TEAM_MEMBERS = [
   {
     name: "Placeholder 1",

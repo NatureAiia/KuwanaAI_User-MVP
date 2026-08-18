@@ -5,6 +5,9 @@ import { Header } from "@/components/Header";
 import { BackButton } from "@/components/ui/BackButton";
 import { Accordion } from "@/components/ui/Accordion";
 
+// See src/app/page.tsx for why this route must opt out of static rendering.
+export const dynamic = "force-dynamic";
+
 const LAST_UPDATED = "August 2026";
 
 const FAQ_ITEMS = [
