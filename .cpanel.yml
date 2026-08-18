@@ -3,7 +3,7 @@ deployment:
   tasks:
     - export DEPLOYPATH=/home/uat/kuwana
     - /bin/mkdir -p $DEPLOYPATH
-    - /usr/bin/rsync -a --delete --exclude='.env*' --exclude='node_modules' --exclude='.next' --exclude='.git' /home/uat/repositories/KuwanaAI_User-MVP/ $DEPLOYPATH/
+    - /usr/bin/rsync -a --delete --exclude='.env*' --exclude='.htaccess' --exclude='node_modules' --exclude='.next' --exclude='.git' /home/uat/repositories/KuwanaAI_User-MVP/ $DEPLOYPATH/
     - /bin/bash -lc 'cd /home/uat/kuwana && npm install --no-audit --no-fund && npx prisma generate && npm run build'
-    - /bin/bash -lc 'pm2 restart kuwana || pm2 start npx --name kuwana --cwd /home/uat/kuwana -- next start -p 3001'
+    - /bin/bash -lc 'pm2 restart kuwana || pm2 start npx --name kuwana --cwd /home/uat/kuwana -- next start -p 3002'
     - /usr/local/bin/pm2 save
