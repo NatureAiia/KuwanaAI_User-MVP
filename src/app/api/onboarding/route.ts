@@ -49,7 +49,7 @@ export async function POST(req: Request) {
   }
 
   // The security boundary for Corporate/Regulator lives here, not in the
-  // schema — both checks key off user.email (from Supabase's verified
+  // schema — both checks key off user.email (from the authenticated
   // session), which the client can't spoof, unlike a role in the request
   // body. See HANDOFF.md and src/lib/orgVerification.ts.
   if (data.role === "corporate" && isPersonalEmailDomain(email)) {
@@ -101,8 +101,8 @@ export async function POST(req: Request) {
 
         await tx.user.upsert({
           where: { id: user.id },
-          update: { email, role: data.role, username, primarySector },
-          create: { id: user.id, email, role: data.role, username, primarySector },
+          update: { email, role: data.role, username, primarySector, onboardingCompletedAt: new Date() },
+          create: { id: user.id, email, role: data.role, username, primarySector, onboardingCompletedAt: new Date() },
         });
 
         await tx.userProfile.upsert({

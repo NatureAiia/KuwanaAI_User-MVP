@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getUser = vi.fn();
+const authMock = vi.fn();
 const userFindUnique = vi.fn();
 const providerFindUnique = vi.fn();
 const providerMemberFindUnique = vi.fn();
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser } }),
+vi.mock("@/lib/nextAuth", () => ({
+  auth: authMock,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -20,7 +20,7 @@ vi.mock("@/lib/prisma", () => ({
 const { requireOwnProvider } = await import("@/lib/providerAuth");
 
 beforeEach(() => {
-  getUser.mockReset();
+  authMock.mockReset();
   userFindUnique.mockReset();
   providerFindUnique.mockReset();
   providerMemberFindUnique.mockReset();
@@ -29,14 +29,14 @@ beforeEach(() => {
 
 describe("requireOwnProvider", () => {
   it("returns a 401 when unauthenticated", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    authMock.mockResolvedValue({ user: null });
     const result = await requireOwnProvider();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(401);
   });
 
   it("returns a 403 when authenticated but not a provider account", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     userFindUnique.mockResolvedValue({ role: "consumer" });
     const result = await requireOwnProvider();
     expect("response" in result).toBe(true);
@@ -44,7 +44,7 @@ describe("requireOwnProvider", () => {
   });
 
   it("returns a 404 when a provider account has no linked Provider record", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     userFindUnique.mockResolvedValue({ role: "provider" });
     providerFindUnique.mockResolvedValue(null);
     const result = await requireOwnProvider();
@@ -53,7 +53,7 @@ describe("requireOwnProvider", () => {
   });
 
   it("returns the caller's own provider, never one it merely asserts", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     userFindUnique.mockResolvedValue({ role: "provider" });
     providerFindUnique.mockResolvedValue({ id: "prov-1", name: "Test Co" });
     const result = await requireOwnProvider();
@@ -70,7 +70,7 @@ describe("requireOwnProvider", () => {
   });
 
   it("returns the provider for an invited teammate, with isOwner false", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u2", email: "teammate@b.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u2", email: "teammate@b.com" } });
     userFindUnique.mockResolvedValue({ role: "provider" });
     providerFindUnique.mockResolvedValue(null);
     providerMemberFindUnique.mockResolvedValue({ provider: { id: "prov-1", name: "Test Co" } });

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const getUser = vi.fn();
+const authMock = vi.fn();
 const findUnique = vi.fn();
 
-vi.mock("@/lib/supabase/server", () => ({
-  createClient: async () => ({ auth: { getUser } }),
+vi.mock("@/lib/nextAuth", () => ({
+  auth: authMock,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -16,8 +16,10 @@ const { requireUser, getUserRole, requireConsumer, requireAdmin, isAllowlistedAd
 const originalAdminEmails = process.env.ADMIN_EMAILS;
 
 beforeEach(() => {
-  getUser.mockReset();
+  authMock.mockReset();
   findUnique.mockReset();
+  // Default: no suspension, unless a test overrides it.
+  findUnique.mockResolvedValue({ accountStatus: "active" });
 });
 
 afterEach(() => {
@@ -26,13 +28,24 @@ afterEach(() => {
 
 describe("requireUser", () => {
   it("returns null when there is no session", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    authMock.mockResolvedValue(null);
     expect(await requireUser()).toBeNull();
   });
 
   it("returns the user when a session exists", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
+  });
+
+  it("returns null when the session has no user id", async () => {
+    authMock.mockResolvedValue({ user: { email: "a@b.com" } });
+    expect(await requireUser()).toBeNull();
+  });
+
+  it("returns null when the account is suspended", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
+    findUnique.mockResolvedValue({ accountStatus: "suspended" });
+    expect(await requireUser()).toBeNull();
   });
 });
 
@@ -50,23 +63,23 @@ describe("getUserRole", () => {
 
 describe("requireConsumer", () => {
   it("returns a 401 response when unauthenticated", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    authMock.mockResolvedValue(null);
     const result = await requireConsumer();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(401);
   });
 
   it("returns a 403 response when authenticated but not a consumer", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    findUnique.mockResolvedValue({ role: "regulator" });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
+    findUnique.mockResolvedValueOnce({ accountStatus: "active" }).mockResolvedValueOnce({ role: "regulator" });
     const result = await requireConsumer();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(403);
   });
 
   it("returns the user when authenticated as a consumer", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    findUnique.mockResolvedValue({ role: "consumer" });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
+    findUnique.mockResolvedValueOnce({ accountStatus: "active" }).mockResolvedValueOnce({ role: "consumer" });
     const result = await requireConsumer();
     expect("user" in result).toBe(true);
     if ("user" in result) expect(result.user.id).toBe("u1");
@@ -75,26 +88,28 @@ describe("requireConsumer", () => {
 
 describe("requireAdmin", () => {
   it("returns null when unauthenticated", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    authMock.mockResolvedValue(null);
     expect(await requireAdmin()).toBeNull();
   });
 
   it("returns null when the user's email isn't on the allowlist", async () => {
     process.env.ADMIN_EMAILS = "someone-else@example.com";
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "admin@example.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "admin@example.com" } });
+    findUnique.mockResolvedValueOnce({ accountStatus: "active" }).mockResolvedValueOnce({ role: "consumer" });
     expect(await requireAdmin()).toBeNull();
   });
 
   it("returns the user when their email is on the allowlist, case-insensitively", async () => {
     process.env.ADMIN_EMAILS = "Admin@Example.com, other@example.com";
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "admin@example.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "admin@example.com" } });
     const result = await requireAdmin();
     expect(result?.id).toBe("u1");
   });
 
   it("returns null when ADMIN_EMAILS is unset (fails closed, not open)", async () => {
     delete process.env.ADMIN_EMAILS;
-    getUser.mockResolvedValue({ data: { user: { id: "u1", email: "admin@example.com" } } });
+    authMock.mockResolvedValue({ user: { id: "u1", email: "admin@example.com" } });
+    findUnique.mockResolvedValueOnce({ accountStatus: "active" }).mockResolvedValueOnce({ role: "consumer" });
     expect(await requireAdmin()).toBeNull();
   });
 });

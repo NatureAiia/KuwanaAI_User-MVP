@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/nextAuth";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 
@@ -16,16 +16,14 @@ import { privateJson } from "@/lib/apiResponse";
  * silent redirect loop.
  */
 export async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const session = await auth();
+  const user = session?.user;
+  if (!user?.id || !user.email) return null;
 
   const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { accountStatus: true } });
   if (dbUser?.accountStatus === "suspended") return null;
 
-  return user;
+  return { id: user.id, email: user.email };
 }
 
 /** Same role lookup dashboard/corporate/regulator pages already do server-side — shared here for API routes. */
