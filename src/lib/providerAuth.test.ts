@@ -27,6 +27,10 @@ beforeEach(() => {
   providerMemberFindUnique.mockResolvedValue(null);
 });
 
+// The one `user.findUnique` mock answers both lookups behind
+// requireOwnProvider: requireUser's account-status/email-verification read
+// and getUserRole's role read. Fixtures below carry all three fields.
+
 describe("requireOwnProvider", () => {
   it("returns a 401 when unauthenticated", async () => {
     getUser.mockResolvedValue({ data: { user: null } });
@@ -37,7 +41,7 @@ describe("requireOwnProvider", () => {
 
   it("returns a 403 when authenticated but not a provider account", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    userFindUnique.mockResolvedValue({ role: "consumer" });
+    userFindUnique.mockResolvedValue({ role: "consumer", accountStatus: "active", emailVerifiedAt: new Date() });
     const result = await requireOwnProvider();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(403);
@@ -45,7 +49,7 @@ describe("requireOwnProvider", () => {
 
   it("returns a 404 when a provider account has no linked Provider record", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    userFindUnique.mockResolvedValue({ role: "provider" });
+    userFindUnique.mockResolvedValue({ role: "provider", accountStatus: "active", emailVerifiedAt: new Date() });
     providerFindUnique.mockResolvedValue(null);
     const result = await requireOwnProvider();
     expect("response" in result).toBe(true);
@@ -54,7 +58,7 @@ describe("requireOwnProvider", () => {
 
   it("returns the caller's own provider, never one it merely asserts", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u1", email: "a@b.com" } } });
-    userFindUnique.mockResolvedValue({ role: "provider" });
+    userFindUnique.mockResolvedValue({ role: "provider", accountStatus: "active", emailVerifiedAt: new Date() });
     providerFindUnique.mockResolvedValue({ id: "prov-1", name: "Test Co" });
     const result = await requireOwnProvider();
     expect("provider" in result).toBe(true);
@@ -71,7 +75,7 @@ describe("requireOwnProvider", () => {
 
   it("returns the provider for an invited teammate, with isOwner false", async () => {
     getUser.mockResolvedValue({ data: { user: { id: "u2", email: "teammate@b.com" } } });
-    userFindUnique.mockResolvedValue({ role: "provider" });
+    userFindUnique.mockResolvedValue({ role: "provider", accountStatus: "active", emailVerifiedAt: new Date() });
     providerFindUnique.mockResolvedValue(null);
     providerMemberFindUnique.mockResolvedValue({ provider: { id: "prov-1", name: "Test Co" } });
     const result = await requireOwnProvider();

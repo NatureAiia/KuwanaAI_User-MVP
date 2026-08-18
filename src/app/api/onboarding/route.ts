@@ -5,6 +5,8 @@ import { recordEvent } from "@/lib/gamification/process-event";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
 import { emailDomain, emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
+import { isMailerConfigured } from "@/lib/email/mailer";
+import { hasVerifiedEmail } from "@/lib/email/verification";
 import type { Sector } from "@prisma/client";
 
 export async function POST(req: Request) {
@@ -35,6 +37,25 @@ export async function POST(req: Request) {
       { status: 409 },
     );
   }
+
+  // The real gate on email verification. requireUser() refuses a User row
+  // whose emailVerifiedAt is NULL, but at this point in a first-time signup
+  // there is no row yet — this route is the thing that creates it. So the
+  // proof has to come from the consumed code instead, and the stamp written
+  // below is what every later request checks.
+  //
+  // With no mailer on this deployment nothing was ever sent and nothing can
+  // be confirmed, so verification is not in force and the row is stamped as
+  // verified. That is the same configured-or-skip policy as Turnstile, and it
+  // means the deployment is half the control — see SECURITY_HARDENING.md.
+  const verificationRequired = isMailerConfigured();
+  if (verificationRequired && !(await hasVerifiedEmail(user.id, email))) {
+    return privateJson(
+      { error: "Please confirm the code we emailed you before finishing signup.", reason: "email_unverified" },
+      { status: 403 },
+    );
+  }
+  const emailVerifiedAt = new Date();
 
   const parsed = bodySchema.safeParse(await req.json());
   if (!parsed.success) {
@@ -105,8 +126,8 @@ export async function POST(req: Request) {
 
         await tx.user.upsert({
           where: { id: user.id },
-          update: { email, role: data.role, username, primarySector },
-          create: { id: user.id, email, role: data.role, username, primarySector },
+          update: { email, role: data.role, username, primarySector, emailVerifiedAt },
+          create: { id: user.id, email, role: data.role, username, primarySector, emailVerifiedAt },
         });
 
         await tx.userProfile.upsert({

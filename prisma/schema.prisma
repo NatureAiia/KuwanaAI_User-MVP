@@ -80,6 +80,14 @@ model User {
   // this app deploys on Vercel (see vercel.json), where a request can land
   // on any warm instance and an in-process Map isn't reliably shared.
   lastNotificationSyncAt DateTime? @map("last_notification_sync_at")
+  // Set when the user entered the emailed one-time code (see
+  // EmailVerificationCode and src/lib/email/verification.ts). Checked by
+  // requireUser(), the same choke point that gates suspended accounts, so an
+  // unverified account is blocked everywhere at once rather than at each
+  // route. Nullable and backfilled to `created_at` for every row that existed
+  // before this shipped — gating accounts retroactively would lock out the
+  // entire user base for a control they were never offered.
+  emailVerifiedAt        DateTime? @map("email_verified_at")
 
   profile                 UserProfile?
   footprints              SectorFootprint[]
@@ -112,6 +120,45 @@ model User {
   notes                   UserNote[]
 
   @@map("users")
+}
+
+/// One-time codes emailed at signup to prove the person controls the address
+/// they registered (see src/lib/email/verification.ts).
+///
+/// `userId` is the Supabase auth uid and is deliberately NOT a foreign key to
+/// `users`. The row it would point at does not exist yet: signup creates the
+/// Supabase auth user first and this app's `User` row only when
+/// /api/onboarding completes — which is precisely what verification gates. A
+/// FK here would make the table unusable at the only moment it is needed.
+///
+/// The code itself is never stored. `codeHash` is an HMAC-SHA256 of the code
+/// under a server-held key, so a database disclosure does not hand over
+/// working codes: six digits is 10^6 possibilities, which an unkeyed hash
+/// surrenders in under a second.
+model EmailVerificationCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  // Bound into the row so a code minted for one address can never be redeemed
+  // against another — a user who changes their email mid-flow must request a
+  // new code rather than reuse the one already in their inbox.
+  email     String
+  codeHash  String    @map("code_hash")
+  expiresAt DateTime  @map("expires_at")
+  // Set the moment a code is accepted, which is what makes it single-use.
+  // Kept (rather than deleting the row) because /api/onboarding reads it back
+  // as the proof that this signup verified at all.
+  consumedAt DateTime? @map("consumed_at")
+  // Wrong guesses against THIS code. Bounded server-side so an attacker
+  // cannot walk the 10^6 space of a live code; the rate limiter bounds how
+  // fast they can ask for new ones.
+  attempts  Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Every read is "the newest code for this user", and the cron sweep deletes
+  // by expiry.
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("email_verification_codes")
 }
 
 model UserProfile {
