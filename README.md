@@ -50,21 +50,12 @@ Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Auth.js (NextAu
 
    Open [http://localhost:3000](http://localhost:3000).
 
-## Running it in a container
+## Deployment
 
-```bash
-cp .env.example .env          # Auth.js, MinIO, and Anthropic values
-docker compose up --build     # postgres → migrations → app on :3000
-docker compose --profile seed up seed
-```
-
-Kubernetes deployment (Helm chart, HPA, migrations-as-a-hook, scheduled jobs, optional in-cluster
-Postgres) lives in `deploy/helm/kuwana`. See **[DEPLOYMENT.md](DEPLOYMENT.md)** — including the one
-real constraint: `NEXT_PUBLIC_*` values are compiled into the client bundle, so staging and
-production need separately built images.
-
-The Vercel path is unchanged. `next.config.ts` only switches to standalone output when
-`NEXT_OUTPUT_STANDALONE=1`, which nothing but the Docker build sets.
+The live deployment runs on a cPanel/PM2 shared VPS account (see `.cpanel.yml`): a Git Version
+Control checkout gets rsynced into the app directory, then `npm install && prisma generate &&
+npm run build` runs and pm2 restarts the `kuwana` process (`next start`). No Docker/Kubernetes are
+involved.
 
 ## Project structure
 

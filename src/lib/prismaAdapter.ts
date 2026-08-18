@@ -9,19 +9,9 @@ import { PrismaPg } from "@prisma/adapter-pg";
  */
 
 /**
- * Matches deploy/helm/kuwana/values.yaml `database.connectionLimit`, which the
- * chart passes in as DATABASE_POOL_MAX.
- *
- * This has to be read here, explicitly, because `pg.Pool` does not understand
- * Prisma's `connection_limit` / `pool_timeout` connection-string parameters —
- * it silently ignores them and applies its own default of 10. Before this was
- * wired up, the chart composed a URL carrying `?connection_limit=5`, the
- * `kuwana.checkConnectionBudget` helper refused to render any release whose
- * `replicas x connectionLimit` exceeded `max_connections`, and every pod then
- * opened twice the number it had been budgeted for. The guard read as proof
- * the budget held while the application quietly broke it.
- *
- * So: change this default and the chart value together, or neither.
+ * `DATABASE_POOL_MAX`, read here explicitly because `pg.Pool` does not
+ * understand Prisma's `connection_limit` / `pool_timeout` connection-string
+ * parameters — it silently ignores them and applies its own default of 10.
  */
 const DEFAULT_POOL_MAX = 5;
 

@@ -9,7 +9,7 @@
  *     Registration (/api/auth/register) deliberately does NOT verify it: a
  *     Cloudflare token is single-use, and the signIn() call right after
  *     registration is what actually verifies it. See .env.example's
- *     Turnstile section and DEPLOYMENT.md.
+ *     Turnstile section.
  *
  *   - Our own unauthenticated routes (waitlist, and anything added later).
  *     Those verify here, against Cloudflare directly, which is entirely
