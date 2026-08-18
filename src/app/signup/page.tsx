@@ -441,6 +441,12 @@ export default function SignupPage() {
         return;
       }
 
+      const signInResult = await signIn("credentials", { email, password, redirect: false });
+      if (signInResult?.error) {
+        setError("Your account was created, but signing you in failed. Please try logging in.");
+        setStep("account");
+        return;
+      }
       setProcessingStage("profile");
       setAccountReady(true);
     })();

@@ -14,10 +14,10 @@ import { issueVerificationCode } from "@/lib/email/verification";
  * hitting it is by definition unverified, and requireUser() rejects exactly
  * that — routing this through it would make the endpoint that fixes the state
  * unreachable from the state it fixes. So it authenticates directly against
- * the raw session instead (auth(), not requireUser()), which is still a real
- * server-side check: the session cookie is httpOnly and signed, and the
- * address is read from the session rather than the request body, so a caller
- * cannot aim a code at somebody else's inbox.
+ * the Auth.js session instead, which is still a real server-side check: the
+ * cookie is httpOnly and signed, and the address is read from the session
+ * rather than the request body, so a caller cannot aim a code at somebody
+ * else's inbox.
  */
 
 // Present but ignored for the destination — see above. Parsed anyway so an

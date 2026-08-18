@@ -127,15 +127,7 @@ export async function POST(req: Request) {
         await tx.user.upsert({
           where: { id: user.id },
           update: { email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date() },
-          create: {
-            id: user.id,
-            email,
-            role: data.role,
-            username,
-            primarySector,
-            emailVerifiedAt,
-            onboardingCompletedAt: new Date(),
-          },
+          create: { id: user.id, email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date() },
         });
 
         await tx.userProfile.upsert({

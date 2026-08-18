@@ -9,9 +9,9 @@ import { MAX_ATTEMPTS, verifyCode } from "@/lib/email/verification";
 /**
  * Accepts a signup verification code.
  *
- * Authenticates against the raw session directly (auth()) rather than
- * through requireUser(), for the same reason as the send route: every caller
- * here is unverified, which is precisely what requireUser() refuses.
+ * Authenticates against the Auth.js session directly rather than through
+ * requireUser(), for the same reason as the send route: every caller here is
+ * unverified, which is precisely what requireUser() refuses.
  */
 
 const bodySchema = z.object({

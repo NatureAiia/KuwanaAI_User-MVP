@@ -6,7 +6,7 @@ full product/architecture spec this build follows.
 
 ## Stack
 
-Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Supabase Auth · Claude API
+Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Auth.js (NextAuth v5) · Claude API
 (server-side only) · Vercel-ready.
 
 ## Setup
@@ -18,17 +18,17 @@ Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Supabase Auth �
    ```
 
 2. **Configure environment** — copy `.env.example` to `.env` and fill in:
-   - `DATABASE_URL` — a Postgres connection string (Supabase or Neon)
-   - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` —
-     from your Supabase project settings
+   - `DATABASE_URL` — a Postgres connection string (Supabase, Neon, or your own)
+   - `AUTH_SECRET` — Auth.js session signing key (`openssl rand -base64 32`)
+   - `MINIO_ENDPOINT` / `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` / `MINIO_BUCKET` — a self-hosted
+     MinIO (or other S3-compatible) instance for provider/listing image uploads
    - `LLAMA_VISION_BASE_URL` / `LLAMA_VISION_MODEL` — for AI recommendations and chat
      (default `http://localhost:11434` / `llama3.2-vision`, matching a local Ollama install;
      see the 2026-08-09 entry below for setup)
 
-   > **Supabase project setting:** for the frictionless onboarding flow described in the build
-   > plan (signup → footprint → consent → save profile, no interruption), disable email
-   > confirmation in your Supabase Auth settings, or the user will need to confirm their email
-   > before `/api/onboarding` can attach their profile.
+   > Signup is frictionless by design (signup → footprint → consent → save profile, no
+   > interruption) unless `SMTP_HOST`/`EMAIL_FROM` are set to turn on email verification — see
+   > `.env.example`'s "Signup email verification" section.
 
 3. **Run migrations and seed data**
 
@@ -53,7 +53,7 @@ Next.js (App Router) + Tailwind CSS v4 · PostgreSQL + Prisma · Supabase Auth �
 ## Running it in a container
 
 ```bash
-cp .env.example .env          # Supabase + Anthropic values
+cp .env.example .env          # Auth.js, MinIO, and Anthropic values
 docker compose up --build     # postgres → migrations → app on :3000
 docker compose --profile seed up seed
 ```

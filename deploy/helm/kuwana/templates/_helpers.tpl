@@ -96,6 +96,37 @@ three supported sources produced it.
 {{- printf "%s-valkey" (include "kuwana.fullname" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "kuwana.minioFullname" -}}
+{{- printf "%s-minio" (include "kuwana.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Where MINIO_ACCESS_KEY/MINIO_SECRET_KEY come from. With the in-cluster MinIO
+enabled the chart generates and owns these — the same relationship
+postgresql.enabled has with DATABASE_URL — so nothing has to hand-maintain a
+credential pointing at a Service this same chart named.
+*/}}
+{{- define "kuwana.minioSecretName" -}}
+{{- if .Values.minio.enabled -}}
+{{- default (include "kuwana.minioFullname" .) .Values.minio.existingSecret -}}
+{{- else -}}
+{{- include "kuwana.secretName" . -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "kuwana.minioEnv" -}}
+- name: MINIO_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "kuwana.minioSecretName" . }}
+      key: {{ if .Values.minio.enabled }}access-key{{ else }}MINIO_ACCESS_KEY{{ end }}
+- name: MINIO_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "kuwana.minioSecretName" . }}
+      key: {{ if .Values.minio.enabled }}secret-key{{ else }}MINIO_SECRET_KEY{{ end }}
+{{- end -}}
+
 {{/*
 REDIS_URL, when a shared store exists at all. Unset, the app falls back to
 per-pod in-memory caching and per-pod rate limiting — correct for a single

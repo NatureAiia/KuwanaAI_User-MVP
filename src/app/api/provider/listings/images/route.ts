@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireOwnProvider } from "@/lib/providerAuth";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createStorageClient } from "@/lib/storage/minio";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BYTES } from "@/components/provider/imageGallery";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { fileMatchesDeclaredType } from "@/lib/uploadValidation";
@@ -35,12 +35,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That file isn't a valid JPEG, PNG, or WebP image" }, { status: 400 });
   }
 
-  let admin: ReturnType<typeof createAdminClient>;
+  let admin: ReturnType<typeof createStorageClient>;
   try {
-    admin = createAdminClient();
+    admin = createStorageClient();
   } catch {
     return NextResponse.json(
-      { error: "Image uploads aren't configured yet — ask an admin to finish Supabase Storage setup." },
+      { error: "Image uploads aren't configured yet — ask an admin to finish the MinIO setup." },
       { status: 503 },
     );
   }
@@ -51,8 +51,8 @@ export async function POST(req: Request) {
     .upload(objectPath, await file.arrayBuffer(), { contentType: file.type, upsert: false });
 
   if (error) {
-    const message = /bucket/i.test(error.message)
-      ? "Image storage isn't set up yet — ask an admin to run the Storage setup script."
+    const message = /bucket/i.test(error.name) || /bucket/i.test(error.message)
+      ? "Image storage isn't set up yet — ask an admin to check the MinIO bucket."
       : "Upload failed — please try again.";
     return NextResponse.json({ error: message }, { status: 502 });
   }

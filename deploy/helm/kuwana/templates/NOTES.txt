@@ -28,7 +28,7 @@ Probe endpoints (the readiness one reports which dependency is failing):
     node -e "fetch('http://127.0.0.1:{{ .Values.service.targetPort }}/api/health/ready').then(r=>r.text()).then(console.log)"
 
 {{ if .Values.secrets.create }}
-WARNING: secrets.create=true. The database URL, Supabase service-role key and
+WARNING: secrets.create=true. The database URL, MinIO credentials and
 Anthropic API key were rendered from values into a Secret, which means they are
 recoverable from `helm get values {{ .Release.Name }}` and from wherever that
 values file is stored. Use externalSecret.enabled or existingSecret for any

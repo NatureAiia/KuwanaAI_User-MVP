@@ -2,15 +2,15 @@ import type { NextConfig } from "next";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const MINIO_PUBLIC_URL = process.env.MINIO_PUBLIC_URL ?? process.env.MINIO_ENDPOINT ?? "";
 
 // Provider-uploaded listing images live in exactly one origin we control
-// (our own Supabase Storage bucket) — unlike ProviderLogo's arbitrary
-// admin-curated URLs, this is precisely the case remotePatterns is for, so
-// these get next/image instead of a plain <img>.
-const supabaseHostname = (() => {
+// (our own MinIO bucket) — unlike ProviderLogo's arbitrary admin-curated
+// URLs, this is precisely the case remotePatterns is for, so these get
+// next/image instead of a plain <img>.
+const minioUrl = (() => {
   try {
-    return new URL(SUPABASE_URL).hostname;
+    return new URL(MINIO_PUBLIC_URL);
   } catch {
     return undefined;
   }
@@ -36,13 +36,13 @@ const nextConfig: NextConfig = {
 
   images: {
     remotePatterns: [
-      ...(supabaseHostname
+      ...(minioUrl
         ? [
             {
-              protocol: "https" as const,
-              hostname: supabaseHostname,
-              port: "",
-              pathname: "/storage/v1/object/public/**",
+              protocol: minioUrl.protocol.replace(":", "") as "http" | "https",
+              hostname: minioUrl.hostname,
+              port: minioUrl.port,
+              pathname: "/**",
               search: "",
             },
           ]
@@ -51,7 +51,7 @@ const nextConfig: NextConfig = {
       // real provider-uploaded photo yet — picsum.photos is a stable,
       // freely-usable placeholder image CDN, deterministic by seed path, so
       // the same listing always gets the same photo. Remove once every
-      // seeded listing has a real Supabase-hosted image instead.
+      // seeded listing has a real MinIO-hosted image instead.
       { protocol: "https" as const, hostname: "picsum.photos", port: "", pathname: "/**", search: "" },
     ],
   },

@@ -1,10 +1,11 @@
 # Production overlay.
 #
-# Database is Supabase (managed): it is already the auth provider, so running
-# a second, self-managed Postgres in-cluster would add an operational burden
-# without removing the Supabase dependency. The in-cluster StatefulSet stays
-# available behind postgresql.enabled if that calculus ever changes — staging
-# runs it, so the path is not theoretical.
+# Target architecture: a single privately-hosted VPS running k3s, not a
+# multi-node autoscaled cluster. Database is the in-cluster Postgres
+# (postgresql.enabled=true, the chart default — not overridden here so this
+# file doesn't drift from it) and storage is the in-cluster MinIO
+# (minio.enabled=true, also the chart default). Nothing here points at a
+# managed external service; everything stateful lives on this one box.
 #
 #   helm upgrade --install kuwana deploy/helm/kuwana \
 #     -n kuwana --create-namespace \
@@ -13,11 +14,12 @@
 #     --set migrations.image.digest=sha256:<digest> \
 #     --atomic --timeout 10m
 
-autoscaling:
-  enabled: true
-  minReplicas: 3
-  maxReplicas: 20
-  targetCPUUtilizationPercentage: 65
+# replicaCount/autoscaling/podDisruptionBudget/topologySpreadConstraints are
+# all left at the chart default (1 replica, autoscaling off, PDB off, no
+# spread constraints) rather than overridden here — restating them would just
+# repeat values.yaml and invite the two files drifting apart. See values.yaml
+# for the single-node reasoning behind each. Re-enable them here explicitly
+# the day this moves off one box.
 
 resources:
   requests:
@@ -25,29 +27,6 @@ resources:
     memory: 768Mi
   limits:
     memory: 1536Mi
-
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 50%
-
-topologySpreadConstraints:
-  # Stricter than the chart default: a real multi-zone production cluster
-  # should refuse to schedule a pod that would concentrate the service in one
-  # zone, rather than quietly allowing it.
-  - maxSkew: 1
-    topologyKey: topology.kubernetes.io/zone
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: kuwana
-        app.kubernetes.io/component: web
-  - maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: ScheduleAnyway
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: kuwana
-        app.kubernetes.io/component: web
 
 ingress:
   enabled: true
@@ -76,11 +55,20 @@ ingress:
 
 config:
   adminEmails: "arthur@rubiem.com"
-  supabaseUrl: "https://your-production-project.supabase.co"
-  supabasePublishableKey: "sb_publishable_replace_me"
+  # minioEndpoint deliberately unset: it defaults to this release's in-cluster
+  # MinIO Service (see configmap.yaml) rather than to a hand-written hostname
+  # that would need to be kept in sync with whatever the release is named.
+  minioBucket: "kuwana"
+  # The public S3 Ingress hostname below (minio.ingress.hosts) — this is what
+  # browsers actually fetch listing images from.
+  minioPublicUrl: "https://storage.kuwana.example.com"
 
 # Vault-backed, via the External Secrets Operator. Nothing sensitive is ever
-# written into this file or into the release's stored values.
+# written into this file or into the release's stored values. MinIO's root
+# credentials are NOT listed here: with minio.enabled=true (the chart
+# default, not overridden below) minio.yaml generates and owns them, the same
+# way postgresql.enabled owns DATABASE_URL — there is nothing for Vault to
+# hold for either.
 externalSecret:
   enabled: true
   secretStoreRef:
@@ -88,14 +76,10 @@ externalSecret:
     kind: ClusterSecretStore
   refreshInterval: 1h
   data:
-    - secretKey: DATABASE_URL
+    - secretKey: AUTH_SECRET
       remoteRef:
         key: kuwana/production
-        property: database_url
-    - secretKey: SUPABASE_SERVICE_ROLE_KEY
-      remoteRef:
-        key: kuwana/production
-        property: supabase_service_role_key
+        property: auth_secret
     - secretKey: ANTHROPIC_API_KEY
       remoteRef:
         key: kuwana/production
@@ -105,19 +89,15 @@ externalSecret:
         key: kuwana/production
         property: cron_secret
 
-postgresql:
-  enabled: false
+# database.connectionLimit/poolTimeout are left at the chart default too: that
+# default was already sized per-pod for the in-cluster Postgres (see
+# values.yaml), and the render-time budget check in _helpers.tpl verifies it
+# against postgresql.maxConnections directly — there is no managed pooler
+# (pgBouncer/port 6543) in this architecture to route around, unlike the
+# Supabase-backed setup this file used to describe.
 
-# Supabase is the database, so DATABASE_URL must point at the **pooler**
-# (pgBouncer, port 6543) and carry connection_limit — 20 replicas each opening
-# Prisma's default pool will exhaust a managed instance. The chart cannot check
-# a managed server's max_connections, so this one is on you.
-database:
-  connectionLimit: 5
-  poolTimeout: 20
-
-# Mandatory here, not optional: at 3-20 replicas, cache invalidation and rate
-# limiting are both wrong without it. The chart refuses to render otherwise.
+# On, and not optional at replicaCount 1 either: see the reasoning in
+# values.yaml. Restated here with production-sized limits.
 valkey:
   enabled: true
   maxmemory: 768mb
@@ -127,17 +107,6 @@ valkey:
       memory: 256Mi
     limits:
       memory: 1Gi
-
-# Turn on once KEDA and Prometheus (scraping ingress-nginx) exist in the
-# cluster, and set autoscaling.enabled=false in the same change — they are
-# mutually exclusive and the chart enforces that. Tune
-# requestsPerSecondPerPod from a load test, not from taste.
-keda:
-  enabled: false
-  minReplicaCount: 3
-  maxReplicaCount: 20
-  requestsPerSecondPerPod: 50
-  p95LatencySeconds: 1.5
 
 migrations:
   enabled: true
@@ -153,3 +122,19 @@ networkPolicy:
   ingressNamespaceSelectors:
     - matchLabels:
         kubernetes.io/metadata.name: ingress-nginx
+
+# minio.enabled stays at the chart default (true) — restated here only to
+# override the public S3 Ingress hostname and give it a real TLS secret name.
+minio:
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: storage.kuwana.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: kuwana-minio-tls
+        hosts:
+          - storage.kuwana.example.com

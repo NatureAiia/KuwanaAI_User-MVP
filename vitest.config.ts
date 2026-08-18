@@ -18,7 +18,8 @@ export default defineConfig({
     // this from .env; tests get a fixed stand-in so they're deterministic
     // regardless of ambient environment.
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      MINIO_PUBLIC_URL: "https://test-minio.example.com",
+      MINIO_BUCKET: "test-bucket",
       AUTH_SECRET: "test-secret-not-real",
     },
   },

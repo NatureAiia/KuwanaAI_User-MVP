@@ -75,9 +75,6 @@ jobs:
           push: false
           load: true
           tags: kuwana:ci
-          build-args: |
-            NEXT_PUBLIC_SUPABASE_URL=https://ci.invalid.supabase.co
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -98,7 +95,11 @@ jobs:
         run: |
           docker run -d --name kuwana-ci -p 3000:3000 \
             -e DATABASE_URL=postgresql://ci:ci@127.0.0.1:5432/ci \
-            -e SUPABASE_SERVICE_ROLE_KEY=ci \
+            -e AUTH_SECRET=ci-not-a-real-secret \
+            -e MINIO_ENDPOINT=http://ci.invalid:9000 \
+            -e MINIO_ACCESS_KEY=ci \
+            -e MINIO_SECRET_KEY=ci \
+            -e MINIO_BUCKET=ci \
             -e ANTHROPIC_API_KEY=ci \
             kuwana:ci
           for i in $(seq 1 30); do
@@ -133,9 +134,6 @@ jobs:
           push: false
           load: true
           tags: kuwana:scan
-          build-args: |
-            NEXT_PUBLIC_SUPABASE_URL=https://ci.invalid.supabase.co
-            NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_ci
           cache-from: type=gha
 
       - name: Trivy image scan

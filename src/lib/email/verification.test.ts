@@ -104,10 +104,10 @@ describe("hashCode", () => {
 
   it("refuses to hash with no key at all rather than falling back to something weaker", () => {
     delete process.env.EMAIL_VERIFICATION_SECRET;
-    const service = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const authSecret = process.env.AUTH_SECRET;
+    delete process.env.AUTH_SECRET;
     expect(() => hashCode(USER, EMAIL, "123456")).toThrow(/EMAIL_VERIFICATION_SECRET/);
-    if (service !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = service;
+    if (authSecret !== undefined) process.env.AUTH_SECRET = authSecret;
   });
 });
 

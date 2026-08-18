@@ -30,24 +30,18 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    // Login matters as much as signup for bot/credential-stuffing traffic —
-    // the Turnstile token is verified server-side inside authorize() itself
-    // (see src/lib/nextAuth.ts), since there's no Supabase Auth backend left
-    // to do that verification implicitly.
-    const result = await signIn("credentials", { email, password, turnstileToken: captchaToken, redirect: false });
+    const result = await signIn("credentials", { email, password, redirect: false });
     if (result?.error) {
       setLoading(false);
       // authorize() masks every failure reason as CredentialsSignin — wrong
       // password, unknown email, and a rate limit all land here identically
-      // by design (see src/lib/nextAuth.ts), except too_many_attempts and
-      // bot_check_failed, which get their own messages since "wrong
-      // password" would be misleading for either.
+      // by design (see src/lib/nextAuth.ts), except the rate-limit code,
+      // which gets its own message since "wrong password" would be
+      // misleading in that case.
       setError(
         result.code === "too_many_attempts"
           ? "Too many attempts — please wait a few minutes and try again."
-          : result.code === "bot_check_failed"
-            ? "We couldn't verify you're human. Please try again."
-            : "That email and password don't match. Check for typos, or reset your password.",
+          : "That email and password don't match. Check for typos, or reset your password.",
       );
       return;
     }

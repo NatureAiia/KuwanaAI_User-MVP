@@ -32,15 +32,20 @@ describe("requireUser", () => {
     expect(await requireUser()).toBeNull();
   });
 
+  it("returns the user when a session exists", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
+    expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
+  });
+
   it("returns null when the session has no user id", async () => {
     authMock.mockResolvedValue({ user: { email: "a@b.com" } });
     expect(await requireUser()).toBeNull();
   });
 
-  it("returns the user when their row exists, fully onboarded, and the email is verified", async () => {
+  it("returns null when the account is suspended", async () => {
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date(), onboardingCompletedAt: new Date() });
-    expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
+    findUnique.mockResolvedValue({ accountStatus: "suspended", emailVerifiedAt: new Date() });
+    expect(await requireUser()).toBeNull();
   });
 
   it("returns null when the account is suspended", async () => {
@@ -53,7 +58,7 @@ describe("requireUser", () => {
     // Gated here rather than per route: eleven routes call requireUser()
     // directly with no role check on top, wallet top-up among them.
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: null, onboardingCompletedAt: new Date() });
+    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: null });
     expect(await requireUser()).toBeNull();
   });
 
@@ -62,16 +67,6 @@ describe("requireUser", () => {
     // requireUser() first. Refusing here would make signup impossible.
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     findUnique.mockResolvedValue(null);
-    expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
-  });
-
-  it("still admits a real row that hasn't finished onboarding, even unverified", async () => {
-    // /api/auth/register (unlike main's Supabase-era onboarding) already
-    // creates the row before onboarding runs, so a mid-signup account has a
-    // real row with emailVerifiedAt still null. Refusing here would make
-    // /api/onboarding itself unreachable — see the comment in auth.ts.
-    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: null, onboardingCompletedAt: null });
     expect(await requireUser()).toEqual({ id: "u1", email: "a@b.com" });
   });
 });
@@ -101,12 +96,9 @@ describe("requireConsumer", () => {
   // getUserRole — so the fixture has to satisfy both.
   it("returns a 403 response when authenticated but not a consumer", async () => {
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({
-      role: "regulator",
-      accountStatus: "active",
-      emailVerifiedAt: new Date(),
-      onboardingCompletedAt: new Date(),
-    });
+    findUnique
+      .mockResolvedValueOnce({ accountStatus: "active", emailVerifiedAt: new Date() })
+      .mockResolvedValueOnce({ role: "regulator" });
     const result = await requireConsumer();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(403);
@@ -114,25 +106,17 @@ describe("requireConsumer", () => {
 
   it("returns the user when authenticated as a consumer", async () => {
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({
-      role: "consumer",
-      accountStatus: "active",
-      emailVerifiedAt: new Date(),
-      onboardingCompletedAt: new Date(),
-    });
+    findUnique
+      .mockResolvedValueOnce({ accountStatus: "active", emailVerifiedAt: new Date() })
+      .mockResolvedValueOnce({ role: "consumer" });
     const result = await requireConsumer();
     expect("user" in result).toBe(true);
     if ("user" in result) expect(result.user.id).toBe("u1");
   });
 
-  it("returns a 401, not a 403, for a fully-onboarded consumer whose email is unverified", async () => {
+  it("returns a 401, not a 403, for a consumer whose email is unverified", async () => {
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
-    findUnique.mockResolvedValue({
-      role: "consumer",
-      accountStatus: "active",
-      emailVerifiedAt: null,
-      onboardingCompletedAt: new Date(),
-    });
+    findUnique.mockResolvedValue({ role: "consumer", accountStatus: "active", emailVerifiedAt: null });
     const result = await requireConsumer();
     expect("response" in result).toBe(true);
     if ("response" in result) expect(result.response.status).toBe(401);
@@ -148,7 +132,9 @@ describe("requireAdmin", () => {
   it("returns null when the user's email isn't on the allowlist", async () => {
     process.env.ADMIN_EMAILS = "someone-else@example.com";
     authMock.mockResolvedValue({ user: { id: "u1", email: "admin@example.com" } });
-    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date(), role: "consumer" });
+    findUnique
+      .mockResolvedValueOnce({ accountStatus: "active", emailVerifiedAt: new Date() })
+      .mockResolvedValueOnce({ role: "consumer" });
     expect(await requireAdmin()).toBeNull();
   });
 
@@ -162,7 +148,9 @@ describe("requireAdmin", () => {
   it("returns null when ADMIN_EMAILS is unset (fails closed, not open)", async () => {
     delete process.env.ADMIN_EMAILS;
     authMock.mockResolvedValue({ user: { id: "u1", email: "admin@example.com" } });
-    findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date(), role: "consumer" });
+    findUnique
+      .mockResolvedValueOnce({ accountStatus: "active", emailVerifiedAt: new Date() })
+      .mockResolvedValueOnce({ role: "consumer" });
     expect(await requireAdmin()).toBeNull();
   });
 });

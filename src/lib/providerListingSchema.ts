@@ -8,11 +8,13 @@ const listingAttributes = boundedJsonRecord(50, 16_000);
 
 // Every listing image must come back from our own upload endpoint
 // (POST /api/provider/listings/images), which writes into this exact
-// bucket path — otherwise a provider could PATCH an arbitrary external URL
-// straight onto a public listing card, a real content-injection surface
-// (unlike sourceUrl, which is just an outbound link, never rendered as
-// <img src>).
-export const LISTING_IMAGE_URL_PREFIX = `${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""}/storage/v1/object/public/listing-images/`;
+// object-key prefix in the MinIO bucket (see src/lib/storage/minio.ts) —
+// otherwise a provider could PATCH an arbitrary external URL straight onto
+// a public listing card, a real content-injection surface (unlike
+// sourceUrl, which is just an outbound link, never rendered as <img src>).
+const MINIO_PUBLIC_URL = (process.env.MINIO_PUBLIC_URL ?? process.env.MINIO_ENDPOINT ?? "").replace(/\/+$/, "");
+const MINIO_BUCKET = process.env.MINIO_BUCKET ?? "";
+export const LISTING_IMAGE_URL_PREFIX = `${MINIO_PUBLIC_URL}/${MINIO_BUCKET}/listing-images/`;
 
 const listingImageUrl = z
   .string()

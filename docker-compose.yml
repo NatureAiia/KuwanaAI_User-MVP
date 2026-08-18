@@ -1,10 +1,12 @@
 # Local stack: Postgres + migrations + the production image.
 #
-#   cp .env.example .env      # fill in Supabase + Anthropic values
+#   cp .env.example .env      # fill in Auth.js, MinIO, and Anthropic values
 #   docker compose up --build
 #   docker compose --profile seed up seed     # once, to load catalog data
 #
-# Supabase Auth and the Claude API are always the real hosted services — only
+# The Claude API is always the real hosted service; Auth.js and MinIO can
+# point at whatever's configured in .env (a local MinIO container, a
+# self-hosted one, etc. — this compose file doesn't run one for you). Only
 # Postgres is local. DATABASE_URL is overridden below to point at that
 # container, so whatever is in .env for it is ignored here on purpose.
 
@@ -35,9 +37,6 @@ services:
     build:
       context: .
       target: migrator
-      args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
     environment:
       DATABASE_URL: postgresql://kuwana:kuwana_local_dev@postgres:5432/kuwana
     depends_on:
@@ -50,8 +49,6 @@ services:
       context: .
       target: runner
       args:
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
         APP_VERSION: local
     env_file:
       - .env

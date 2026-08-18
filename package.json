@@ -16,9 +16,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",
+    "@aws-sdk/client-s3": "^3.1111.0",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
-    "@supabase/supabase-js": "^2.112.3",
     "bcryptjs": "^3.0.3",
     "boneyard-js": "^1.9.0",
     "clsx": "^2.1.1",
