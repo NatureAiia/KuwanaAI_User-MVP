@@ -18,8 +18,8 @@ const originalAdminEmails = process.env.ADMIN_EMAILS;
 beforeEach(() => {
   authMock.mockReset();
   findUnique.mockReset();
-  // Default: no suspension, email already verified, unless a test overrides it.
-  findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date() });
+  // Default: active, verified, and fully onboarded, unless a test overrides it.
+  findUnique.mockResolvedValue({ accountStatus: "active", emailVerifiedAt: new Date(), onboardingCompletedAt: new Date() });
 });
 
 afterEach(() => {
@@ -48,7 +48,13 @@ describe("requireUser", () => {
     expect(await requireUser()).toBeNull();
   });
 
-  it("rejects a row whose email was never verified", async () => {
+  it("returns null when the account is suspended", async () => {
+    authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
+    findUnique.mockResolvedValue({ accountStatus: "suspended", emailVerifiedAt: new Date(), onboardingCompletedAt: new Date() });
+    expect(await requireUser()).toBeNull();
+  });
+
+  it("rejects a fully-onboarded row whose email was never verified", async () => {
     // Gated here rather than per route: eleven routes call requireUser()
     // directly with no role check on top, wallet top-up among them.
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
@@ -57,7 +63,7 @@ describe("requireUser", () => {
   });
 
   it("still admits a session with no row at all — that is mid-signup", async () => {
-    // /api/onboarding is the thing that creates the row, and it calls
+    // /api/onboarding is the thing that finishes the row, and it calls
     // requireUser() first. Refusing here would make signup impossible.
     authMock.mockResolvedValue({ user: { id: "u1", email: "a@b.com" } });
     findUnique.mockResolvedValue(null);

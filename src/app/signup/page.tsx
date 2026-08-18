@@ -202,10 +202,11 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  // Empty when Turnstile isn't configured for this deployment; Supabase
-  // ignores the option in that case, so the flow is unchanged. Held in a ref
-  // as well because the account-creation effect reads it without wanting it as
-  // a dependency (see the signUp call).
+  // Empty when Turnstile isn't configured for this deployment; authorize()
+  // (src/lib/nextAuth.ts) treats a missing token as "skip" in that case, so
+  // the flow is unchanged. Held in a ref rather than state because the
+  // account-creation effect reads it without wanting it as a dependency (see
+  // the signIn call).
   const captchaTokenRef = useRef("");
   const setCaptchaToken = (token: string) => {
     captchaTokenRef.current = token;
@@ -353,9 +354,17 @@ export default function SignupPage() {
     setStep(prev ?? "role");
   }
 
-  // Stage one: create the Supabase account, then ask the server to mail a
+  // Stage one: create the account row, then ask the server to mail a
   // verification code. Deliberately depends only on the credentials, so the
   // profile answers changing underneath it can never re-enter it.
+  //
+  // Turnstile is deliberately NOT verified here: a Cloudflare token is
+  // single-use, and the sign-in call a few lines down (or the one on the
+  // "verify" step's success path) is the one that actually verifies it, via
+  // authorize() in src/lib/nextAuth.ts. Checking it twice against Cloudflare
+  // would fail the second call. Row creation on its own can't grant a
+  // session, so it's an acceptable target to leave unchecked here — it's
+  // still bounded by RATE_LIMITS.publicWrite.
   useEffect(() => {
     if (step !== "processing" || startedAccount.current) return;
     startedAccount.current = true;
@@ -379,6 +388,26 @@ export default function SignupPage() {
         setStep("account");
         // The account was not created, so let a corrected retry run this again.
         startedAccount.current = false;
+        return;
+      }
+
+      // Establish a session right away — this is the direct analogue of
+      // Supabase's signUp() minting a session immediately, before its own
+      // "email confirmed" state was ever true. Email verification is purely
+      // an app-level gate (requireUser(), see src/lib/auth.ts) checked on
+      // every subsequent request, not a precondition for having a session at
+      // all — that's what lets the send/verify routes below authenticate via
+      // the raw session (auth()) while still being blocked by requireUser()
+      // everywhere else until the code is confirmed.
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        turnstileToken: captchaTokenRef.current || undefined,
+        redirect: false,
+      });
+      if (signInResult?.error) {
+        setError("Your account was created, but signing you in failed. Please try logging in.");
+        setStep("account");
         return;
       }
 

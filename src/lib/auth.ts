@@ -27,20 +27,19 @@ export async function requireUser() {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { accountStatus: true, emailVerifiedAt: true },
+    select: { accountStatus: true, emailVerifiedAt: true, onboardingCompletedAt: true },
   });
   if (dbUser?.accountStatus === "suspended") return null;
 
-  // A NULL here is not the ordinary mid-signup state — /api/onboarding never
-  // writes a row without stamping this (it either confirms the emailed code
-  // or records that this deployment has no mailer, see isMailerConfigured).
-  // Existing rows were backfilled by the migration. So reaching this branch
-  // means a row was created by some path that skipped that check, which is
-  // exactly the case worth refusing.
-  //
-  // `dbUser?.` deliberately: no row at all IS the mid-signup state, and it
-  // has to pass, or onboarding could never create one.
-  if (dbUser && !dbUser.emailVerifiedAt) return null;
+  // Gated on onboardingCompletedAt, not on row-existence: unlike main's
+  // Supabase-era flow (where /api/onboarding created the row, so "no row"
+  // was the only mid-signup state), /api/auth/register already creates the
+  // row before onboarding ever runs — so a mid-signup account here has a
+  // real row with emailVerifiedAt still null. Refusing on row-existence
+  // alone would make onboarding itself return "Not authenticated" and could
+  // never be completed. Once onboardingCompletedAt is set, the row is a real
+  // account and an unverified email is refused from then on.
+  if (dbUser?.onboardingCompletedAt && !dbUser.emailVerifiedAt) return null;
 
   return { id: user.id, email: user.email };
 }
