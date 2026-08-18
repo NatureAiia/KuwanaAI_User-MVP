@@ -620,7 +620,7 @@ export function CompareClient({
               disabled={loadingRecommendation || loadingTraditional}
             >
               <Sparkles size={16} />
-              Get AI recommendation
+              All factors considered
             </Button>
             <Button
               onClick={getTraditionalComparison}
@@ -629,7 +629,7 @@ export function CompareClient({
               disabled={loadingRecommendation || loadingTraditional}
             >
               <Scale size={16} />
-              Traditional comparison
+              Price comparison
             </Button>
             <LinkButton
               variant="ghost"
@@ -643,7 +643,7 @@ export function CompareClient({
           {/* Clearly-labelled explanation of which engine is which, under the
               buttons, so the two results aren't mistaken for each other. */}
           <p className="max-w-xl text-[12px] leading-snug text-text-muted">
-            Kuwana recommendation is personalised to your situation. Traditional comparison is a deterministic,
+            Kuwana recommendation is personalised to your situation. Price comparison is a deterministic,
             rules-based ranking — no personalization — that shows exactly how it scored each option.
           </p>
           {recommendationError && <p className="text-[13px] text-accent-coral">{recommendationError}</p>}
@@ -682,7 +682,7 @@ export function CompareClient({
           <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-5">
             <div className="h-8 w-8 shrink-0 animate-spin rounded-full border-2 border-accent-teal border-t-transparent" />
             <div>
-              <p className="font-display text-[14px] font-semibold">Running the traditional comparison engine…</p>
+              <p className="font-display text-[14px] font-semibold">Running the price comparison engine…</p>
               <p className="text-[12px] text-text-muted">
                 A deterministic Python engine is scoring {listings.length} listings — no AI involved
               </p>
@@ -695,7 +695,7 @@ export function CompareClient({
             <div className="flex items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-text-secondary">
                 <Scale size={13} />
-                Traditional comparison
+                Price comparison
               </p>
               <button
                 type="button"
