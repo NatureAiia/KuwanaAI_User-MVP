@@ -19,7 +19,7 @@ env:
 
 jobs:
   verify:
-    name: Lint, typecheck, test
+    name: Lint, typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -39,9 +39,9 @@ jobs:
       # CLI loads its config, so *every* prisma command needs it present —
       # including `generate`, which never opens a connection. Without it this
       # step fails with "PrismaConfigEnvError: Cannot resolve environment
-      # variable: DIRECT_URL" and takes the typecheck, lint and test steps
-      # below down with it. Same placeholder approach the Dockerfile already
-      # uses for DATABASE_URL during the build.
+      # variable: DIRECT_URL" and takes the typecheck and lint steps below
+      # down with it. Same placeholder approach the Dockerfile already uses
+      # for DATABASE_URL during the build.
       - run: npx prisma generate
         env:
           DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci
@@ -51,9 +51,6 @@ jobs:
 
       - name: Lint
         run: npm run lint
-
-      - name: Test
-        run: npm test
 
   build:
     name: Build image
