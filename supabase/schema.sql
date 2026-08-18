@@ -8,10 +8,11 @@
 -- any table here. All 30 tables + every index/FK below run unmodified on
 -- Supabase today and on plain Postgres / RDS / Neon / self-hosted later.
 --
--- The one exception: two small triggers at the very end of this file that
--- link public.users to Supabase's own auth.users (see that section's
--- comment for why and how). Everything above that line is 100% portable;
--- skip only that final section when targeting non-Supabase Postgres.
+-- This file used to end with two small triggers linking public.users to
+-- Supabase's own auth.users. Those were removed once Auth.js (NextAuth v5)
+-- replaced Supabase Auth (see the note at the end of this file) — everything
+-- below is now 100% portable, with nothing left to skip on non-Supabase
+-- Postgres.
 --
 -- HOW TO RUN
 --   Fresh Supabase project (no repo/Node needed):
