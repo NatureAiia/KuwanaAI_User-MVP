@@ -24,10 +24,20 @@ imagePullSecrets: []
 # --- replicas & scaling ---------------------------------------------------
 # Ignored when autoscaling.enabled is true (the HPA owns the replica count;
 # leaving both live makes every Helm upgrade fight the autoscaler).
-replicaCount: 3
+#
+# 1, not 2: the target is a single VPS. A "hot spare" second replica on the
+# same box protects against nothing a node failure wouldn't also take out,
+# and it doubles the Node process's baseline memory footprint for that. Raise
+# this (and turn autoscaling back on) the moment there is more than one node
+# to spread across.
+replicaCount: 1
 
 autoscaling:
-  enabled: true
+  # Off by default: the target is one VPS, not a cluster with room to add
+  # nodes under load. The block's fields are left in place, not deleted, so
+  # turning this back on later (a move to multiple nodes) is a values change,
+  # not a rewrite.
+  enabled: false
   minReplicas: 3
   maxReplicas: 12
   targetCPUUtilizationPercentage: 70
@@ -54,17 +64,24 @@ autoscaling:
           periodSeconds: 60
 
 podDisruptionBudget:
-  enabled: true
+  # Off by default: at replicaCount 1, a minAvailable of 50% rounds up to 1,
+  # which means the one pod that exists can never be voluntarily evicted —
+  # not for a node drain, not for a cluster upgrade, not ever, until a second
+  # replica exists to make "disruption" a meaningful concept. Turn this on
+  # together with raising replicaCount/autoscaling past 1.
+  enabled: false
   # Percentage, not a count, so it stays correct as the HPA moves replicas.
   minAvailable: 50%
 
 # Request-rate autoscaling. Mutually exclusive with autoscaling.enabled — two
 # controllers driving one Deployment's replica count fight each other.
 #
-# Requires KEDA in the cluster and Prometheus scraping ingress-nginx. Left off
-# by default so the chart installs on a bare cluster; turn it on once that
-# dependency exists, because CPU is a weak proxy for load in an app that
-# spends its time waiting on Supabase, Postgres and the Claude API.
+# Requires KEDA in the cluster and Prometheus scraping ingress-nginx, neither
+# of which exists on a fresh single-VPS install — left off for that reason,
+# same as autoscaling.enabled. Turn it on (with autoscaling.enabled left
+# false, since the two fight each other) once there's a real multi-node
+# cluster and that dependency exists — CPU is a weak proxy for load in an app
+# that spends its time waiting on Postgres and the Claude API.
 keda:
   enabled: false
   prometheusAddress: http://prometheus-operated.monitoring.svc.cluster.local:9090
@@ -97,24 +114,28 @@ resources:
     memory: 1Gi
 
 # --- placement ------------------------------------------------------------
-# Spread across zones first, then nodes, so losing either does not take the
-# service with it. ScheduleAnyway, not DoNotSchedule: a single-zone cluster
-# must still be able to schedule.
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: topology.kubernetes.io/zone
-    whenUnsatisfiable: ScheduleAnyway
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: kuwana
-        app.kubernetes.io/component: web
-  - maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: ScheduleAnyway
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/name: kuwana
-        app.kubernetes.io/component: web
+# Empty by default: there is exactly one node, so a zone/hostname spread
+# constraint has nothing to spread across and is a no-op at best. Kept here,
+# rather than deleted, as the multi-node shape to restore verbatim once
+# there's a second node — ScheduleAnyway (not DoNotSchedule) so a single-zone
+# cluster in that future state can still schedule:
+#
+# topologySpreadConstraints:
+#   - maxSkew: 1
+#     topologyKey: topology.kubernetes.io/zone
+#     whenUnsatisfiable: ScheduleAnyway
+#     labelSelector:
+#       matchLabels:
+#         app.kubernetes.io/name: kuwana
+#         app.kubernetes.io/component: web
+#   - maxSkew: 1
+#     topologyKey: kubernetes.io/hostname
+#     whenUnsatisfiable: ScheduleAnyway
+#     labelSelector:
+#       matchLabels:
+#         app.kubernetes.io/name: kuwana
+#         app.kubernetes.io/component: web
+topologySpreadConstraints: []
 
 nodeSelector: {}
 tolerations: []
@@ -151,6 +172,12 @@ service:
 
 ingress:
   enabled: true
+  # k3s ships Traefik as its default ingress controller, not nginx — the
+  # annotations on this chart's Ingress resources (proxy-body-size,
+  # proxy-read-timeout, proxy-buffering) are all nginx-ingress-specific and
+  # Traefik will simply ignore them. The fix is installing ingress-nginx and
+  # disabling Traefik at k3s install time (see DEPLOYMENT.md), not rewriting
+  # this chart to speak Traefik's annotation dialect.
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "2m"
@@ -395,28 +422,40 @@ cronJobs:
 
 # --- network policy -------------------------------------------------------
 networkPolicy:
+  # Kept on as documentation and defense-in-depth even though it is not fully
+  # load-bearing on this target: k3s's default CNI (Flannel) does not enforce
+  # NetworkPolicy at all, so these resources describe the intended traffic
+  # shape without a controller actually blocking anything that violates it.
+  # Real enforcement needs a policy-aware CNI (Calico is the documented future
+  # path in DEPLOYMENT.md) — until then, treat this as an accurate diagram,
+  # not an active control.
   enabled: true
   # Namespaces allowed to reach the web pods (the ingress controller, and
   # anything else that legitimately calls in).
   ingressNamespaceSelectors:
     - matchLabels:
         kubernetes.io/metadata.name: ingress-nginx
-  # Egress must stay open enough for DNS, Supabase, the Anthropic API and the
-  # database. CIDR-pinning those is not practical against managed endpoints,
-  # so egress is allowed to the internet minus RFC1918, plus in-cluster DNS
-  # and the optional in-cluster Postgres.
+  # Egress must stay open enough for DNS, the Anthropic API, and any external
+  # services the app calls (Paynow, OpenRouter, Firecrawl). CIDR-pinning those
+  # is not practical against endpoints on rotating IPs, so egress is allowed
+  # to the internet minus RFC1918, plus in-cluster DNS and the in-cluster
+  # Postgres/MinIO Services.
   allowExternalEgress: true
 
 # --- database connection budget -------------------------------------------
 # The app opens a connection pool per process. Left at its default that pool is
-# sized for one server, not for an autoscaled fleet: at 20 replicas it silently
-# asks for hundreds of connections and the database starts refusing them —
-# which looks like a total outage, not a capacity problem.
+# sized for one server, not for a fleet: if this chart is ever scaled past its
+# single-node default, N replicas each opening an unbounded pool silently asks
+# for hundreds of connections and the database starts refusing them — which
+# looks like a total outage, not a capacity problem.
 #
-# The budget is: maxReplicas x connectionLimit + migrations + cron <= the
-# server's max_connections. The chart checks this arithmetic at render time
-# for the in-cluster database and fails rather than letting it be discovered
-# in production.
+# The budget is: (replica ceiling) x connectionLimit + migrations + cron <=
+# the server's max_connections, where "replica ceiling" is
+# keda.maxReplicaCount, autoscaling.maxReplicas, or plain replicaCount —
+# whichever of the three is actually driving the pod count (see the
+# render-time check in _helpers.tpl, which picks the same one). The chart
+# checks this arithmetic at render time for the in-cluster database and fails
+# rather than letting it be discovered in production.
 #
 # HOW IT REACHES THE POOL: as DATABASE_POOL_MAX on the ConfigMap, read by
 # src/lib/prismaAdapter.ts. NOT via the `connection_limit` parameter on the
@@ -436,11 +475,20 @@ database:
 
 # --- shared cache / rate-limit store --------------------------------------
 # Above one replica this stops being optional infrastructure and becomes a
-# correctness requirement. Next's unstable_cache is per process: without a
-# shared store, `revalidateTag` after an admin catalog edit clears the cache on
+# correctness requirement: Next's unstable_cache is per process, so without a
+# shared store `revalidateTag` after an admin catalog edit clears the cache on
 # the one pod that served the write and leaves the other N-1 serving stale data
 # until their own TTL expires, and the in-process rate limiter permits
 # limit x replicas requests instead of limit.
+#
+# Still on by default at replicaCount 1, where neither of those failure modes
+# exists yet: a shared store also survives a pod restart (an in-process cache/
+# limiter does not), and keeping it wired in now means raising replicaCount
+# later is a values change, not a day the correctness requirement above shows
+# up for the first time. Turn it off only for the smallest possible footprint
+# and accept both failure modes becoming live the moment a second replica
+# appears — the chart's render-time check (_helpers.tpl) refuses that
+# combination.
 valkey:
   enabled: true
   image: valkey/valkey:8.1-alpine
@@ -474,13 +522,13 @@ externalRedis:
   existingSecret: ""
   secretKey: REDIS_URL
 
-# --- optional in-cluster Postgres ----------------------------------------
-# Off by default: production points DATABASE_URL at Supabase, which is also
-# the auth provider, so an in-cluster database would only split one datastore
-# into two without removing the Supabase dependency. Turn it on for staging,
-# air-gapped evaluation, or a migration away from managed Postgres.
+# --- in-cluster Postgres ---------------------------------------------------
+# On by default: the target architecture is a single VPS with nothing managed
+# externally, so this is now the primary database path, not an opt-in eval
+# one. Set enabled: false and provide secrets.databaseUrl to point at a
+# managed Postgres instead.
 postgresql:
-  enabled: false
+  enabled: true
   image: postgres:17-alpine
   # Postgres defaults to 100, which an autoscaled web tier exhausts long
   # before it exhausts CPU. Each connection costs a backend process and some
@@ -510,10 +558,11 @@ postgresql:
     size: 20Gi
 
 # --- self-hosted object storage (MinIO) ------------------------------------
-# On by default: the same shape as postgresql.enabled above (see there for
-# the escape hatch). Set enabled: false and fill in config.minioEndpoint +
-# secrets.minioAccessKey/minioSecretKey to point at a MinIO (or other
-# S3-compatible store) you run outside this chart.
+# On by default: the target architecture is a single VPS with nothing managed
+# externally, so this is now the primary storage path rather than an opt-in
+# eval one — the same shift postgresql.enabled just made. Set enabled: false
+# and fill in config.minioEndpoint + secrets.minioAccessKey/minioSecretKey to
+# point at a MinIO (or other S3-compatible store) you run outside this chart.
 minio:
   enabled: true
   image: minio/minio:RELEASE.2025-04-08T15-41-24Z

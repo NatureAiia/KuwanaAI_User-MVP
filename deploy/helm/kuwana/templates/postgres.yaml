@@ -61,10 +61,13 @@ metadata:
     app.kubernetes.io/component: postgres
 spec:
   serviceName: {{ $name }}
-  # Single instance. This is a portability and evaluation option, not an HA
-  # database — there is no replication, no failover and no automatic restore
-  # here. Production runs against managed Postgres (Supabase) by default for
-  # exactly that reason.
+  # Single instance. This is the target architecture's primary database, not
+  # an HA one — there is no replication, no failover and no automatic
+  # restore here, and postgresql.backup only reaches a PVC in the same
+  # cluster (see backup.enabled below and DEPLOYMENT.md's Database section
+  # for the off-box gap that leaves open). Set postgresql.enabled=false and
+  # point secrets.databaseUrl at a managed Postgres instead if that tradeoff
+  # is ever unacceptable.
   replicas: 1
   selector:
     matchLabels:

@@ -1,9 +1,11 @@
 # Staging overlay.
 #
-# Runs the in-cluster Postgres so staging can be torn down and rebuilt without
-# touching a managed database, and so the StatefulSet path stays exercised
-# rather than rotting untested. Supabase Auth is still the hosted service —
-# it is the identity provider, not something this chart can stand up.
+# Runs the in-cluster Postgres (the chart default) so staging can be torn
+# down and rebuilt without touching a separate database, and so the
+# StatefulSet path stays exercised rather than rotting untested. Auth.js is
+# entirely self-hosted (Credentials + JWT), so there's no external identity
+# provider dependency here at all — only MinIO and Postgres are stood up
+# in-cluster, both defaulting on.
 #
 #   helm upgrade --install kuwana deploy/helm/kuwana \
 #     -n kuwana-staging --create-namespace \
