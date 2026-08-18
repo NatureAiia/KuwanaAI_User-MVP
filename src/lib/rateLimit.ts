@@ -209,6 +209,8 @@ export const RATE_LIMITS = {
   publicRead: { limit: 120, windowSeconds: 60 },
   /** /api/bi/v1/* — keyed by ApiKey.id, not IP, so one BI tool's schedule can't starve another key's budget. */
   biApi: { limit: 60, windowSeconds: 60 },
+  /** Credentials authorize(), keyed by IP+email — bounds password-guessing without locking an account out from other IPs. */
+  login: { limit: 10, windowSeconds: 600 },
 } as const satisfies Record<string, RateLimitRule>;
 
 /* -------------------------------------------------------------------------- */
