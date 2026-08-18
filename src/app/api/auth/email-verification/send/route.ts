@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/nextAuth";
 import { privateJson } from "@/lib/apiResponse";
 import { clientKey, enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
 import { isMailerConfigured, sendMail } from "@/lib/email/mailer";
@@ -14,10 +14,10 @@ import { issueVerificationCode } from "@/lib/email/verification";
  * hitting it is by definition unverified, and requireUser() rejects exactly
  * that — routing this through it would make the endpoint that fixes the state
  * unreachable from the state it fixes. So it authenticates directly against
- * the Supabase session instead, which is still a real server-side check: the
- * cookie is httpOnly and signed, and the address is read from the session
- * rather than the request body, so a caller cannot aim a code at somebody
- * else's inbox.
+ * the raw session instead (auth(), not requireUser()), which is still a real
+ * server-side check: the session cookie is httpOnly and signed, and the
+ * address is read from the session rather than the request body, so a caller
+ * cannot aim a code at somebody else's inbox.
  */
 
 // Present but ignored for the destination — see above. Parsed anyway so an
@@ -25,11 +25,9 @@ import { issueVerificationCode } from "@/lib/email/verification";
 const bodySchema = z.object({}).strict().optional();
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) {
+  const session = await auth();
+  const user = session?.user;
+  if (!user?.id || !user.email) {
     return privateJson({ error: "Not authenticated" }, { status: 401 });
   }
 

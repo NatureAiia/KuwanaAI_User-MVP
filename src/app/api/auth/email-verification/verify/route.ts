@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { auth } from "@/lib/nextAuth";
 import { prisma } from "@/lib/prisma";
 import { privateJson } from "@/lib/apiResponse";
 import { clientKey, enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
@@ -9,9 +9,9 @@ import { MAX_ATTEMPTS, verifyCode } from "@/lib/email/verification";
 /**
  * Accepts a signup verification code.
  *
- * Authenticates against the Supabase session directly rather than through
- * requireUser(), for the same reason as the send route: every caller here is
- * unverified, which is precisely what requireUser() refuses.
+ * Authenticates against the raw session directly (auth()) rather than
+ * through requireUser(), for the same reason as the send route: every caller
+ * here is unverified, which is precisely what requireUser() refuses.
  */
 
 const bodySchema = z.object({
@@ -23,11 +23,9 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user?.email) {
+  const session = await auth();
+  const user = session?.user;
+  if (!user?.id || !user.email) {
     return privateJson({ error: "Not authenticated" }, { status: 401 });
   }
 

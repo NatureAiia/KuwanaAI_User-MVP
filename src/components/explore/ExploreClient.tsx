@@ -10,7 +10,6 @@ import { ListingCardFixture } from "@/components/explore/ListingCardFixture";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingRequirements } from "@/lib/eligibility";
-import { createClient } from "@/lib/supabase/client";
 import { useCompareTray } from "@/lib/useCompareTray";
 import type { CategoryDTO, CategoryWithListingsDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
@@ -46,9 +45,9 @@ export function ExploreClient({
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => setIsAuthed(!!data.user));
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((session) => setIsAuthed(!!session?.user));
   }, []);
 
   useEffect(() => {

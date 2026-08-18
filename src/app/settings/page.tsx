@@ -6,7 +6,7 @@ import { Bell, ChevronRight, ShieldCheck, Wallet } from "lucide-react";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { CurrencySwitcher } from "@/components/CurrencySwitcher";
-import { createClient } from "@/lib/supabase/client";
+import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { SwitchAccountButton } from "@/components/LogoutButton";
@@ -24,9 +24,9 @@ export default function SettingsPage() {
   }>({});
 
   useEffect(() => {
-    createClient()
-      .auth.getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null));
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((session) => setEmail(session?.user?.email ?? null));
     fetch("/api/settings/consents")
       .then((r) => r.json())
       .then((d) => setConsents(d.consents ?? {}));
@@ -49,7 +49,7 @@ export default function SettingsPage() {
   }
 
   async function logout() {
-    await createClient().auth.signOut();
+    await signOut({ redirect: false });
     router.push("/");
     router.refresh();
   }

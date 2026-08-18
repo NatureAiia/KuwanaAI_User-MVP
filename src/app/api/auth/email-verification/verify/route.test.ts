@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const getUser = vi.fn();
+const authMock = vi.fn();
 const enforceRateLimit = vi.fn();
 const isMailerConfigured = vi.fn();
 const verifyCode = vi.fn();
 const updateMany = vi.fn();
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser } }) }));
+vi.mock("@/lib/nextAuth", () => ({ auth: authMock }));
 vi.mock("@/lib/rateLimit", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/rateLimit")>()),
   enforceRateLimit,
@@ -26,13 +26,13 @@ const request = (body: unknown) =>
   });
 
 beforeEach(() => {
-  getUser.mockReset();
+  authMock.mockReset();
   enforceRateLimit.mockReset();
   isMailerConfigured.mockReset();
   verifyCode.mockReset();
   updateMany.mockReset();
 
-  getUser.mockResolvedValue({ data: { user: { id: "u1", email: "person@example.com" } } });
+  authMock.mockResolvedValue({ user: { id: "u1", email: "person@example.com" } });
   enforceRateLimit.mockResolvedValue(null);
   isMailerConfigured.mockReturnValue(true);
   verifyCode.mockResolvedValue({ ok: true });
@@ -41,7 +41,7 @@ beforeEach(() => {
 
 describe("POST /api/auth/email-verification/verify", () => {
   it("refuses without a session", async () => {
-    getUser.mockResolvedValue({ data: { user: null } });
+    authMock.mockResolvedValue(null);
     expect((await POST(request({ code: "123456" }))).status).toBe(401);
   });
 

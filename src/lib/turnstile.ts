@@ -1,17 +1,13 @@
 /**
  * Cloudflare Turnstile verification.
  *
- * Two places a token gets checked, and it matters which is which:
- *
- *   - Supabase Auth routes (signup, login). The token is handed to
- *     `supabase.auth.signUp({ options: { captchaToken } })` and **Supabase**
- *     verifies it. That only takes effect once Turnstile is enabled in the
- *     Supabase dashboard with the same secret — passing a token to a project
- *     that has CAPTCHA switched off is silently ignored. See DEPLOYMENT.md.
- *
- *   - Our own unauthenticated routes (waitlist, and anything added later).
- *     Those verify here, against Cloudflare directly, which is entirely
- *     within this codebase's control.
+ * Verified here directly against Cloudflare for every caller — the waitlist
+ * route, and login (inside authorize(), see src/lib/nextAuth.ts). Signup does
+ * NOT call this a second time: a Cloudflare token is single-use, and
+ * authorize() already verifies the same token when the signup flow signs the
+ * new account in immediately after registering it (see src/app/signup/
+ * page.tsx). There is no Supabase Auth backend left to hand the token to
+ * implicitly, unlike this file's previous incarnation.
  *
  * FAILURE POLICY: fails **closed** when a secret is configured, and skips
  * entirely when one is not. That combination is deliberate. Failing open on a

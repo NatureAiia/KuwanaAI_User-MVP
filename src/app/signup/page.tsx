@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
+import { signIn } from "next-auth/react";
+import { passwordSchema } from "@/lib/authSchema";
 import { Button } from "@/components/ui/Button";
 import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
@@ -201,10 +202,11 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  // Empty when Turnstile isn't configured for this deployment; Supabase
-  // ignores the option in that case, so the flow is unchanged. Held in a ref
-  // as well because the account-creation effect reads it without wanting it as
-  // a dependency (see the signUp call).
+  // Empty when Turnstile isn't configured for this deployment; authorize()
+  // (src/lib/nextAuth.ts) treats a missing token as "skip" in that case, so
+  // the flow is unchanged. Held in a ref rather than state because the
+  // account-creation effect reads it without wanting it as a dependency (see
+  // the signIn call).
   const captchaTokenRef = useRef("");
   const setCaptchaToken = (token: string) => {
     captchaTokenRef.current = token;
@@ -352,40 +354,60 @@ export default function SignupPage() {
     setStep(prev ?? "role");
   }
 
-  // Stage one: create the Supabase account, then ask the server to mail a
+  // Stage one: create the account row, then ask the server to mail a
   // verification code. Deliberately depends only on the credentials, so the
   // profile answers changing underneath it can never re-enter it.
+  //
+  // Turnstile is deliberately NOT verified here: a Cloudflare token is
+  // single-use, and the sign-in call a few lines down (or the one on the
+  // "verify" step's success path) is the one that actually verifies it, via
+  // authorize() in src/lib/nextAuth.ts. Checking it twice against Cloudflare
+  // would fail the second call. Row creation on its own can't grant a
+  // session, so it's an acceptable target to leave unchecked here — it's
+  // still bounded by RATE_LIMITS.publicWrite.
   useEffect(() => {
     if (step !== "processing" || startedAccount.current) return;
     startedAccount.current = true;
 
     (async () => {
       setProcessingStage("account");
-      const supabase = createClient();
-      // Supabase verifies captchaToken itself, but ONLY once CAPTCHA is
-      // enabled in the project's Auth settings with the matching secret —
-      // passing a token to a project with it switched off is silently ignored.
-      // See DEPLOYMENT.md; the code here is half of the control.
-      const { error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        // Read via ref so this effect keeps its run-once dependency list — the
-        // widget resolves its token asynchronously and would otherwise be a
-        // dependency of an effect that must not re-enter.
-        ...(captchaTokenRef.current ? { options: { captchaToken: captchaTokenRef.current } } : {}),
+      const registerRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (signUpError) {
-        const alreadyRegistered = /already registered|already exists|already been used|taken/i.test(
-          signUpError.message,
-        );
+      if (!registerRes.ok) {
+        const errBody = await registerRes.json().catch(() => ({}));
         setError(
-          alreadyRegistered
+          registerRes.status === 409
             ? "This email can only be used once. If you already have an account, please log in instead."
-            : signUpError.message,
+            : typeof errBody?.error === "string"
+              ? errBody.error
+              : "Something went wrong creating your account. Please try again.",
         );
         setStep("account");
         // The account was not created, so let a corrected retry run this again.
         startedAccount.current = false;
+        return;
+      }
+
+      // Establish a session right away — this is the direct analogue of
+      // Supabase's signUp() minting a session immediately, before its own
+      // "email confirmed" state was ever true. Email verification is purely
+      // an app-level gate (requireUser(), see src/lib/auth.ts) checked on
+      // every subsequent request, not a precondition for having a session at
+      // all — that's what lets the send/verify routes below authenticate via
+      // the raw session (auth()) while still being blocked by requireUser()
+      // everywhere else until the code is confirmed.
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        turnstileToken: captchaTokenRef.current || undefined,
+        redirect: false,
+      });
+      if (signInResult?.error) {
+        setError("Your account was created, but signing you in failed. Please try logging in.");
+        setStep("account");
         return;
       }
 
@@ -418,6 +440,7 @@ export default function SignupPage() {
         setStep("verify");
         return;
       }
+
       setProcessingStage("profile");
       setAccountReady(true);
     })();
@@ -515,7 +538,7 @@ export default function SignupPage() {
           res.status === 403 && typeof errBody?.error === "string"
             ? errBody.error
             : errBody?.error
-              ? "We couldn't save your profile. Check your email to confirm your account, then log in."
+              ? "We couldn't save your profile. Please try logging in and completing your profile again."
               : "Something went wrong saving your profile.",
         );
         return;
@@ -560,14 +583,18 @@ export default function SignupPage() {
           ? "Use 3–20 letters, numbers, or underscores only."
           : null,
       email: email && !email.includes("@") ? "Email must include an @ symbol." : null,
-      password: password && password.length < 6 ? "Password needs at least 6 characters." : null,
+      password: password ? (passwordSchema.safeParse(password).error?.issues[0]?.message ?? null) : null,
     };
   }
 
   function canContinue(s: ConsumerStep | "orgDetails" | "industry") {
     switch (s) {
       case "account":
-        return !!(/^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) && email.trim() && password.length >= 6);
+        return !!(
+          /^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) &&
+          email.trim() &&
+          passwordSchema.safeParse(password).success
+        );
       case "personal":
         return !!(ageRange && occupation);
       case "telecom":

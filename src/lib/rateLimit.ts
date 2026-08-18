@@ -242,6 +242,8 @@ export const RATE_LIMITS = {
   publicRead: { limit: 120, windowSeconds: 60 },
   /** /api/bi/v1/* — keyed by ApiKey.id, not IP, so one BI tool's schedule can't starve another key's budget. */
   biApi: { limit: 60, windowSeconds: 60 },
+  /** Credentials authorize(), keyed by IP+email — bounds password-guessing without locking an account out from other IPs. */
+  login: { limit: 10, windowSeconds: 600 },
   /** Binary uploads (listing/advert images) — each call buffers up to MAX_IMAGE_BYTES in memory and costs real storage/bandwidth, so tighter than authedWrite. */
   mediaUpload: { limit: 10, windowSeconds: 60 },
   /**

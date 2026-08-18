@@ -19,6 +19,7 @@ export default defineConfig({
     // regardless of ambient environment.
     env: {
       NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+      AUTH_SECRET: "test-secret-not-real",
     },
   },
 });

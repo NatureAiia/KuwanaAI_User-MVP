@@ -22,6 +22,7 @@ const DB_TIMEOUT_MS = 3_000;
 /** Env the server cannot function without; absence is a config fault, not a transient one. */
 const REQUIRED_ENV = [
   "DATABASE_URL",
+  "AUTH_SECRET",
   "NEXT_PUBLIC_SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
 ] as const;

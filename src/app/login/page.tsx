@@ -4,7 +4,7 @@ import { Suspense, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { signIn, signOut } from "next-auth/react";
 import { safeRedirectPath } from "@/lib/safeRedirect";
 import { Button } from "@/components/ui/Button";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -30,23 +30,24 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    // Login matters as much as signup here: it is the credential-stuffing
-    // surface, and it is equally invisible to this app's rate limiter because
-    // the call goes straight from the browser to Supabase.
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-      ...(captchaToken ? { options: { captchaToken } } : {}),
-    });
-    if (error) {
+    // Login matters as much as signup for bot/credential-stuffing traffic —
+    // the Turnstile token is verified server-side inside authorize() itself
+    // (see src/lib/nextAuth.ts), since there's no Supabase Auth backend left
+    // to do that verification implicitly.
+    const result = await signIn("credentials", { email, password, turnstileToken: captchaToken, redirect: false });
+    if (result?.error) {
       setLoading(false);
+      // authorize() masks every failure reason as CredentialsSignin — wrong
+      // password, unknown email, and a rate limit all land here identically
+      // by design (see src/lib/nextAuth.ts), except too_many_attempts and
+      // bot_check_failed, which get their own messages since "wrong
+      // password" would be misleading for either.
       setError(
-        /invalid login credentials/i.test(error.message)
-          ? "That email and password don't match. Check for typos, or reset your password."
-          : /email not confirmed/i.test(error.message)
-            ? "Confirm your email first — check your inbox for the link we sent."
-            : error.message,
+        result.code === "too_many_attempts"
+          ? "Too many attempts — please wait a few minutes and try again."
+          : result.code === "bot_check_failed"
+            ? "We couldn't verify you're human. Please try again."
+            : "That email and password don't match. Check for typos, or reset your password.",
       );
       return;
     }
@@ -59,7 +60,7 @@ function LoginForm() {
     const statusRes = await fetch("/api/auth/account-status");
     const status = await statusRes.json().catch(() => null);
     if (status?.suspended) {
-      await supabase.auth.signOut();
+      await signOut({ redirect: false });
       setLoading(false);
       setError("This account has been deactivated. Contact support if you think this is a mistake.");
       return;
