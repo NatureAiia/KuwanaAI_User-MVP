@@ -174,10 +174,20 @@ config:
   # Comma-separated admin allowlist consumed by requireAdmin() in src/lib/auth.ts.
   adminEmails: ""
   nodeEnv: production
-  # Public by design — inlined into the client bundle at image build time and
-  # repeated here so the readiness probe's config check can see them.
-  supabaseUrl: ""
-  supabasePublishableKey: ""
+  # Self-hosted MinIO (S3-compatible Storage — see src/lib/storage/minio.ts).
+  # Non-secret half; minioAccessKey/minioSecretKey live under secrets below.
+  minioEndpoint: ""
+  minioBucket: ""
+  # Optional — the browser-facing base URL objects are served from, if
+  # different from minioEndpoint (e.g. an internal/cluster-local endpoint vs
+  # a public Ingress hostname). Falls back to minioEndpoint when empty.
+  minioPublicUrl: ""
+  # Optional — some S3-compatible clients require a non-empty region even
+  # though MinIO itself ignores it.
+  minioRegion: ""
+  # Optional — Auth.js's trustHost covers most deployments without this
+  # (see src/lib/nextAuth.ts); set only if the Host header isn't reachable.
+  authUrl: ""
 
   # --- signup email verification (src/lib/email/mailer.ts) ---
   # Leaving smtpHost/emailFrom empty is a supported state: verification is not
@@ -215,7 +225,11 @@ existingSecret: ""
 secrets:
   create: false
   databaseUrl: ""
-  supabaseServiceRoleKey: ""
+  # Auth.js (NextAuth v5) — generate with `openssl rand -base64 32`.
+  authSecret: ""
+  # Self-hosted MinIO credentials — pairs with config.minioEndpoint/minioBucket above.
+  minioAccessKey: ""
+  minioSecretKey: ""
   anthropicApiKey: ""
   cronSecret: ""
   # Optional — each gates a feature rather than the app booting.
@@ -237,18 +251,18 @@ secrets:
   # SMTP credential for signup verification mail. Pairs with config.smtpHost /
   # config.smtpUser above.
   smtpPassword: ""
-  # Optional. Keys the HMAC over verification codes; derived from
-  # supabaseServiceRoleKey via HKDF when empty, which is fine. Setting it
-  # rotates code hashing independently — at the cost of invalidating every
-  # code currently in flight.
+  # Optional. Keys the HMAC over verification codes; derived from authSecret
+  # via HKDF when empty, which is fine. Setting it rotates code hashing
+  # independently — at the cost of invalidating every code currently in flight.
   emailVerificationSecret: ""
   # Turnstile's SERVER-side key. The site key is a build arg on the image
   # (NEXT_PUBLIC_TURNSTILE_SITE_KEY), not a runtime value — setting it here
   # would do nothing, since client bundles are inlined at build time.
   #
-  # For signup and login the token is verified by SUPABASE, which only happens
-  # once CAPTCHA is enabled in the project's Auth settings with this same
-  # secret. Setting it here alone protects the waitlist and nothing else.
+  # Since the move to Auth.js, nothing verifies this token for signup/login —
+  # Supabase used to, and Auth.js's Credentials provider has no equivalent
+  # hook (see src/lib/turnstile.ts). Setting it here protects the waitlist
+  # and nothing else.
   turnstileSecretKey: ""
 
 externalSecret:
@@ -263,10 +277,18 @@ externalSecret:
       remoteRef:
         key: kuwana/production
         property: database_url
-    - secretKey: SUPABASE_SERVICE_ROLE_KEY
+    - secretKey: AUTH_SECRET
       remoteRef:
         key: kuwana/production
-        property: supabase_service_role_key
+        property: auth_secret
+    - secretKey: MINIO_ACCESS_KEY
+      remoteRef:
+        key: kuwana/production
+        property: minio_access_key
+    - secretKey: MINIO_SECRET_KEY
+      remoteRef:
+        key: kuwana/production
+        property: minio_secret_key
     - secretKey: ANTHROPIC_API_KEY
       remoteRef:
         key: kuwana/production

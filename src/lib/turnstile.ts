@@ -1,17 +1,16 @@
 /**
  * Cloudflare Turnstile verification.
  *
- * Two places a token gets checked, and it matters which is which:
- *
- *   - Supabase Auth routes (signup, login). The token is handed to
- *     `supabase.auth.signUp({ options: { captchaToken } })` and **Supabase**
- *     verifies it. That only takes effect once Turnstile is enabled in the
- *     Supabase dashboard with the same secret — passing a token to a project
- *     that has CAPTCHA switched off is silently ignored. See DEPLOYMENT.md.
+ *   - Signup/login previously handed their token to
+ *     `supabase.auth.signUp({ options: { captchaToken } })`, which Supabase
+ *     verified server-side. Auth.js's Credentials provider has no equivalent
+ *     hook, so as of the move off Supabase the widget on those two pages is
+ *     unwired — it still renders and captures a token, but nothing checks
+ *     it. See .env.example's Turnstile section and DEPLOYMENT.md.
  *
  *   - Our own unauthenticated routes (waitlist, and anything added later).
  *     Those verify here, against Cloudflare directly, which is entirely
- *     within this codebase's control.
+ *     within this codebase's control, and are unaffected by the above.
  *
  * FAILURE POLICY: fails **closed** when a secret is configured, and skips
  * entirely when one is not. That combination is deliberate. Failing open on a

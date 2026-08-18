@@ -17,14 +17,16 @@ untouched — nothing here replaces it, and `next.config.ts` only switches to st
 ## 1. Local: docker compose
 
 ```bash
-cp .env.example .env          # fill in Supabase + Anthropic values
+cp .env.example .env          # fill in Auth.js, MinIO, and Anthropic values
 docker compose up --build     # postgres → migrate → web, in that order
 docker compose --profile seed up seed   # once: loads sectors, providers, listings
 ```
 
-App on http://localhost:3000. Postgres is local; **Supabase Auth and the Claude API are the real
-hosted services** — only the database is containerised, because Supabase is the identity provider
-and cannot be stood up locally.
+App on http://localhost:3000. Postgres is local; **the Claude API is the real hosted service** —
+Auth.js (NextAuth v5) is entirely self-hosted (Credentials + JWT, no external identity provider),
+so it needs nothing beyond `AUTH_SECRET`. MinIO can be a local container of your own (this compose
+file doesn't run one for you) or a real self-hosted instance elsewhere — either way it's not baked
+into this stack, unlike Postgres.
 
 `DATABASE_URL` from `.env` is deliberately overridden in `docker-compose.yml` to point at the
 `postgres` container.
@@ -36,10 +38,7 @@ and cannot be stood up locally.
 One Dockerfile, two publishable targets:
 
 ```bash
-docker build --target runner   -t kuwana:local \
-  --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
-  --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx .
-
+docker build --target runner   -t kuwana:local .
 docker build --target migrator -t kuwana-migrate:local .
 ```
 
@@ -50,22 +49,16 @@ querying, by construction.
 **`migrator`** — `prisma migrate deploy` plus the seed script. Runs as a Helm hook, never as a
 long-lived workload.
 
-### The one build-time constraint worth knowing
+### No more build-time environment split
 
-`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are inlined into the **client
-bundle at build time** by Next.js. That part cannot be supplied later by the Deployment's env, so
-**staging and production need separately built images**. Both values are public by design — the
-publishable key is meant to sit in a browser. `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`,
-`DATABASE_URL` and `CRON_SECRET` are *not* build args and only ever reach the container at runtime.
+Auth.js (`AUTH_URL`/`AUTH_SECRET`) and MinIO (`MINIO_*`) are all **server-only** env — unlike the
+old `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` values they replace, none of
+them are inlined into the client bundle at build time, so they're just runtime Deployment env (see
+the chart's ConfigMap/Secret) and never build args. The one remaining build arg is
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, which is genuinely public and still baked in the same way.
 
-They must **also** be present as runtime env, which is why the chart's ConfigMap carries them:
-the inlining covers the browser bundle only, and `src/proxy.ts` reads
-`process.env.NEXT_PUBLIC_SUPABASE_URL` on the server for every request. Baked into the image but
-absent from the pod env, the app is live but every non-health route returns 500.
-
-To collapse to a single build-once artifact, the browser Supabase client would have to read its
-config from a runtime-injected script rather than `process.env` — a real change to
-`src/lib/supabase/client.ts`, not a deployment setting. Not done here.
+That means, unlike before, **the same image can run in staging and production** — there is no
+longer an environment-scoped rebuild requirement for auth/storage config.
 
 ---
 
@@ -80,7 +73,9 @@ Requires Kubernetes ≥ 1.27 (`CronJob.timeZone` is used).
 kubectl create namespace kuwana
 kubectl -n kuwana create secret generic kuwana-app \
   --from-literal=DATABASE_URL='postgresql://...supabase...' \
-  --from-literal=SUPABASE_SERVICE_ROLE_KEY='...' \
+  --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
+  --from-literal=MINIO_ACCESS_KEY='...' \
+  --from-literal=MINIO_SECRET_KEY='...' \
   --from-literal=ANTHROPIC_API_KEY='sk-ant-...' \
   --from-literal=CRON_SECRET="$(openssl rand -hex 32)"
 

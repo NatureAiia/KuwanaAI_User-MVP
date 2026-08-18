@@ -52,13 +52,15 @@ ingress:
 
 config:
   adminEmails: "arthur@rubiem.com"
-  supabaseUrl: "https://your-staging-project.supabase.co"
-  supabasePublishableKey: "sb_publishable_replace_me"
+  minioEndpoint: "http://minio.kuwana-staging.svc.cluster.local:9000"
+  minioBucket: "kuwana-staging"
 
 # Secrets still come from a Secret created out of band — staging holds real
-# Supabase and Anthropic credentials, which cost real money if leaked.
+# MinIO and Anthropic credentials, which cost real money if leaked.
 #   kubectl -n kuwana-staging create secret generic kuwana-app \
-#     --from-literal=SUPABASE_SERVICE_ROLE_KEY=... \
+#     --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
+#     --from-literal=MINIO_ACCESS_KEY=... \
+#     --from-literal=MINIO_SECRET_KEY=... \
 #     --from-literal=ANTHROPIC_API_KEY=... \
 #     --from-literal=CRON_SECRET="$(openssl rand -hex 32)"
 existingSecret: "kuwana-app"

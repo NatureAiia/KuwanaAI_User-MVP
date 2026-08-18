@@ -10,13 +10,24 @@ data:
   HOSTNAME: "0.0.0.0"
   NEXT_TELEMETRY_DISABLED: "1"
   ADMIN_EMAILS: {{ .Values.config.adminEmails | quote }}
-  # Public Supabase values. Required at runtime, not merely duplicated: the
-  # build-time inlining only covers the browser bundle, and src/proxy.ts reads
-  # process.env.NEXT_PUBLIC_SUPABASE_URL on the server for every request —
-  # unset, it throws and every non-health route returns 500. Verified by
-  # running the image without them.
-  NEXT_PUBLIC_SUPABASE_URL: {{ .Values.config.supabaseUrl | quote }}
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: {{ .Values.config.supabasePublishableKey | quote }}
+  # MinIO (self-hosted S3-compatible Storage — see src/lib/storage/minio.ts).
+  # Non-secret half only; MINIO_ACCESS_KEY/MINIO_SECRET_KEY live in the Secret.
+  MINIO_ENDPOINT: {{ .Values.config.minioEndpoint | quote }}
+  MINIO_BUCKET: {{ .Values.config.minioBucket | quote }}
+  {{- with .Values.config.minioPublicUrl }}
+  MINIO_PUBLIC_URL: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.config.minioRegion }}
+  MINIO_REGION: {{ . | quote }}
+  {{- end }}
+  {{- /*
+    Auth.js (NextAuth v5). AUTH_SECRET lives in the Secret; AUTH_URL is
+    optional — trustHost's Host-header inference covers most deployments
+    without it (see src/lib/nextAuth.ts).
+  */}}
+  {{- with .Values.config.authUrl }}
+  AUTH_URL: {{ . | quote }}
+  {{- end }}
   # The pool size the application actually applies. The `connection_limit`
   # parameter on the database URL is Prisma-engine syntax that the Prisma 7
   # `pg` driver adapter does not read — src/lib/prismaAdapter.ts sets

@@ -1,11 +1,4 @@
 # syntax=docker/dockerfile:1.9
-# check=skip=SecretsUsedInArgOrEnv
-#
-# The skip above is for NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: BuildKit flags
-# anything ending in KEY as a secret, but a Supabase *publishable* key is
-# designed to be served to browsers and is inlined into the client bundle by
-# Next regardless. The service-role key — the one that would matter — is never
-# a build arg.
 #
 # Kuwana — production image.
 #
@@ -55,22 +48,22 @@ RUN --mount=type=cache,target=/root/.npm \
 # ---------------------------------------------------------------------------
 FROM deps AS builder
 
-# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so
-# they cannot be supplied later by the Deployment's env. That makes the image
-# environment-scoped: staging and production need separate builds. Both values
-# are public by design (the publishable key is safe in a browser); the service
-# role key is NOT among them and is only ever injected at runtime.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-# The Turnstile site key is read by a client component, so it has to be here
-# rather than in the Deployment's env: supplied only at runtime it inlines as
-# undefined, the widget renders nothing, and the deployment looks protected
-# while no challenge is ever issued. Optional — unset simply means no widget,
-# which is the documented "not configured" state, not a broken build.
+# Auth.js (AUTH_URL/AUTH_SECRET) and MinIO (MINIO_*) are all server-only env
+# vars — unlike the old NEXT_PUBLIC_SUPABASE_* values they replace, none of
+# them need to be inlined into the client bundle at build time, so they're
+# just runtime Deployment env (see deploy/helm/kuwana) and never build args
+# here. That also means, unlike before, this image is no longer
+# environment-scoped by auth/storage config — the same image can run in
+# staging and production.
+#
+# The Turnstile site key is the one remaining exception: it's read by a
+# client component, so it has to be here rather than in the Deployment's
+# env: supplied only at runtime it inlines as undefined, the widget renders
+# nothing, and the deployment looks protected while no challenge is ever
+# issued. Optional — unset simply means no widget, which is the documented
+# "not configured" state, not a broken build.
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL} \
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY} \
-    NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
 
 COPY prisma ./prisma
 RUN npx prisma generate

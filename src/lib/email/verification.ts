@@ -32,20 +32,21 @@ export const MAX_ATTEMPTS = 5;
 
 /**
  * Keys the HMAC. `EMAIL_VERIFICATION_SECRET` if set; otherwise derived from
- * the service-role key, which every real deployment already has.
+ * `AUTH_SECRET`, which every real deployment already has (Auth.js refuses to
+ * start without it).
  *
- * HKDF rather than using the service key directly: the derived key is
+ * HKDF rather than using the auth secret directly: the derived key is
  * domain-separated by the `info` string, so this use cannot weaken — or be
  * weakened by — anything else that key is used for.
  */
 function verificationKey(): Buffer {
-  const secret = process.env.EMAIL_VERIFICATION_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = process.env.EMAIL_VERIFICATION_SECRET ?? process.env.AUTH_SECRET;
   if (!secret) {
-    // Only reachable on a deployment that configured SMTP but has no Supabase
-    // service key, which cannot serve a request anyway. Failing here is
+    // Only reachable on a deployment that configured SMTP but has no
+    // AUTH_SECRET, which cannot serve a request anyway. Failing here is
     // better than silently falling back to an unkeyed hash.
     throw new Error(
-      "Email verification needs EMAIL_VERIFICATION_SECRET or SUPABASE_SERVICE_ROLE_KEY to key its code hashes",
+      "Email verification needs EMAIL_VERIFICATION_SECRET or AUTH_SECRET to key its code hashes",
     );
   }
   return Buffer.from(hkdfSync("sha256", secret, "", "kuwana:email-verification:v1", 32));

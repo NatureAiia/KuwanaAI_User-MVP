@@ -23,8 +23,10 @@ const DB_TIMEOUT_MS = 3_000;
 const REQUIRED_ENV = [
   "DATABASE_URL",
   "AUTH_SECRET",
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
+  "MINIO_ENDPOINT",
+  "MINIO_ACCESS_KEY",
+  "MINIO_SECRET_KEY",
+  "MINIO_BUCKET",
 ] as const;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
