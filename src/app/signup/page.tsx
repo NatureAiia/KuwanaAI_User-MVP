@@ -18,12 +18,21 @@ import { FieldError } from "@/components/ui/FieldError";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { markHardNav } from "@/components/SoftNavTracker";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
-import { AGE_RANGES, OCCUPATIONS, SOCIAL_PLATFORMS } from "@/lib/onboarding-options";
+import {
+  AGE_RANGES,
+  OCCUPATIONS,
+  SOCIAL_PLATFORMS,
+  EMPLOYEE_COUNT_BANDS,
+  MONTHLY_TRANSACTION_VOLUME_BANDS,
+  PROVIDER_BUSINESS_TYPES,
+  PROVIDER_LISTING_VOLUME_BANDS,
+} from "@/lib/onboarding-options";
 import { REGULATORS } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { clsx } from "clsx";
 
 type Role = "consumer" | "corporate" | "provider" | "regulator";
+type ApplicantRole = "corporate" | "provider" | "regulator";
 
 // Guarantees the "processing" tunnel reads as an intentional moment rather
 // than a flicker: measured from the first time the user hits "Save my
@@ -89,7 +98,36 @@ const ROLE_OPTIONS: {
 // "quick setup": consent gate, credentials, optional opt-ins.
 const CONSUMER_STEPS = ["account", "dataConsent", "consent"] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "verification" | "verify" | "processing";
+type Step =
+  | "role"
+  | ConsumerStep
+  | "orgDetails"
+  | "industry"
+  | "applicationDetails"
+  | "verification"
+  | "declarations"
+  | "verify"
+  | "processing"
+  | "summary";
+
+// Labeled upload slots for the corporate/provider/regulator "verification"
+// step — which slots are actually *required* to proceed lives in
+// canContinue("verification") below, not here: corporate needs at least one
+// of its three, regulator needs its one (institutional access is the most
+// sensitive of the three applicant roles), provider needs none at all
+// (the informal-sector persona may have neither document).
+const VERIFICATION_SLOTS: Record<ApplicantRole, { key: string; label: string }[]> = {
+  corporate: [
+    { key: "incorporation", label: "Certificate of Incorporation" },
+    { key: "tax_clearance", label: "Tax Clearance Certificate" },
+    { key: "proof_of_address", label: "Proof of Business Address" },
+  ],
+  provider: [
+    { key: "national_id", label: "National ID" },
+    { key: "proof_of_business", label: "Proof of Business/Address" },
+  ],
+  regulator: [{ key: "institutional_id", label: "Institutional ID or Letter of Authorization" }],
+};
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -165,6 +203,37 @@ function MultiChipGroup({
   );
 }
 
+function TextField({
+  label,
+  optional,
+  value,
+  onChange,
+  placeholder,
+  maxLength,
+}: {
+  label: string;
+  optional?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  maxLength?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="text-[13px] font-medium text-text-secondary">
+        {label} {optional && <span className="text-text-muted">(optional)</span>}
+      </span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+      />
+    </label>
+  );
+}
+
 export default function SignupPage() {
   const router = useRouter();
   const isDesktop = useIsDesktop();
@@ -206,29 +275,64 @@ export default function SignupPage() {
   const [occupation, setOccupation] = useState("");
   const [socialPlatforms, setSocialPlatforms] = useState<string[]>([]);
 
+  // Corporate/Provider/Regulator-only "applicationDetails" step, reached
+  // after orgDetails/industry — a handful of role-specific fields, all
+  // optional (see onboardingSchema.ts and the "declarations" step below for
+  // what's actually required). Only the fields relevant to the current role
+  // are ever sent to /api/onboarding.
+  const [registrationNumber, setRegistrationNumber] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
+  const [registeredAddress, setRegisteredAddress] = useState("");
+  const [yearEstablished, setYearEstablished] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactTitle, setContactTitle] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [employeeCountBand, setEmployeeCountBand] = useState("");
+  const [monthlyVolumeBand, setMonthlyVolumeBand] = useState("");
+  const [businessType, setBusinessType] = useState("");
+  const [yearsOperating, setYearsOperating] = useState("");
+  const [estimatedMonthlyListingVolume, setEstimatedMonthlyListingVolume] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("");
+  const [officialCapacity, setOfficialCapacity] = useState("");
+
   // The mandatory pre-signup gate (ToS/Privacy Policy + the Cyber and Data
   // Protection Act [Chapter 12:07] disclosure) — shown to every role on the
-  // new "dataConsent" step, right after role selection. Enforced server-side
-  // too: /api/auth/register rejects the request without a matching
-  // `consentAccepted: true` (see registerSchema in src/lib/authSchema.ts).
+  // "dataConsent" step, which for corporate/provider/regulator is now the
+  // true last step of their application (see nextAfterAccount() below).
+  // Enforced server-side too: /api/auth/register rejects the request
+  // without a matching `consentAccepted: true` (see registerSchema in
+  // src/lib/authSchema.ts).
   const [consentAccepted, setConsentAccepted] = useState(false);
   // Separate, optional opt-in on the "consent" step — distinct from the
   // mandatory gate above (see the field's own comment in
-  // src/lib/onboardingSchema.ts).
+  // src/lib/onboardingSchema.ts). Consumer-only: the three applicant roles
+  // never reach the "consent" step anymore.
   const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
 
   // Corporate/Provider/Regulator-only "verification" step, reached after
-  // orgDetails/industry — a business registration/ID document upload plus
-  // an optional custom-dashboard request. Both are optional: applicationStatus
-  // is set to "pending" for these roles regardless of whether either was
-  // filled in (see /api/onboarding/route.ts).
-  const [verificationDocs, setVerificationDocs] = useState<string[]>([]);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
+  // applicationDetails — one or more labeled document uploads (see
+  // VERIFICATION_SLOTS above) plus an optional custom-dashboard request.
+  // Keyed by slot key rather than a flat list so a re-upload replaces that
+  // slot instead of appending a duplicate.
+  const [verificationDocs, setVerificationDocs] = useState<Record<string, string>>({});
+  // Which slot is mid-upload, or null — replaces a single "uploadingDoc"
+  // boolean now that there can be more than one input on the step.
+  const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const [customInterfaceRequested, setCustomInterfaceRequested] = useState(false);
   const [customInterfaceNotes, setCustomInterfaceNotes] = useState("");
+
+  // "declarations" step (corporate/provider/regulator only) — required
+  // checkboxes plus an optional free-text reason. Regulator swaps
+  // dataProtectionComplianceDeclared for authorizedToActDeclared, since
+  // regulator access is about institutional authority, not data handling
+  // (see the fields' comments in schema.prisma).
+  const [accurateInfoDeclared, setAccurateInfoDeclared] = useState(false);
+  const [dataProtectionComplianceDeclared, setDataProtectionComplianceDeclared] = useState(false);
+  const [authorizedToActDeclared, setAuthorizedToActDeclared] = useState(false);
+  const [whyApplying, setWhyApplying] = useState("");
 
   // The emailed one-time code (see /api/auth/email-verification). Only ever
   // reached when the deployment has a mailer configured — without one the
@@ -238,32 +342,42 @@ export default function SignupPage() {
   const [verifying, setVerifying] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
 
-  // Account creation now happens right after the "account" step (not at the
-  // very end) — the later "verification" step needs a real, authenticated
-  // user id to attach uploaded documents to (see
-  // /api/onboarding/verification-docs). `creatingAccount` disables the
-  // account step's Continue button for the duration instead of using a
-  // dedicated screen, since it's a sub-second to few-second operation, not
-  // the long profile-save tunnel below.
+  // Account creation for corporate/provider/regulator now happens only once
+  // their *entire* application — orgDetails/industry/applicationDetails/
+  // verification/declarations — is filled in, triggered from the
+  // "dataConsent" step's final submit rather than right after "account" (see
+  // nextAfterAccount() below). `creatingAccount` disables that submit button
+  // for the duration instead of using a dedicated screen, since it's a
+  // sub-second to few-second operation, not the long profile-save tunnel
+  // below.
   const [creatingAccount, setCreatingAccount] = useState(false);
   // Profile saving is still a separate one-shot effect (gated on
-  // `accountReady` *and* `step === "processing"`) so it stays resumable after
-  // an arbitrary pause on the code screen, same reasoning as before — the
-  // gate just grew a second condition since account creation and profile
-  // saving are no longer adjacent in the step machine.
+  // `accountReady` *and* on actually being on the "processing" step) so it
+  // stays resumable after an arbitrary pause on the code screen.
   const startedProfile = useRef(false);
   const [accountReady, setAccountReady] = useState(false);
-  // Which step to land on once the emailed code is confirmed — almost always
-  // the step right after "account" (orgDetails/consent), but the profile-save
-  // effect below points this at "processing" instead for the rarer case
-  // where a mailer got configured between account creation and its own
-  // verification check.
+  // Which step to land on once the emailed code is confirmed — "consent" for
+  // consumer (the opt-ins step right after "account"), "processing" for the
+  // three applicant roles, since their whole application was already
+  // collected before createAccount() ever ran. The profile-save effect below
+  // points this at "processing" instead for the rarer case where a mailer
+  // got configured between account creation and its own verification check.
   const verifyResumeRef = useRef<Step>("account");
   const processingAnchorRef = useRef<number | null>(null);
   // Set only while the profile-save effect is actually padding out the
   // minimum tunnel duration below — calling it early resolves that wait
   // immediately without touching anything else in-flight.
   const skipTunnelWaitRef = useRef<(() => void) | null>(null);
+  // One id per signup attempt for the three applicant roles, minted lazily on
+  // the first document upload (crypto.randomUUID(), NOT Date.now()/
+  // Math.random() and NOT at module scope) — see
+  // /api/onboarding/verification-docs, which uses this to scope pre-auth
+  // uploads since no session/userId exists yet at this point in the flow.
+  const draftIdRef = useRef<string | null>(null);
+  function getDraftId(): string {
+    if (!draftIdRef.current) draftIdRef.current = crypto.randomUUID();
+    return draftIdRef.current;
+  }
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -280,17 +394,20 @@ export default function SignupPage() {
     setStep(prev ?? "role");
   }
 
-  // The step right after "account" for this role — orgDetails for the three
-  // applicant roles (which still need org details / industry / verification
-  // before their review step), straight to the optional "consent" opt-ins
-  // for consumer, whose flow has nothing else to collect.
+  // The step to land on once the account row actually exists — "consent"
+  // (the optional opt-ins step) for consumer, whose flow has nothing else to
+  // collect at that point; "processing" for the three applicant roles, since
+  // orgDetails/industry/applicationDetails/verification/declarations all run
+  // *before* createAccount() is ever called for them now (see the
+  // "dataConsent" step below) — there's nothing left to gather, so their
+  // profile-save tunnel starts immediately.
   function nextAfterAccount(): Step {
-    return role === "consumer" ? "consent" : "orgDetails";
+    return role === "consumer" ? "consent" : "processing";
   }
 
   // Stage one: create the account row, sign in, and ask the server to mail a
-  // verification code — triggered directly from the "account" step's
-  // Continue button rather than a step-gated effect, since it's a one-shot
+  // verification code — triggered directly from the "dataConsent" step's
+  // submit button rather than a step-gated effect, since it's a one-shot
   // user action, not something that needs to survive a step transition or
   // re-run on remount.
   //
@@ -305,6 +422,16 @@ export default function SignupPage() {
     if (creatingAccount) return;
     setCreatingAccount(true);
     setError(null);
+
+    // For the three applicant roles, "dataConsent" IS "Submit application" —
+    // the tunnel's minimum duration is measured from this click, not from
+    // whenever the profile-save effect happens to start, so a mailer-free
+    // deployment doesn't feel any faster than one that has to round-trip an
+    // email. `??=` so a retry after an error (e.g. a 409 on this same call)
+    // doesn't reset the clock.
+    if (role !== "consumer") {
+      processingAnchorRef.current ??= Date.now();
+    }
 
     const registerRes = await fetch("/api/auth/register", {
       method: "POST",
@@ -405,9 +532,8 @@ export default function SignupPage() {
 
   // Stage two: save the profile. Gated on `accountReady` *and* on actually
   // being on the "processing" step (not just accountReady, now that account
-  // creation happens much earlier in the flow) — otherwise this would fire
-  // the moment createAccount() finishes, before any of orgDetails/industry/
-  // verification/consent has been filled in.
+  // creation happens much later in the applicant flow) — otherwise this
+  // would fire the moment createAccount() finishes.
   useEffect(() => {
     if (!accountReady || step !== "processing" || startedProfile.current) return;
     startedProfile.current = true;
@@ -422,10 +548,16 @@ export default function SignupPage() {
       // Only meaningful for the three applicant roles — sent as `undefined`
       // fields are simply omitted by JSON.stringify, so this is harmless
       // (and ignored server-side) for consumer, which never spreads it in.
+      const documents = (role && role !== "consumer" ? VERIFICATION_SLOTS[role as ApplicantRole] : [])
+        .filter((slot) => verificationDocs[slot.key])
+        .map((slot) => ({ label: slot.label, url: verificationDocs[slot.key] }));
+
       const applicantFields = {
-        verificationDocumentUrls: verificationDocs,
+        documents,
         customInterfaceRequested,
         customInterfaceNotes: customInterfaceNotes.trim() || undefined,
+        accurateInfoDeclared,
+        whyApplying: whyApplying.trim() || undefined,
       };
 
       const body =
@@ -435,19 +567,47 @@ export default function SignupPage() {
               organizationName,
               organizationDescription: organizationDescription.trim() || undefined,
               primarySector,
+              registrationNumber: registrationNumber.trim() || undefined,
+              taxNumber: taxNumber.trim() || undefined,
+              registeredAddress: registeredAddress.trim() || undefined,
+              yearEstablished: yearEstablished.trim() || undefined,
+              contactName: contactName.trim() || undefined,
+              contactTitle: contactTitle.trim() || undefined,
+              contactPhone: contactPhone.trim() || undefined,
+              employeeCountBand: employeeCountBand || undefined,
+              monthlyVolumeBand: monthlyVolumeBand || undefined,
               consents,
               ...applicantFields,
+              dataProtectionComplianceDeclared,
             }
           : role === "provider"
             ? {
                 role,
                 businessName: organizationName,
                 businessDescription: organizationDescription.trim() || undefined,
+                businessType: businessType || undefined,
+                registeredAddress: registeredAddress.trim() || undefined,
+                yearsOperating: yearsOperating.trim() || undefined,
+                contactName: contactName.trim() || undefined,
+                contactPhone: contactPhone.trim() || undefined,
+                estimatedMonthlyListingVolume: estimatedMonthlyListingVolume || undefined,
                 consents,
                 ...applicantFields,
+                dataProtectionComplianceDeclared,
               }
             : role === "regulator"
-              ? { role, regulatorName, consents, ...applicantFields }
+              ? {
+                  role,
+                  regulatorName,
+                  jurisdiction: jurisdiction.trim() || undefined,
+                  contactName: contactName.trim() || undefined,
+                  contactTitle: contactTitle.trim() || undefined,
+                  contactPhone: contactPhone.trim() || undefined,
+                  officialCapacity: officialCapacity.trim() || undefined,
+                  consents,
+                  ...applicantFields,
+                  authorizedToActDeclared,
+                }
               : {
                   // Footprint fields (telecom/banking/insurance/healthcare)
                   // are deliberately omitted, not sent as empty/undefined —
@@ -505,9 +665,23 @@ export default function SignupPage() {
         skipTunnelWaitRef.current = null;
       }
 
-      markHardNav();
-      router.push(role === "consumer" ? "/dashboard" : `/${role}`);
-      router.refresh();
+      // Consumer keeps its exact original behavior: straight to the
+      // dashboard, no receipt screen. The three applicant roles get a
+      // one-time read-only "summary" screen instead of navigating away
+      // immediately — its own "Continue to your dashboard" button is what
+      // actually calls router.push for them (see the "summary" step below).
+      if (role === "consumer") {
+        markHardNav();
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
+      // Not go(): this runs from inside the effect (not a click handler), so
+      // pushing history directly avoids pulling the unstable `go` closure
+      // into this effect's dependency array for no functional benefit —
+      // "processing" is always the step this effect is gated on above.
+      historyRef.current.push("processing");
+      setStep("summary");
     })();
   }, [
     accountReady,
@@ -527,6 +701,24 @@ export default function SignupPage() {
     verificationDocs,
     customInterfaceRequested,
     customInterfaceNotes,
+    registrationNumber,
+    taxNumber,
+    registeredAddress,
+    yearEstablished,
+    contactName,
+    contactTitle,
+    contactPhone,
+    employeeCountBand,
+    monthlyVolumeBand,
+    businessType,
+    yearsOperating,
+    estimatedMonthlyListingVolume,
+    jurisdiction,
+    officialCapacity,
+    accurateInfoDeclared,
+    dataProtectionComplianceDeclared,
+    authorizedToActDeclared,
+    whyApplying,
     router,
   ]);
 
@@ -541,13 +733,19 @@ export default function SignupPage() {
     };
   }
 
-  function canContinue(s: ConsumerStep | "orgDetails" | "industry" | "verification") {
+  function canContinue(
+    s: ConsumerStep | "orgDetails" | "industry" | "applicationDetails" | "verification" | "declarations",
+  ) {
     switch (s) {
       case "dataConsent":
         return consentAccepted;
       case "account":
         return !!(
-          /^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) &&
+          // Username is consumer-only (see the "account" step's JSX below) —
+          // corporate/provider/regulator never collect one at signup, so
+          // this check is skipped entirely for them rather than blocking
+          // Continue on a field they never see.
+          (role !== "consumer" || /^[a-zA-Z0-9_]{3,20}$/.test(username.trim())) &&
           email.trim() &&
           passwordSchema.safeParse(password).success
         );
@@ -555,10 +753,25 @@ export default function SignupPage() {
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "industry":
         return !!primarySector;
-      case "verification":
-        // Both the document upload and the custom-interface request are
-        // optional — applicationStatus is set to "pending" either way.
+      case "applicationDetails":
+        // Every field on this step is optional — see onboardingSchema.ts.
         return true;
+      case "verification":
+        // Which slots are actually required differs per role: corporate
+        // needs at least one of its three documents, regulator needs its
+        // one (institutional access is the most sensitive of the three
+        // applicant roles), provider needs none. The custom-interface
+        // request is always optional.
+        if (role === "corporate") return Object.keys(verificationDocs).length > 0;
+        if (role === "regulator") return !!verificationDocs["institutional_id"];
+        return true;
+      case "declarations":
+        // Regulator swaps dataProtectionComplianceDeclared for
+        // authorizedToActDeclared (see that field's comment above); the
+        // free-text "why are you applying?" is optional for every role.
+        return role === "regulator"
+          ? accurateInfoDeclared && authorizedToActDeclared
+          : accurateInfoDeclared && dataProtectionComplianceDeclared;
       case "consent":
         return true;
     }
@@ -624,26 +837,32 @@ export default function SignupPage() {
     }
   }
 
-  async function handleVerificationDocChange(e: ChangeEvent<HTMLInputElement>) {
+  async function handleVerificationDocChange(slotKey: string, e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    setUploadingDoc(true);
+    setUploadingSlot(slotKey);
     setError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
+      // No session exists yet at this point for corporate/provider/
+      // regulator — account creation now happens at the very end of their
+      // flow, from the "dataConsent" step's submit — so a per-attempt
+      // draftId stands in for the userId this route would otherwise scope
+      // the upload to. See /api/onboarding/verification-docs.
+      formData.append("draftId", getDraftId());
       const res = await fetch("/api/onboarding/verification-docs", { method: "POST", body: formData });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(typeof body?.error === "string" ? body.error : "Upload failed — please try again.");
         return;
       }
-      setVerificationDocs((prev) => [...prev, body.url]);
+      setVerificationDocs((prev) => ({ ...prev, [slotKey]: body.url }));
     } catch {
       setError("We couldn't reach the server. Please try again.");
     } finally {
-      setUploadingDoc(false);
+      setUploadingSlot(null);
     }
   }
 
@@ -725,28 +944,30 @@ export default function SignupPage() {
         {step === "account" && (
           <div className="mt-8 space-y-4">
             <h1 className="font-display text-[24px] font-bold">Create your account</h1>
-            <label className="block">
-              <span className="text-[13px] font-medium text-text-secondary">Username</span>
-              <input
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                minLength={3}
-                maxLength={20}
-                pattern="[a-zA-Z0-9_]+"
-                title="Letters, numbers, and underscores only"
-                placeholder="e.g. tendai_m"
-                aria-invalid={!!accountFieldErrors().username}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
-              />
-              {accountFieldErrors().username ? (
-                <FieldError error={accountFieldErrors().username} />
-              ) : (
-                <span className="mt-1 block text-[12px] text-text-muted">
-                  This is your unique ID on Kuwana — letters, numbers, and underscores only.
-                </span>
-              )}
-            </label>
+            {role === "consumer" && (
+              <label className="block">
+                <span className="text-[13px] font-medium text-text-secondary">Username</span>
+                <input
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  minLength={3}
+                  maxLength={20}
+                  pattern="[a-zA-Z0-9_]+"
+                  title="Letters, numbers, and underscores only"
+                  placeholder="e.g. tendai_m"
+                  aria-invalid={!!accountFieldErrors().username}
+                  className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                />
+                {accountFieldErrors().username ? (
+                  <FieldError error={accountFieldErrors().username} />
+                ) : (
+                  <span className="mt-1 block text-[12px] text-text-muted">
+                    This is your unique ID on Kuwana — letters, numbers, and underscores only.
+                  </span>
+                )}
+              </label>
+            )}
             <label className="block">
               <span className="text-[13px] font-medium text-text-secondary">Email</span>
               <input
@@ -815,62 +1036,16 @@ export default function SignupPage() {
               </>
             )}
             {error && <p className="text-[13px] text-accent-coral">{error}</p>}
-            {/* Solved here rather than on the final step: the token is
-                short-lived and single-use, so challenging immediately before
-                the account is actually created would mean re-challenging
-                anyone who spends time on the profile questions. */}
-            <Turnstile onToken={setCaptchaToken} />
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
               <Button
-                onClick={() => go("dataConsent")}
+                onClick={() => go(role === "consumer" ? "dataConsent" : "orgDetails")}
                 disabled={!canContinue("account")}
                 className="flex-1"
               >
                 Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "dataConsent" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Before you continue</h1>
-            <p className="text-[13px] text-text-secondary">
-              {role === "consumer"
-                ? "One last check before we create your account."
-                : "One last check before we create and verify your account."}
-            </p>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={consentAccepted}
-                onChange={(e) => setConsentAccepted(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
-              </span>
-            </label>
-            <p className="text-[11px] italic leading-relaxed text-text-muted">
-              By continuing, you agree to let Kuwana process your usage data, product comparisons,
-              and account information to refine our algorithms, personalize recommendations, and
-              improve app performance. You may withdraw your consent at any time in your account
-              settings under the Cyber and Data Protection Act [Chapter 12:07]
-            </p>
-            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={createAccount}
-                disabled={!canContinue("dataConsent") || creatingAccount}
-                className="flex-1"
-              >
-                {creatingAccount ? "Creating account…" : "I Agree & Continue"}
               </Button>
             </div>
           </div>
@@ -956,7 +1131,7 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go(role === "corporate" ? "industry" : "verification")}
+                onClick={() => go(role === "corporate" ? "industry" : "applicationDetails")}
                 disabled={!canContinue("orgDetails")}
                 className="flex-1"
               >
@@ -1011,39 +1186,146 @@ export default function SignupPage() {
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
-              <Button onClick={() => go("verification")} disabled={!canContinue("industry")} className="flex-1">
+              <Button
+                onClick={() => go("applicationDetails")}
+                disabled={!canContinue("industry")}
+                className="flex-1"
+              >
                 Continue
               </Button>
             </div>
           </div>
         )}
 
-        {step === "verification" && (
+        {step === "applicationDetails" && (
+          <div className="mt-8 space-y-4">
+            <h1 className="font-display text-[24px] font-bold">A few more details</h1>
+            <p className="text-[13px] text-text-secondary">
+              All optional — they just help our team review your application faster.
+            </p>
+            {role === "corporate" && (
+              <>
+                <TextField label="Registration / incorporation number" optional value={registrationNumber} onChange={setRegistrationNumber} />
+                <TextField label="Tax / VAT number" optional value={taxNumber} onChange={setTaxNumber} />
+                <TextField label="Registered business address" optional value={registeredAddress} onChange={setRegisteredAddress} />
+                <TextField label="Year established" optional value={yearEstablished} onChange={setYearEstablished} maxLength={4} placeholder="e.g. 1998" />
+                <TextField label="Contact person — name" optional value={contactName} onChange={setContactName} />
+                <TextField label="Contact person — title" optional value={contactTitle} onChange={setContactTitle} />
+                <TextField label="Contact person — phone" optional value={contactPhone} onChange={setContactPhone} />
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Employee count <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup options={EMPLOYEE_COUNT_BANDS} value={employeeCountBand} onChange={setEmployeeCountBand} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Monthly transaction volume <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup options={MONTHLY_TRANSACTION_VOLUME_BANDS} value={monthlyVolumeBand} onChange={setMonthlyVolumeBand} />
+                  </div>
+                </div>
+              </>
+            )}
+            {role === "provider" && (
+              <>
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Business type <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup options={PROVIDER_BUSINESS_TYPES} value={businessType} onChange={setBusinessType} />
+                  </div>
+                </div>
+                <TextField label="Registered address" optional value={registeredAddress} onChange={setRegisteredAddress} />
+                <TextField label="Years operating" optional value={yearsOperating} onChange={setYearsOperating} placeholder="e.g. 3" />
+                <TextField label="Contact person — name" optional value={contactName} onChange={setContactName} />
+                <TextField label="Contact person — phone" optional value={contactPhone} onChange={setContactPhone} />
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Estimated monthly listing volume <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup
+                      options={PROVIDER_LISTING_VOLUME_BANDS}
+                      value={estimatedMonthlyListingVolume}
+                      onChange={setEstimatedMonthlyListingVolume}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+            {role === "regulator" && (
+              <>
+                <label className="block">
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Jurisdiction / mandate <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <textarea
+                    value={jurisdiction}
+                    onChange={(e) => setJurisdiction(e.target.value)}
+                    placeholder="e.g. Telecommunications licensing and consumer protection across Zimbabwe."
+                    maxLength={500}
+                    rows={3}
+                    className="mt-1.5 w-full resize-none rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+                  />
+                </label>
+                <TextField label="Contact person — name" optional value={contactName} onChange={setContactName} />
+                <TextField label="Contact person — title" optional value={contactTitle} onChange={setContactTitle} />
+                <TextField label="Contact person — phone" optional value={contactPhone} onChange={setContactPhone} />
+                <TextField label="Your official capacity / role" optional value={officialCapacity} onChange={setOfficialCapacity} placeholder="e.g. Senior Compliance Officer" />
+              </>
+            )}
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("verification")}
+                disabled={!canContinue("applicationDetails")}
+                className="flex-1"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "verification" && role && role !== "consumer" && (
           <div className="mt-8 space-y-5">
             <h1 className="font-display text-[24px] font-bold">Verify your organization</h1>
             <p className="text-[13px] leading-relaxed text-text-secondary">
-              Upload a business registration document or ID so our team can review your account.
-              This is optional, and your account is fully usable right away either way — it only
-              speeds up review.
+              {role === "corporate"
+                ? "Upload at least one of the documents below so our team can review your application."
+                : role === "regulator"
+                  ? "Upload proof of your institutional role so our team can review your application."
+                  : "Upload a document if you have one — this is entirely optional and speeds up review, but your account is fully usable either way."}
             </p>
-            <label className="block">
-              <span className="text-[13px] font-medium text-text-secondary">Verification document</span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleVerificationDocChange}
-                disabled={uploadingDoc}
-                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[13px] text-text-secondary outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-accent-sky/15 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-accent-sky"
-              />
-              {uploadingDoc && <span className="mt-1 block text-[12px] text-text-muted">Uploading…</span>}
-            </label>
-            {verificationDocs.length > 0 && (
-              <ul className="space-y-1 text-[12px] text-accent-teal">
-                {verificationDocs.map((url, i) => (
-                  <li key={url}>Document {i + 1} uploaded ✓</li>
-                ))}
-              </ul>
-            )}
+            {VERIFICATION_SLOTS[role as ApplicantRole].map((slot) => (
+              <label key={slot.key} className="block">
+                <span className="text-[13px] font-medium text-text-secondary">
+                  {slot.label}
+                  {role === "provider" && <span className="text-text-muted"> (optional)</span>}
+                </span>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => handleVerificationDocChange(slot.key, e)}
+                  disabled={uploadingSlot !== null}
+                  className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[13px] text-text-secondary outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-accent-sky/15 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-accent-sky"
+                />
+                {uploadingSlot === slot.key && (
+                  <span className="mt-1 block text-[12px] text-text-muted">Uploading…</span>
+                )}
+                {verificationDocs[slot.key] && (
+                  <span className="mt-1 block text-[12px] text-accent-teal">Uploaded ✓</span>
+                )}
+              </label>
+            ))}
             <div>
               <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
                 <input
@@ -1072,8 +1354,132 @@ export default function SignupPage() {
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
-              <Button onClick={() => go("consent")} disabled={uploadingDoc} className="flex-1">
+              <Button
+                onClick={() => go("declarations")}
+                disabled={uploadingSlot !== null || !canContinue("verification")}
+                className="flex-1"
+              >
                 Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "declarations" && (
+          <div className="mt-8 space-y-4">
+            <h1 className="font-display text-[24px] font-bold">Declarations</h1>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={accurateInfoDeclared}
+                onChange={(e) => setAccurateInfoDeclared(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                The information I&apos;ve provided is accurate.
+              </span>
+            </label>
+            {role === "regulator" ? (
+              <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={authorizedToActDeclared}
+                  onChange={(e) => setAuthorizedToActDeclared(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  I am authorized to act on behalf of this institution.
+                </span>
+              </label>
+            ) : (
+              <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                <input
+                  type="checkbox"
+                  checked={dataProtectionComplianceDeclared}
+                  onChange={(e) => setDataProtectionComplianceDeclared(e.target.checked)}
+                  className="mt-0.5 tap-target"
+                />
+                <span className="text-[13px] text-text-secondary">
+                  We comply with applicable data protection law.
+                </span>
+              </label>
+            )}
+            <label className="block">
+              <span className="text-[13px] font-medium text-text-secondary">
+                Why are you applying? <span className="text-text-muted">(optional)</span>
+              </span>
+              <textarea
+                value={whyApplying}
+                onChange={(e) => setWhyApplying(e.target.value)}
+                maxLength={500}
+                rows={3}
+                className="mt-1.5 w-full resize-none rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
+              />
+            </label>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("dataConsent")}
+                disabled={!canContinue("declarations")}
+                className="flex-1"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "dataConsent" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Before you continue</h1>
+            <p className="text-[13px] text-text-secondary">
+              {role === "consumer"
+                ? "One last check before we create your account."
+                : "One last check before we create your account and submit your application."}
+            </p>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(e) => setConsentAccepted(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
+              </span>
+            </label>
+            <p className="text-[11px] italic leading-relaxed text-text-muted">
+              By continuing, you agree to let Kuwana process your usage data, product comparisons,
+              and account information to refine our algorithms, personalize recommendations, and
+              improve app performance. You may withdraw your consent at any time in your account
+              settings under the Cyber and Data Protection Act [Chapter 12:07]
+            </p>
+            {/* Rendered right here, not on "account", because createAccount()
+                is called from this step's button: a Turnstile token is
+                short-lived and single-use, and for corporate/provider/
+                regulator (whose applicationDetails/verification/declarations
+                steps now sit between "account" and here) solving it back on
+                "account" could mean it's expired by the time it's actually
+                used. */}
+            <Turnstile onToken={setCaptchaToken} />
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={createAccount}
+                disabled={!canContinue("dataConsent") || creatingAccount}
+                className="flex-1"
+              >
+                {creatingAccount
+                  ? "Creating account…"
+                  : role === "consumer"
+                    ? "I Agree & Continue"
+                    : "I Agree & Submit Application"}
               </Button>
             </div>
           </div>
@@ -1081,81 +1487,52 @@ export default function SignupPage() {
 
         {step === "consent" && (
           <div className="mt-8 space-y-4">
-            {role === "consumer" ? (
-              <>
-                <h1 className="font-display text-[24px] font-bold">Before we save your profile</h1>
-                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-                  <input
-                    type="checkbox"
-                    checked={researchConsent}
-                    onChange={(e) => setResearchConsent(e.target.checked)}
-                    className="mt-0.5 tap-target"
-                  />
-                  <span className="text-[13px] text-text-secondary">
-                    Allow anonymized use of my comparison activity to improve Kuwana&apos;s
-                    recommendations.
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-                  <input
-                    type="checkbox"
-                    checked={leaderboardConsent}
-                    onChange={(e) => setLeaderboardConsent(e.target.checked)}
-                    className="mt-0.5 tap-target"
-                  />
-                  <span className="text-[13px] text-text-secondary">
-                    Join the opt-in XP leaderboard under a nickname (never your real name).
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-                  <input
-                    type="checkbox"
-                    checked={healthDataConsent}
-                    onChange={(e) => setHealthDataConsent(e.target.checked)}
-                    className="mt-0.5 tap-target"
-                  />
-                  <span className="text-[13px] text-text-secondary">
-                    Separately, allow anonymized use of any health-related data I add later to
-                    improve Kuwana&apos;s comparisons.
-                  </span>
-                </label>
-                <p className="text-[12px] text-text-muted">
-                  You can change any of these settings anytime in Settings.
-                </p>
-              </>
-            ) : (
-              <>
-                <h1 className="font-display text-[24px] font-bold">Review &amp; submit</h1>
-                <div className="rounded-xl border border-border bg-bg-surface p-4 text-[13px]">
-                  <p className="text-text-secondary">
-                    {role === "regulator" ? "Regulator" : ROLE_OPTIONS.find((r) => r.id === role)?.title}
-                  </p>
-                  <p className="mt-1 font-semibold">
-                    {role === "regulator" ? regulatorName : organizationName}
-                  </p>
-                  {role === "corporate" && primarySector && (
-                    <p className="mt-1 text-text-secondary">{SECTORS[primarySector].name}</p>
-                  )}
-                  {verificationDocs.length > 0 && (
-                    <p className="mt-1 text-text-secondary">
-                      {verificationDocs.length} verification document(s) uploaded
-                    </p>
-                  )}
-                </div>
-                <p className="text-[12px] text-text-muted">
-                  {role === "provider"
-                    ? "We'll save your profile now and queue your application for review — your first listing still goes through admin review before it's visible to shoppers."
-                    : "We'll verify your email domain, save your profile, and queue your application for review."}
-                </p>
-              </>
-            )}
+            <h1 className="font-display text-[24px] font-bold">Before we save your profile</h1>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={researchConsent}
+                onChange={(e) => setResearchConsent(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                Allow anonymized use of my comparison activity to improve Kuwana&apos;s
+                recommendations.
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={leaderboardConsent}
+                onChange={(e) => setLeaderboardConsent(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                Join the opt-in XP leaderboard under a nickname (never your real name).
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={healthDataConsent}
+                onChange={(e) => setHealthDataConsent(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                Separately, allow anonymized use of any health-related data I add later to
+                improve Kuwana&apos;s comparisons.
+              </span>
+            </label>
+            <p className="text-[12px] text-text-muted">
+              You can change any of these settings anytime in Settings.
+            </p>
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
               {isDesktop ? (
                 <WaterButton
-                  label={role === "consumer" ? "Save my profile" : "Submit application"}
+                  label="Save my profile"
                   onClick={startProcessing}
                   paddingX={0}
                   paddingY={13}
@@ -1170,7 +1547,7 @@ export default function SignupPage() {
                 />
               ) : (
                 <Button onClick={startProcessing} className="flex-1">
-                  {role === "consumer" ? "Save my profile" : "Submit application"}
+                  Save my profile
                 </Button>
               )}
             </div>
@@ -1246,6 +1623,85 @@ export default function SignupPage() {
               </div>
             )}
           </LoadingFacts>
+        )}
+
+        {step === "summary" && role && role !== "consumer" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Application submitted</h1>
+            <p className="text-[13px] text-text-secondary">
+              Here&apos;s what we received. Our team will review it and follow up by email if
+              anything else is needed.
+            </p>
+            <div className="space-y-3 rounded-xl border border-border bg-bg-surface p-4 text-[13px]">
+              <div>
+                <p className="text-text-secondary">
+                  {ROLE_OPTIONS.find((r) => r.id === role)?.title}
+                </p>
+                <p className="mt-1 font-semibold">
+                  {role === "regulator" ? regulatorName : organizationName}
+                </p>
+                {role === "corporate" && primarySector && (
+                  <p className="mt-1 text-text-secondary">{SECTORS[primarySector].name}</p>
+                )}
+              </div>
+              {[
+                ["Registration number", registrationNumber],
+                ["Tax number", taxNumber],
+                ["Registered address", registeredAddress],
+                ["Year established", yearEstablished],
+                ["Business type", businessType],
+                ["Years operating", yearsOperating],
+                ["Estimated monthly listing volume", estimatedMonthlyListingVolume],
+                ["Jurisdiction / mandate", jurisdiction],
+                ["Contact person", contactName],
+                ["Contact title", contactTitle],
+                ["Contact phone", contactPhone],
+                ["Official capacity", officialCapacity],
+                ["Employee count", employeeCountBand],
+                ["Monthly transaction volume", monthlyVolumeBand],
+              ]
+                .filter(([, value]) => !!value)
+                .map(([label, value]) => (
+                  <p key={label} className="text-text-secondary">
+                    <span className="text-text-muted">{label}:</span> {value}
+                  </p>
+                ))}
+              {Object.keys(verificationDocs).length > 0 && (
+                <p className="text-text-secondary">
+                  <span className="text-text-muted">Documents uploaded:</span>{" "}
+                  {VERIFICATION_SLOTS[role as ApplicantRole]
+                    .filter((slot) => verificationDocs[slot.key])
+                    .map((slot) => slot.label)
+                    .join(", ")}
+                </p>
+              )}
+              {customInterfaceRequested && (
+                <p className="text-text-secondary">Custom dashboard/interface requested.</p>
+              )}
+              {whyApplying && (
+                <p className="text-text-secondary">
+                  <span className="text-text-muted">Why applying:</span> {whyApplying}
+                </p>
+              )}
+              <p className="text-text-secondary">
+                Declarations: information declared accurate
+                {role === "regulator"
+                  ? ", authorized to act on behalf of this institution"
+                  : ", data protection compliance confirmed"}
+                .
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                markHardNav();
+                router.push(`/${role}`);
+                router.refresh();
+              }}
+              className="w-full"
+            >
+              Continue to your dashboard
+            </Button>
+          </div>
         )}
       </div>
     </div>

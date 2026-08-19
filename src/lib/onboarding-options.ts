@@ -72,6 +72,14 @@ export const WALLETS = [
 export const INSURERS = ["Old Mutual", "First Mutual", "ZIMNAT", "Fidelity Life", "I don't have insurance"];
 export const POLICY_TYPES = ["Life", "Health", "Motor", "Property", "Funeral", "Travel", "House insurance"];
 
+// Chip-group option lists for the corporate/provider/regulator signup
+// wizard's "applicationDetails" step (src/app/signup/page.tsx) — all
+// optional, same low-friction pattern as the consumer arrays above.
+export const EMPLOYEE_COUNT_BANDS = ["1-10", "11-50", "51-200", "201-1000", "1000+"];
+export const MONTHLY_TRANSACTION_VOLUME_BANDS = ["Under $10k", "$10k-$100k", "$100k-$1M", "$1M+"];
+export const PROVIDER_BUSINESS_TYPES = ["Kiosk", "Informal trader", "Registered SME", "Other"];
+export const PROVIDER_LISTING_VOLUME_BANDS = ["Under 10", "10-50", "50-200", "200+"];
+
 export const MEDICAL_AIDS = [
   "Cimas",
   "First Mutual Health",

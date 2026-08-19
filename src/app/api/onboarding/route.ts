@@ -130,15 +130,70 @@ export async function POST(req: Request) {
         // laid down for a future admin review UI (see the field comment on
         // User.applicationStatus). Consumers stay at the default
         // not_applicable, never touched here.
-        const isApplicantRole = data.role !== "consumer";
-        const applicationFields = isApplicantRole
-          ? {
-              applicationStatus: "pending" as const,
-              verificationDocumentUrls: data.verificationDocumentUrls,
-              customInterfaceRequested: data.customInterfaceRequested,
-              customInterfaceNotes: data.customInterfaceNotes,
-            }
-          : {};
+        //
+        // Checked per-branch on `data.role` (rather than a single
+        // `isApplicantRole` boolean) so TypeScript actually narrows `data` to
+        // the right member of the discriminated union in each branch —
+        // applicationDetails' shape differs per role, same reasoning as the
+        // profileName/username ternaries below.
+        const applicationFields =
+          data.role === "corporate"
+            ? {
+                applicationStatus: "pending" as const,
+                verificationDocuments: data.documents,
+                applicationDetails: {
+                  registrationNumber: data.registrationNumber,
+                  taxNumber: data.taxNumber,
+                  registeredAddress: data.registeredAddress,
+                  yearEstablished: data.yearEstablished,
+                  contactName: data.contactName,
+                  contactTitle: data.contactTitle,
+                  contactPhone: data.contactPhone,
+                  employeeCountBand: data.employeeCountBand,
+                  monthlyVolumeBand: data.monthlyVolumeBand,
+                  whyApplying: data.whyApplying,
+                },
+                customInterfaceRequested: data.customInterfaceRequested,
+                customInterfaceNotes: data.customInterfaceNotes,
+                accurateInfoDeclared: data.accurateInfoDeclared,
+                dataProtectionComplianceDeclared: data.dataProtectionComplianceDeclared,
+              }
+            : data.role === "provider"
+              ? {
+                  applicationStatus: "pending" as const,
+                  verificationDocuments: data.documents,
+                  applicationDetails: {
+                    businessType: data.businessType,
+                    registeredAddress: data.registeredAddress,
+                    yearsOperating: data.yearsOperating,
+                    contactName: data.contactName,
+                    contactPhone: data.contactPhone,
+                    estimatedMonthlyListingVolume: data.estimatedMonthlyListingVolume,
+                    whyApplying: data.whyApplying,
+                  },
+                  customInterfaceRequested: data.customInterfaceRequested,
+                  customInterfaceNotes: data.customInterfaceNotes,
+                  accurateInfoDeclared: data.accurateInfoDeclared,
+                  dataProtectionComplianceDeclared: data.dataProtectionComplianceDeclared,
+                }
+              : data.role === "regulator"
+                ? {
+                    applicationStatus: "pending" as const,
+                    verificationDocuments: data.documents,
+                    applicationDetails: {
+                      jurisdiction: data.jurisdiction,
+                      contactName: data.contactName,
+                      contactTitle: data.contactTitle,
+                      contactPhone: data.contactPhone,
+                      officialCapacity: data.officialCapacity,
+                      whyApplying: data.whyApplying,
+                    },
+                    customInterfaceRequested: data.customInterfaceRequested,
+                    customInterfaceNotes: data.customInterfaceNotes,
+                    accurateInfoDeclared: data.accurateInfoDeclared,
+                    authorizedToActDeclared: data.authorizedToActDeclared,
+                  }
+                : {};
 
         await tx.user.upsert({
           where: { id: user.id },

@@ -114,8 +114,39 @@ model User {
   // Business registration / ID documents uploaded on the "verification" step
   // of the corporate/provider/regulator signup wizard (see
   // /api/onboarding/verification-docs) — empty for consumers, who never see
-  // that step.
+  // that step. Deprecated in favor of verificationDocuments (below), which
+  // carries a label per document; kept (rather than dropped) because this
+  // column's own migration (20260819000000) is already committed at this
+  // HEAD and there's no way from this environment to confirm whether it's
+  // already deployed against a database holding real applicant rows — see
+  // the new migration's comment for the full tradeoff. Nothing writes to
+  // this column anymore.
   verificationDocumentUrls String[] @default([]) @map("verification_document_urls")
+  // {label, url}[] — replaces verificationDocumentUrls above so each upload
+  // slot on the "verification" step (e.g. corporate's "Certificate of
+  // Incorporation" vs "Tax Clearance Certificate") keeps its own label
+  // instead of an unlabeled flat list. Empty for consumers.
+  verificationDocuments  Json      @default("[]") @map("verification_documents")
+  // Tailored per-role object from the "applicationDetails" step
+  // (registrationNumber/taxNumber/... for corporate, businessType/... for
+  // provider, jurisdiction/... for regulator) — a Json blob rather than
+  // dozens of mostly-null columns, since only a handful of fields are ever
+  // relevant to any one role. See that step in src/app/signup/page.tsx and
+  // the corporate/provider/regulator branches of /api/onboarding/route.ts
+  // for the exact shape per role. Null for consumers.
+  applicationDetails     Json?     @map("application_details")
+  // Declarations captured on the "declarations" step — plain booleans (not
+  // folded into applicationDetails) since a future admin review UI will want
+  // to query/filter on these directly, the same reasoning applicationStatus
+  // above already documents. authorizedToActDeclared is regulator-only
+  // (replaces dataProtectionComplianceDeclared for that role, since a
+  // regulator's declaration is about institutional authority, not data
+  // handling); dataProtectionComplianceDeclared is corporate/provider-only.
+  // Both default false and simply go unused for consumer/whichever role
+  // doesn't ask for them, same pattern as primarySector above.
+  accurateInfoDeclared     Boolean @default(false) @map("accurate_info_declared")
+  dataProtectionComplianceDeclared Boolean @default(false) @map("data_protection_compliance_declared")
+  authorizedToActDeclared  Boolean @default(false) @map("authorized_to_act_declared")
   // Captured on the same verification step — an applicant asking for a
   // bespoke dashboard/interface beyond the standard corporate/provider/
   // regulator portal. Informational only, same as applicationStatus.

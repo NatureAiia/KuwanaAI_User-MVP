@@ -27,19 +27,32 @@ const consentsSchema = z.object({
 });
 
 // Captured on the "verification" step corporate/provider/regulator see after
-// orgDetails/industry — a business registration/ID document upload plus an
-// optional custom-dashboard request. All optional: this step's document
-// upload can fail (no MinIO configured, network hiccup) without blocking
-// account creation, and route.ts sets applicationStatus: "pending" for these
-// roles regardless of whether any of this was filled in.
+// orgDetails/industry/applicationDetails — a set of labeled document uploads
+// plus an optional custom-dashboard request. `documents` is shape-only
+// validated here (an array of {label, url} pairs); *which* labels are
+// actually required for a given role (regulator needs its one slot, corporate
+// needs at least one of its three, provider needs none) is enforced
+// client-side on the "verification" step's Continue button, not here — see
+// that step's canContinue() in src/app/signup/page.tsx and the comment on
+// onboardingBodySchema below for why this isn't a server-side .refine().
+// route.ts sets applicationStatus: "pending" for these roles regardless of
+// how many documents were actually uploaded.
 const verificationFieldsSchema = {
-  // URLs returned by POST /api/onboarding/verification-docs — never
-  // client-supplied arbitrary strings in the security sense that matters,
-  // since that route uploads to our own MinIO bucket and hands back its own
-  // public URL, same trust boundary as providerListingSchema's image URLs.
-  verificationDocumentUrls: z.array(z.string()).max(10).default([]),
+  // {label, url}[] — label is our own fixed per-role slot name (e.g.
+  // "Certificate of Incorporation"), url is returned by POST
+  // /api/onboarding/verification-docs. The url is never a client-supplied
+  // arbitrary string in the security sense that matters, since that route
+  // uploads to our own MinIO bucket and hands back its own public URL, same
+  // trust boundary as providerListingSchema's image URLs.
+  documents: z
+    .array(z.object({ label: z.string().min(1).max(100), url: z.string() }))
+    .max(10)
+    .default([]),
   customInterfaceRequested: z.boolean().default(false),
   customInterfaceNotes: z.string().trim().max(1000).optional(),
+  // Free-text "why are you applying?" on the "declarations" step — optional
+  // for every role.
+  whyApplying: z.string().trim().max(500).optional(),
 };
 
 const consumerSchema = z.object({
@@ -120,8 +133,25 @@ const corporateSchema = z.object({
   // Intelligence dashboard to their own sector instead of an unfiltered
   // all-sectors view (see src/app/corporate/page.tsx).
   primarySector: z.enum(SECTOR_SLUGS),
+  // "applicationDetails" step — all optional, folded into User.
+  // applicationDetails as a Json blob by route.ts rather than becoming
+  // dozens of columns (see that field's comment in schema.prisma).
+  registrationNumber: z.string().trim().max(100).optional(),
+  taxNumber: z.string().trim().max(100).optional(),
+  registeredAddress: z.string().trim().max(300).optional(),
+  yearEstablished: z.string().trim().max(4).optional(),
+  contactName: z.string().trim().max(100).optional(),
+  contactTitle: z.string().trim().max(100).optional(),
+  contactPhone: z.string().trim().max(30).optional(),
+  employeeCountBand: z.string().optional(),
+  monthlyVolumeBand: z.string().optional(),
   consents: consentsSchema,
   ...verificationFieldsSchema,
+  // "declarations" step — both required for corporate, unlike regulator
+  // below which swaps dataProtectionComplianceDeclared for
+  // authorizedToActDeclared.
+  accurateInfoDeclared: z.literal(true),
+  dataProtectionComplianceDeclared: z.literal(true),
 });
 
 // The informal-sector provider persona (see HANDOFF.md: a kiosk operator, a
@@ -131,8 +161,17 @@ const providerSchema = z.object({
   role: z.literal("provider"),
   businessName: z.string().min(1),
   businessDescription: z.string().trim().max(300).optional(),
+  // "applicationDetails" step — all optional, same reasoning as corporate's.
+  businessType: z.string().optional(),
+  registeredAddress: z.string().trim().max(300).optional(),
+  yearsOperating: z.string().trim().max(50).optional(),
+  contactName: z.string().trim().max(100).optional(),
+  contactPhone: z.string().trim().max(30).optional(),
+  estimatedMonthlyListingVolume: z.string().optional(),
   consents: consentsSchema,
   ...verificationFieldsSchema,
+  accurateInfoDeclared: z.literal(true),
+  dataProtectionComplianceDeclared: z.literal(true),
 });
 
 // regulatorName must be one of REGULATOR_NAMES, then route.ts checks the
@@ -141,8 +180,20 @@ const providerSchema = z.object({
 const regulatorSchema = z.object({
   role: z.literal("regulator"),
   regulatorName: z.enum(REGULATOR_NAMES),
+  // "applicationDetails" step — all optional, same reasoning as corporate's.
+  jurisdiction: z.string().trim().max(500).optional(),
+  contactName: z.string().trim().max(100).optional(),
+  contactTitle: z.string().trim().max(100).optional(),
+  contactPhone: z.string().trim().max(30).optional(),
+  officialCapacity: z.string().trim().max(200).optional(),
   consents: consentsSchema,
   ...verificationFieldsSchema,
+  // Regulator access is the most sensitive of the three applicant roles, so
+  // its declaration swaps out data-protection-compliance for an explicit
+  // claim of institutional authority — see the field's comment in
+  // schema.prisma.
+  accurateInfoDeclared: z.literal(true),
+  authorizedToActDeclared: z.literal(true),
 });
 
 export const onboardingBodySchema = z.preprocess(
