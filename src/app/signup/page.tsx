@@ -39,6 +39,14 @@ import { clsx } from "clsx";
 
 type Role = "consumer" | "corporate" | "provider" | "regulator";
 
+// Guarantees the "processing" tunnel reads as an intentional moment rather
+// than a flicker: measured from the first time the user hits "Save my
+// profile"/"Create account", not reset by a detour through the email-code
+// screen, so a fast (no-mailer) signup still gets the full tunnel while one
+// that already spent time waiting on a verification email isn't padded
+// further.
+const MIN_TUNNEL_MS = 45000;
+
 // Corporate/Provider/Regulator each grant elevated access (Market
 // Intelligence, a Provider listing portal, Compliance & Market Monitoring),
 // so each is backed by a real server-side check in /api/onboarding rather
@@ -285,6 +293,11 @@ export default function SignupPage() {
   const startedAccount = useRef(false);
   const startedProfile = useRef(false);
   const [accountReady, setAccountReady] = useState(false);
+  const processingAnchorRef = useRef<number | null>(null);
+  // Set only while the profile-save effect is actually padding out the
+  // minimum tunnel duration below — calling it early resolves that wait
+  // immediately without touching anything else in-flight.
+  const skipTunnelWaitRef = useRef<(() => void) | null>(null);
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
@@ -549,6 +562,16 @@ export default function SignupPage() {
         return;
       }
 
+      const anchor = processingAnchorRef.current ?? Date.now();
+      const remaining = MIN_TUNNEL_MS - (Date.now() - anchor);
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => {
+          skipTunnelWaitRef.current = resolve;
+          setTimeout(resolve, remaining);
+        });
+        skipTunnelWaitRef.current = null;
+      }
+
       markHardNav();
       router.push(role === "consumer" ? "/dashboard" : `/${role}`);
       router.refresh();
@@ -624,7 +647,12 @@ export default function SignupPage() {
     }
   }
 
+  function skipTunnel() {
+    skipTunnelWaitRef.current?.();
+  }
+
   function startProcessing() {
+    processingAnchorRef.current = Date.now();
     go("processing");
   }
 
@@ -1387,7 +1415,11 @@ export default function SignupPage() {
         )}
 
         {step === "processing" && (
-          <LoadingFacts title="Saving your profile" subtitle="Getting your comparison scores ready">
+          <LoadingFacts
+            title="Saving your profile"
+            subtitle="Getting your comparison scores ready"
+            onSkip={skipTunnel}
+          >
             <ProgressSteps
               className="mt-6 max-w-[260px]"
               steps={[

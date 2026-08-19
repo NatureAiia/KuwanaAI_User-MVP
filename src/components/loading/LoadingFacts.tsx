@@ -51,12 +51,18 @@ interface LoadingFactsProps {
   title?: string;
   subtitle?: string;
   children?: React.ReactNode;
+  /** Auth flows pad this screen out to a fixed minimum duration; passing
+   *  this renders a top-right button letting the user cut that wait short
+   *  instead of forcing it on everyone. Omitted by the plain route-level
+   *  loading.tsx usages, which have no wait to skip. */
+  onSkip?: () => void;
 }
 
 export function LoadingFacts({
   title = "Just a moment…",
   subtitle = "Loading your experience",
   children,
+  onSkip,
 }: LoadingFactsProps) {
   const reduceMotion = useReducedMotion();
   const [isDark, setIsDark] = useState(false);
@@ -113,6 +119,15 @@ export function LoadingFacts({
       className="fixed inset-0 z-40 overflow-hidden"
       style={{ background: theme.background }}
     >
+      {onSkip && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="absolute right-5 top-5 z-20 rounded-full border border-border bg-bg-surface/80 px-4 py-2 text-[13px] font-medium text-text-secondary backdrop-blur-sm transition-colors hover:text-text-primary"
+        >
+          Skip →
+        </button>
+      )}
       {reduceMotion ? (
         <div className="absolute inset-0" style={{ background: theme.backdrop }} />
       ) : (

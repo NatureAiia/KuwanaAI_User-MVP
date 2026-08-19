@@ -13,6 +13,15 @@ import { AuthTopBar } from "@/components/AuthTopBar";
 import { Turnstile } from "@/components/Turnstile";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { markHardNav } from "@/components/SoftNavTracker";
+import { LoadingFacts } from "@/components/loading/LoadingFacts";
+
+// The destination route's own loading.tsx only stays up until that page's
+// data is ready, which can be near-instant — too short for the tunnel to
+// read as an intentional moment rather than a flicker. Holding it here for a
+// fixed minimum, measured from the moment credentials are confirmed valid,
+// guarantees the same tunnel experience every time regardless of backend
+// speed.
+const MIN_TUNNEL_MS = 45000;
 
 function LoginForm() {
   const router = useRouter();
@@ -22,9 +31,22 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   // Empty when Turnstile isn't configured; verifyTurnstileToken no-ops then.
   const [captchaToken, setCaptchaToken] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
+  const redirectDestRef = useRef<string | null>(null);
+  const redirectTimeoutRef = useRef<number | null>(null);
+
+  function finishRedirect() {
+    if (redirectTimeoutRef.current !== null) {
+      window.clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = null;
+    }
+    markHardNav();
+    router.push(redirectDestRef.current ?? "/dashboard");
+    router.refresh();
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,13 +84,23 @@ function LoginForm() {
       return;
     }
 
-    setLoading(false);
     // `next` is attacker-controllable — anyone can send a link with their own
     // value. Passing it to the router unchecked is an open redirect off the
     // back of a successful login. See lib/safeRedirect.ts.
-    markHardNav();
-    router.push(safeRedirectPath(params.get("next")));
-    router.refresh();
+    const dest = safeRedirectPath(params.get("next"));
+    const start = Date.now();
+    redirectDestRef.current = dest;
+    setRedirecting(true);
+    redirectTimeoutRef.current = window.setTimeout(
+      finishRedirect,
+      Math.max(0, MIN_TUNNEL_MS - (Date.now() - start)),
+    );
+  }
+
+  if (redirecting) {
+    return (
+      <LoadingFacts title="Welcome back" subtitle="Loading your dashboard" onSkip={finishRedirect} />
+    );
   }
 
   return (
