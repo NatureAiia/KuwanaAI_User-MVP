@@ -87,7 +87,7 @@ const ROLE_OPTIONS: {
 // ever reaching "consent" — that data now lives in the separate, deferred
 // /api/footprint editing flow instead, so signup itself stays a 3-step
 // "quick setup": consent gate, credentials, optional opt-ins.
-const CONSUMER_STEPS = ["dataConsent", "account", "consent"] as const;
+const CONSUMER_STEPS = ["account", "dataConsent", "consent"] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
 type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "verification" | "verify" | "processing";
 
@@ -382,11 +382,12 @@ export default function SignupPage() {
     }
 
     setAccountReady(true);
-    // Not go(): "account" was already pushed onto historyRef by whichever
-    // call led here (go("verify")'s push, in the code-required path) or,
-    // here, this *is* that push — see resumeAfterVerify() below for why the
-    // code-required path doesn't push again on its way out of "verify".
-    historyRef.current.push("account");
+    // Not go(): "dataConsent" (the step createAccount() is always called
+    // from) was already pushed onto historyRef by whichever call led here
+    // (go("verify")'s push, in the code-required path) or, here, this *is*
+    // that push — see resumeAfterVerify() below for why the code-required
+    // path doesn't push again on its way out of "verify".
+    historyRef.current.push("dataConsent");
     setStep(nextAfterAccount());
   }
 
@@ -714,49 +715,8 @@ export default function SignupPage() {
                   ? `Selected: ${ROLE_OPTIONS.find((r) => r.id === role)?.title}`
                   : "Select a role to continue"}
               </span>
-              <Button onClick={() => go("dataConsent")} disabled={!role}>
+              <Button onClick={() => go("account")} disabled={!role}>
                 Continue →
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "dataConsent" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Before you continue</h1>
-            <p className="text-[13px] text-text-secondary">
-              {role === "consumer"
-                ? "A quick check before we set up your account."
-                : "A quick check before we set up and verify your account."}
-            </p>
-            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-              <input
-                type="checkbox"
-                checked={consentAccepted}
-                onChange={(e) => setConsentAccepted(e.target.checked)}
-                className="mt-0.5 tap-target"
-              />
-              <span className="text-[13px] text-text-secondary">
-                I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
-              </span>
-            </label>
-            <p className="text-[11px] italic leading-relaxed text-text-muted">
-              By continuing, you agree to let Kuwana process your usage data, product comparisons,
-              and account information to refine our algorithms, personalize recommendations, and
-              improve app performance. You may withdraw your consent at any time in your account
-              settings under the Cyber and Data Protection Act [Chapter 12:07]
-            </p>
-            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("account")}
-                disabled={!canContinue("dataConsent")}
-                className="flex-1"
-              >
-                I Agree &amp; Continue
               </Button>
             </div>
           </div>
@@ -865,11 +825,52 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={createAccount}
-                disabled={!canContinue("account") || creatingAccount}
+                onClick={() => go("dataConsent")}
+                disabled={!canContinue("account")}
                 className="flex-1"
               >
-                {creatingAccount ? "Creating account…" : "Continue"}
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "dataConsent" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Before you continue</h1>
+            <p className="text-[13px] text-text-secondary">
+              {role === "consumer"
+                ? "One last check before we create your account."
+                : "One last check before we create and verify your account."}
+            </p>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(e) => setConsentAccepted(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
+              </span>
+            </label>
+            <p className="text-[11px] italic leading-relaxed text-text-muted">
+              By continuing, you agree to let Kuwana process your usage data, product comparisons,
+              and account information to refine our algorithms, personalize recommendations, and
+              improve app performance. You may withdraw your consent at any time in your account
+              settings under the Cyber and Data Protection Act [Chapter 12:07]
+            </p>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={createAccount}
+                disabled={!canContinue("dataConsent") || creatingAccount}
+                className="flex-1"
+              >
+                {creatingAccount ? "Creating account…" : "I Agree & Continue"}
               </Button>
             </div>
           </div>
