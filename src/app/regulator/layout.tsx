@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { RegulatorHeader } from "@/components/regulator/RegulatorHeader";
 import { RegulatorPortalNav } from "@/components/regulator/RegulatorPortalNav";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 // Auth gate + chrome only — same "layout re-checks for the gate, page
 // re-checks for its own data" split corporate/admin layouts already use.
@@ -25,6 +26,7 @@ export default async function RegulatorLayout({ children }: { children: React.Re
 
   return (
     <div id="main-content" tabIndex={-1} className="flex min-h-screen flex-1 flex-col">
+      <WelcomeModal userId={user.id} role="regulator" />
       <RegulatorHeader regulatorName={regulatorName} />
       <div className="flex flex-1 flex-col md:flex-row">
         <RegulatorPortalNav />

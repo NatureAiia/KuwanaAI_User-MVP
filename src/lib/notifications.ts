@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { isNotificationEnabled } from "@/lib/notificationPreferences";
+import { adminEmailAllowlist } from "@/lib/auth";
 
 /**
  * How long a user's notification sync result is considered current.
@@ -107,4 +108,52 @@ export async function notifyListingDecision(params: {
     update: { message, read: false },
     create: { userId: ownerUserId, listingId, type, message },
   });
+}
+
+/**
+ * Tells every admin a corporate/provider/regulator applicant just finished
+ * onboarding — called from /api/onboarding right after applicationStatus is
+ * set to "pending" for those three roles. "Admin" here means either the real
+ * `admin` Role or the ADMIN_EMAILS allowlist fallback (see isAllowlistedAdmin
+ * in src/lib/auth.ts) — the same two mechanisms requireAdmin() itself treats
+ * as equivalent, so this notifies everyone requireAdmin() would let through.
+ *
+ * Upserted per (admin, applicant) via applicantUserId — Notification has no
+ * scoping column for "one specific other user" among its existing nullable
+ * FKs (they're all listing/rule-shaped), so this is a new one, following the
+ * same "own nullable column + its own unique constraint" pattern as
+ * alertRuleId/businessConditionId/priceCapRuleId. Re-running onboarding for
+ * the same applicant (e.g. after a mid-flow retry) updates the same row
+ * instead of spamming a duplicate.
+ */
+export async function notifyAdminNewApplication(params: {
+  applicantUserId: string;
+  applicantEmail: string;
+  role: string;
+  username: string;
+}): Promise<void> {
+  const { applicantUserId, applicantEmail, role, username } = params;
+  const type = "user_application_submitted";
+
+  const allowlist = adminEmailAllowlist();
+  const admins = await prisma.user.findMany({
+    where: {
+      OR: [{ role: "admin" }, ...(allowlist.length > 0 ? [{ email: { in: allowlist } }] : [])],
+    },
+    select: { id: true },
+  });
+  if (admins.length === 0) return;
+
+  const message = `${username} (${applicantEmail}) applied as ${role} — review pending.`;
+
+  await Promise.all(
+    admins.map(async (admin) => {
+      if (!(await isNotificationEnabled(admin.id, type))) return;
+      await prisma.notification.upsert({
+        where: { userId_applicantUserId_type: { userId: admin.id, applicantUserId, type } },
+        update: { message, read: false },
+        create: { userId: admin.id, applicantUserId, type, message },
+      });
+    }),
+  );
 }

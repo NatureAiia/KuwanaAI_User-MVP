@@ -35,6 +35,17 @@ enum AccountStatus {
   suspended
 }
 
+// Corporate/Provider/Regulator self-service accounts get full access
+// immediately (see /api/onboarding) — this is purely informational for a
+// future admin review UI, never a gate (nothing reads it to block access
+// yet). Consumer accounts never leave `not_applicable`.
+enum ApplicationStatus {
+  not_applicable
+  pending
+  approved
+  rejected
+}
+
 model User {
   id                     String    @id @default(uuid())
   email                  String    @unique
@@ -88,6 +99,31 @@ model User {
   // before this shipped — gating accounts retroactively would lock out the
   // entire user base for a control they were never offered.
   emailVerifiedAt        DateTime? @map("email_verified_at")
+  // Stamped by /api/auth/register once the pre-signup consent gate (ToS +
+  // Cyber and Data Protection Act [Chapter 12:07] disclosure) is passed —
+  // register rejects the request outright if it isn't. Distinct from
+  // Consent (below), which covers the optional research/leaderboard/health
+  // opt-ins captured later in onboarding, not this mandatory gate.
+  consentAcceptedAt      DateTime? @map("consent_accepted_at")
+  // Set to `pending` by /api/onboarding for corporate/provider/regulator
+  // signups only (stays not_applicable for consumers) — surfaced to a future
+  // admin approve/reject UI. Deliberately not read anywhere as a gate today;
+  // see notifyAdminNewApplication in src/lib/notifications.ts for the only
+  // other thing that reacts to it.
+  applicationStatus      ApplicationStatus @default(not_applicable) @map("application_status")
+  // Business registration / ID documents uploaded on the "verification" step
+  // of the corporate/provider/regulator signup wizard (see
+  // /api/onboarding/verification-docs) — empty for consumers, who never see
+  // that step.
+  verificationDocumentUrls String[] @default([]) @map("verification_document_urls")
+  // Captured on the same verification step — an applicant asking for a
+  // bespoke dashboard/interface beyond the standard corporate/provider/
+  // regulator portal. Informational only, same as applicationStatus.
+  customInterfaceRequested Boolean  @default(false) @map("custom_interface_requested")
+  customInterfaceNotes    String?  @map("custom_interface_notes")
+  // Laid down for a future admin approve/reject UI — nothing reads these yet.
+  reviewedByEmail        String?   @map("reviewed_by_email")
+  reviewedAt             DateTime? @map("reviewed_at")
 
   profile                 UserProfile?
   footprints              SectorFootprint[]
@@ -103,6 +139,10 @@ model User {
   streak                  UserStreak?
   subscription            Subscription?
   notifications           Notification[]
+  // Opposite side of Notification.applicantUserId — admin notifications that
+  // reference this user as the applicant, not the recipient (that's the
+  // plain `notifications` relation above via Notification.userId).
+  applicationNotifications Notification[] @relation("NotificationApplicant")
   conversations           Conversation[]
   ownedProvider           Provider?
   providerMembership      ProviderMember?
@@ -610,6 +650,10 @@ enum NotificationType {
   // published listing in its category — one summary notification per rule,
   // same "compute + upsert on read" shape as alert_threshold_crossed.
   price_cap_breached
+  // Admin: a corporate/provider/regulator applicant just finished onboarding
+  // (see notifyAdminNewApplication in src/lib/notifications.ts) — scoped by
+  // applicantUserId below, not a listing.
+  user_application_submitted
 }
 
 model Notification {
@@ -627,6 +671,13 @@ model Notification {
   businessCondition   BusinessCondition? @relation(fields: [businessConditionId], references: [id], onDelete: Cascade)
   priceCapRuleId      String?            @map("price_cap_rule_id")
   priceCapRule        PriceCapRule?      @relation(fields: [priceCapRuleId], references: [id], onDelete: Cascade)
+  // Scoping column for user_application_submitted — the applicant, not the
+  // admin (userId above is the admin being notified). No back-relation on
+  // User for this one (it would collide with the `notifications` relation
+  // already there for userId), so it's a plain column + relation without a
+  // named opposite field.
+  applicantUserId     String?            @map("applicant_user_id")
+  applicant           User?              @relation("NotificationApplicant", fields: [applicantUserId], references: [id], onDelete: Cascade)
   type                NotificationType   @default(price_drop)
   message             String
   // Only meaningful for price_drop; null for every other type.
@@ -642,6 +693,7 @@ model Notification {
   @@unique([userId, alertRuleId, type])
   @@unique([userId, businessConditionId, type])
   @@unique([userId, priceCapRuleId, type])
+  @@unique([userId, applicantUserId, type])
   @@index([listingId])
   @@index([userId, read, createdAt(sort: Desc)])
   @@map("notifications")

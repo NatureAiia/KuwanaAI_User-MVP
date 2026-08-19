@@ -15,6 +15,7 @@ import { ProviderFilterBar } from "@/components/provider/ProviderFilterBar";
 import { ProviderListingsTable } from "@/components/provider/ProviderListingsTable";
 import { SellerEngagementStrip } from "@/components/provider/SellerEngagementStrip";
 import { SellerWalletTile } from "@/components/provider/SellerWalletTile";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 const STATUSES = ["draft", "pending_review", "published", "rejected"] as const;
 type Status = (typeof STATUSES)[number];
@@ -106,6 +107,7 @@ export default async function ProviderPortalPage({
 
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
+      <WelcomeModal userId={user.id} role="provider" />
       <Header />
       <DailyVisitPing />
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

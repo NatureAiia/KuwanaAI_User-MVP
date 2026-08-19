@@ -53,6 +53,14 @@ export const registerSchema = z
   .object({
     email: z.email().max(254),
     password: passwordSchema,
+    // Proof the client actually passed the pre-signup consent gate (the
+    // `dataConsent` step in src/app/signup/page.tsx) — enforced server-side,
+    // not just a disabled Continue button, since a request can always skip
+    // the UI. `literal(true)` rather than `boolean()`: sending `false` (or
+    // omitting the field) must fail the same way, not silently succeed.
+    consentAccepted: z.literal(true, {
+      message: "You must accept the Terms of Service and data processing disclosure to continue.",
+    }),
   })
   .refine(
     ({ email, password }) => {

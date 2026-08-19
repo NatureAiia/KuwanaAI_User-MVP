@@ -26,6 +26,22 @@ const consentsSchema = z.object({
   health_data_sharing: z.boolean().optional(),
 });
 
+// Captured on the "verification" step corporate/provider/regulator see after
+// orgDetails/industry — a business registration/ID document upload plus an
+// optional custom-dashboard request. All optional: this step's document
+// upload can fail (no MinIO configured, network hiccup) without blocking
+// account creation, and route.ts sets applicationStatus: "pending" for these
+// roles regardless of whether any of this was filled in.
+const verificationFieldsSchema = {
+  // URLs returned by POST /api/onboarding/verification-docs — never
+  // client-supplied arbitrary strings in the security sense that matters,
+  // since that route uploads to our own MinIO bucket and hands back its own
+  // public URL, same trust boundary as providerListingSchema's image URLs.
+  verificationDocumentUrls: z.array(z.string()).max(10).default([]),
+  customInterfaceRequested: z.boolean().default(false),
+  customInterfaceNotes: z.string().trim().max(1000).optional(),
+};
+
 const consumerSchema = z.object({
   role: z.literal("consumer"),
   // A unique handle, not a display name — enforced unique on `users.username`
@@ -105,6 +121,7 @@ const corporateSchema = z.object({
   // all-sectors view (see src/app/corporate/page.tsx).
   primarySector: z.enum(SECTOR_SLUGS),
   consents: consentsSchema,
+  ...verificationFieldsSchema,
 });
 
 // The informal-sector provider persona (see HANDOFF.md: a kiosk operator, a
@@ -115,6 +132,7 @@ const providerSchema = z.object({
   businessName: z.string().min(1),
   businessDescription: z.string().trim().max(300).optional(),
   consents: consentsSchema,
+  ...verificationFieldsSchema,
 });
 
 // regulatorName must be one of REGULATOR_NAMES, then route.ts checks the
@@ -124,6 +142,7 @@ const regulatorSchema = z.object({
   role: z.literal("regulator"),
   regulatorName: z.enum(REGULATOR_NAMES),
   consents: consentsSchema,
+  ...verificationFieldsSchema,
 });
 
 export const onboardingBodySchema = z.preprocess(

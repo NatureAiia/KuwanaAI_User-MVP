@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
@@ -10,7 +10,6 @@ import WaterButton from "@/components/ui/WaterButton";
 import { Badge } from "@/components/ui/Card";
 import { AuthTopBar } from "@/components/AuthTopBar";
 import { Turnstile } from "@/components/Turnstile";
-import { ProviderLogo } from "@/components/ProviderLogo";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import { LoadingFacts } from "@/components/loading/LoadingFacts";
 import { DynamicBar } from "@/components/ui/DynamicBar";
@@ -19,20 +18,7 @@ import { FieldError } from "@/components/ui/FieldError";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { markHardNav } from "@/components/SoftNavTracker";
 import { Check, User, Building2, Store, Landmark, type LucideIcon } from "lucide-react";
-import {
-  AGE_RANGES,
-  OCCUPATIONS,
-  SOCIAL_PLATFORMS,
-  NETWORKS,
-  PLAN_TYPES,
-  SPEND_RANGES,
-  BANKS,
-  ACCOUNT_TYPES,
-  WALLETS,
-  INSURERS,
-  POLICY_TYPES,
-  MEDICAL_AIDS,
-} from "@/lib/onboarding-options";
+import { AGE_RANGES, OCCUPATIONS, SOCIAL_PLATFORMS } from "@/lib/onboarding-options";
 import { REGULATORS } from "@/lib/orgVerification";
 import { SECTORS, LIVE_SECTORS, type SectorSlug } from "@/lib/sectors";
 import { clsx } from "clsx";
@@ -41,10 +27,10 @@ type Role = "consumer" | "corporate" | "provider" | "regulator";
 
 // Guarantees the "processing" tunnel reads as an intentional moment rather
 // than a flicker: measured from the first time the user hits "Save my
-// profile"/"Create account", not reset by a detour through the email-code
-// screen, so a fast (no-mailer) signup still gets the full tunnel while one
-// that already spent time waiting on a verification email isn't padded
-// further.
+// profile"/"Submit application", not reset by a detour through the
+// email-code screen, so a fast (no-mailer) signup still gets the full tunnel
+// while one that already spent time waiting on a verification email isn't
+// padded further.
 const MIN_TUNNEL_MS = 45000;
 
 // Corporate/Provider/Regulator each grant elevated access (Market
@@ -68,7 +54,7 @@ const ROLE_OPTIONS: {
     title: "Consumer",
     desc: "Track your personal data footprint across telecoms, banking, insurance & health providers.",
     bullet: "For data subjects",
-    meta: "5-step profile",
+    meta: "Quick setup",
   },
   {
     id: "corporate",
@@ -76,7 +62,7 @@ const ROLE_OPTIONS: {
     title: "Corporate",
     desc: "Bank, telco, insurer, or hospital — monitor market intelligence across every sector.",
     bullet: "Work email required",
-    meta: "1-step setup",
+    meta: "Verified setup",
   },
   {
     id: "provider",
@@ -84,7 +70,7 @@ const ROLE_OPTIONS: {
     title: "Provider self-service",
     desc: "List and manage your own products or services — a kiosk, an agent, a small business.",
     bullet: "For any business, any size",
-    meta: "1-step setup",
+    meta: "Verified setup",
   },
   {
     id: "regulator",
@@ -92,22 +78,18 @@ const ROLE_OPTIONS: {
     title: "Regulator",
     desc: "POTRAZ, RBZ, IPEC — monitor compliance and complaints across the market.",
     bullet: "Verified institutional email required",
-    meta: "1-step setup",
+    meta: "Verified setup",
   },
 ];
 
-const CONSUMER_STEPS = [
-  "account",
-  "personal",
-  "telecom",
-  "banking",
-  "wallets",
-  "insurance",
-  "health",
-  "consent",
-] as const;
+// The consumer wizard used to walk through a long footprint-collection
+// questionnaire (personal/telecom/banking/wallets/insurance/health) before
+// ever reaching "consent" — that data now lives in the separate, deferred
+// /api/footprint editing flow instead, so signup itself stays a 3-step
+// "quick setup": consent gate, credentials, optional opt-ins.
+const CONSUMER_STEPS = ["dataConsent", "account", "consent"] as const;
 type ConsumerStep = (typeof CONSUMER_STEPS)[number];
-type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "verify" | "processing";
+type Step = "role" | ConsumerStep | "orgDetails" | "industry" | "verification" | "verify" | "processing";
 
 function ProgressBar({ step }: { step: ConsumerStep }) {
   const index = CONSUMER_STEPS.indexOf(step);
@@ -125,12 +107,10 @@ function ChipGroup({
   options,
   value,
   onChange,
-  renderOption,
 }: {
   options: string[];
   value: string;
   onChange: (v: string) => void;
-  renderOption?: (opt: string) => React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap gap-2.5">
@@ -147,7 +127,6 @@ function ChipGroup({
               : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
-          {renderOption ? renderOption(opt) : null}
           {opt}
         </button>
       ))}
@@ -159,12 +138,10 @@ function MultiChipGroup({
   options,
   values,
   onToggle,
-  renderOption,
 }: {
   options: string[];
   values: string[];
   onToggle: (v: string) => void;
-  renderOption?: (opt: string) => React.ReactNode;
 }) {
   return (
     <div className="flex flex-wrap gap-2.5">
@@ -181,21 +158,11 @@ function MultiChipGroup({
               : "border-border bg-bg-surface text-text-secondary hover:border-accent-sky/40",
           )}
         >
-          {renderOption ? renderOption(opt) : null}
           {opt}
         </button>
       ))}
     </div>
   );
-}
-
-/** Renders the provider logo (or a colored-initials fallback) to the left of
- *  the option label. Sized for chip-row use — bigger than the listing card
- *  so a user picking their network/bank/insurer can actually see the mark. */
-function ProviderChipMark({ name }: { name: string }) {
-  // Catch-all sentinel / negative options — never display a logo for these.
-  if (/^(i don't|public hospital only|none|other\b)/i.test(name)) return null;
-  return <ProviderLogo name={name} size={20} className="max-h-[20px] max-w-[40px]" />;
 }
 
 export default function SignupPage() {
@@ -205,16 +172,14 @@ export default function SignupPage() {
   const [step, setStep] = useState<Step>("role");
   const historyRef = useRef<Step[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [processingStage, setProcessingStage] = useState<"account" | "profile">("account");
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Empty when Turnstile isn't configured for this deployment; authorize()
   // (src/lib/nextAuth.ts) treats a missing token as "skip" in that case, so
-  // the flow is unchanged. Held in a ref rather than state because the
-  // account-creation effect reads it without wanting it as a dependency (see
-  // the signIn call).
+  // the flow is unchanged. Held in a ref rather than state because
+  // createAccount() reads it without wanting it as a dependency.
   const captchaTokenRef = useRef("");
   const setCaptchaToken = (token: string) => {
     captchaTokenRef.current = token;
@@ -234,65 +199,66 @@ export default function SignupPage() {
   // all-sectors view (see src/app/corporate/page.tsx).
   const [primarySector, setPrimarySector] = useState<SectorSlug | "">("");
 
+  // Folded into the "account" step (consumer only) now that the old
+  // dedicated "personal" step is gone — all optional, same as
+  // onboardingSchema's consumer branch.
   const [ageRange, setAgeRange] = useState("");
   const [occupation, setOccupation] = useState("");
   const [socialPlatforms, setSocialPlatforms] = useState<string[]>([]);
 
-  const [network, setNetwork] = useState("");
-  const [planType, setPlanType] = useState("");
-  const [spend, setSpend] = useState("");
-
-  // Banking relationships are now multi-select — many Zimbabweans hold
-  // accounts at more than one bank (salary at CBZ, EcoCash at Steward, USD
-  // nostro at Stanbic, etc.). The "I don't bank" sentinel is exclusive so
-  // the account-types follow-up step stays hidden for those users.
-  const [banks, setBanks] = useState<string[]>([]);
-  // Free-text name captured when "Other" is picked in the banks list — shown
-  // as a short inline input above the account-types follow-up. Sent to the
-  // API in place of the literal "Other" marker whenever it's filled in.
-  const [otherBank, setOtherBank] = useState("");
-  const [accountTypes, setAccountTypes] = useState<string[]>([]);
-  // Mobile wallets (EcoCash, OneMoney, InnBucks, etc.) are tracked
-  // separately from bank account types because they're issued by telecoms /
-  // fintechs, not banks, and a user almost always has a wallet *in addition
-  // to* a bank account. Optional — pick none is a valid answer.
-  const [wallets, setWallets] = useState<string[]>([]);
-
-  // Insurance coverage — multi-select since a user can hold policies
-  // with more than one insurer (life at Old Mutual + funeral at ZIMNAT,
-  // etc.). "I don't have insurance" is an exclusive sentinel like
-  // "I don't bank" — see toggleInsurer() below.
-  const [insurers, setInsurers] = useState<string[]>([]);
-  const [policyTypes, setPolicyTypes] = useState<string[]>([]);
-
-  // Medical aid coverage — multi-select since a person can belong to more
-  // than one scheme (a workplace PSMAS policy plus private family cover at
-  // Cimas, etc.). "Public hospital only" and "None" are exclusive sentinels
-  // like "I don't bank"/"I don't have insurance" — see toggleMedicalAid().
-  const [medicalAids, setMedicalAids] = useState<string[]>([]);
-  const [chronicOptIn, setChronicOptIn] = useState(false);
-  const [termsAccepted, setTermsAccepted] = useState(false);
+  // The mandatory pre-signup gate (ToS/Privacy Policy + the Cyber and Data
+  // Protection Act [Chapter 12:07] disclosure) — shown to every role on the
+  // new "dataConsent" step, right after role selection. Enforced server-side
+  // too: /api/auth/register rejects the request without a matching
+  // `consentAccepted: true` (see registerSchema in src/lib/authSchema.ts).
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  // Separate, optional opt-in on the "consent" step — distinct from the
+  // mandatory gate above (see the field's own comment in
+  // src/lib/onboardingSchema.ts).
   const [healthDataConsent, setHealthDataConsent] = useState(false);
 
   const [researchConsent, setResearchConsent] = useState(false);
   const [leaderboardConsent, setLeaderboardConsent] = useState(false);
 
+  // Corporate/Provider/Regulator-only "verification" step, reached after
+  // orgDetails/industry — a business registration/ID document upload plus
+  // an optional custom-dashboard request. Both are optional: applicationStatus
+  // is set to "pending" for these roles regardless of whether either was
+  // filled in (see /api/onboarding/route.ts).
+  const [verificationDocs, setVerificationDocs] = useState<string[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [customInterfaceRequested, setCustomInterfaceRequested] = useState(false);
+  const [customInterfaceNotes, setCustomInterfaceNotes] = useState("");
+
   // The emailed one-time code (see /api/auth/email-verification). Only ever
   // reached when the deployment has a mailer configured — without one the
   // send route answers `verificationRequired: false` and the flow skips
-  // straight from account creation to saving the profile, exactly as it did
-  // before this existed.
+  // straight past the code screen, exactly as it did before this existed.
   const [code, setCode] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
 
-  // Account creation and profile saving are two separate one-shot effects
-  // rather than one, because verification now sits between them and the
-  // second half has to be resumable after an arbitrary pause on the code
-  // screen. Each has its own re-entry guard.
-  const startedAccount = useRef(false);
+  // Account creation now happens right after the "account" step (not at the
+  // very end) — the later "verification" step needs a real, authenticated
+  // user id to attach uploaded documents to (see
+  // /api/onboarding/verification-docs). `creatingAccount` disables the
+  // account step's Continue button for the duration instead of using a
+  // dedicated screen, since it's a sub-second to few-second operation, not
+  // the long profile-save tunnel below.
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  // Profile saving is still a separate one-shot effect (gated on
+  // `accountReady` *and* `step === "processing"`) so it stays resumable after
+  // an arbitrary pause on the code screen, same reasoning as before — the
+  // gate just grew a second condition since account creation and profile
+  // saving are no longer adjacent in the step machine.
   const startedProfile = useRef(false);
   const [accountReady, setAccountReady] = useState(false);
+  // Which step to land on once the emailed code is confirmed — almost always
+  // the step right after "account" (orgDetails/consent), but the profile-save
+  // effect below points this at "processing" instead for the rarer case
+  // where a mailer got configured between account creation and its own
+  // verification check.
+  const verifyResumeRef = useRef<Step>("account");
   const processingAnchorRef = useRef<number | null>(null);
   // Set only while the profile-save effect is actually padding out the
   // minimum tunnel duration below — calling it early resolves that wait
@@ -301,59 +267,6 @@ export default function SignupPage() {
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
-  }
-
-  // "I don't bank" is an exclusive sentinel — picking it clears every other
-  // bank the user may have already chosen, and picking a real bank while the
-  // sentinel is set clears the sentinel first. Keeps the multi-select UX
-  // sensible without forcing the user into a separate "are you sure?" step.
-  function toggleBank(value: string) {
-    if (value === "I don't bank") {
-      setBanks((prev) => (prev.includes(value) ? [] : [value]));
-      return;
-    }
-    setBanks((prev) => {
-      const withoutSentinel = prev.filter((b) => b !== "I don't bank");
-      return withoutSentinel.includes(value)
-        ? withoutSentinel.filter((b) => b !== value)
-        : [...withoutSentinel, value];
-    });
-  }
-
-  // Same exclusive-sentinel pattern for insurers. "I don't have insurance"
-  // is the uninsured marker; picking it clears any selected insurers, and
-  // picking a real insurer clears the sentinel. Mirrors toggleBank() above
-  // so the multi-select UX behaves consistently across the two financial
-  // steps.
-  function toggleInsurer(value: string) {
-    if (value === "I don't have insurance") {
-      setInsurers((prev) => (prev.includes(value) ? [] : [value]));
-      return;
-    }
-    setInsurers((prev) => {
-      const withoutSentinel = prev.filter((i) => i !== "I don't have insurance");
-      return withoutSentinel.includes(value)
-        ? withoutSentinel.filter((i) => i !== value)
-        : [...withoutSentinel, value];
-    });
-  }
-
-  // Same exclusive-sentinel pattern for medical aids. "None" (no coverage)
-  // and "Public hospital only" (no private scheme) are the markers that clear
-  // every scheme already chosen; picking a real scheme clears the sentinels
-  // first. Mirrors toggleBank()/toggleInsurer() so the multi-select UX behaves
-  // consistently across the financial and health steps.
-  function toggleMedicalAid(value: string) {
-    if (value === "Public hospital only" || value === "None") {
-      setMedicalAids((prev) => (prev.includes(value) ? [] : [value]));
-      return;
-    }
-    setMedicalAids((prev) => {
-      const withoutSentinel = prev.filter((m) => m !== "Public hospital only" && m !== "None");
-      return withoutSentinel.includes(value)
-        ? withoutSentinel.filter((m) => m !== value)
-        : [...withoutSentinel, value];
-    });
   }
 
   function go(next: Step) {
@@ -367,9 +280,19 @@ export default function SignupPage() {
     setStep(prev ?? "role");
   }
 
-  // Stage one: create the account row, then ask the server to mail a
-  // verification code. Deliberately depends only on the credentials, so the
-  // profile answers changing underneath it can never re-enter it.
+  // The step right after "account" for this role — orgDetails for the three
+  // applicant roles (which still need org details / industry / verification
+  // before their review step), straight to the optional "consent" opt-ins
+  // for consumer, whose flow has nothing else to collect.
+  function nextAfterAccount(): Step {
+    return role === "consumer" ? "consent" : "orgDetails";
+  }
+
+  // Stage one: create the account row, sign in, and ask the server to mail a
+  // verification code — triggered directly from the "account" step's
+  // Continue button rather than a step-gated effect, since it's a one-shot
+  // user action, not something that needs to survive a step transition or
+  // re-run on remount.
   //
   // Turnstile is deliberately NOT verified here: a Cloudflare token is
   // single-use, and the sign-in call a few lines down (or the one on the
@@ -378,118 +301,130 @@ export default function SignupPage() {
   // would fail the second call. Row creation on its own can't grant a
   // session, so it's an acceptable target to leave unchecked here — it's
   // still bounded by RATE_LIMITS.publicWrite.
-  useEffect(() => {
-    if (step !== "processing" || startedAccount.current) return;
-    startedAccount.current = true;
+  async function createAccount() {
+    if (creatingAccount) return;
+    setCreatingAccount(true);
+    setError(null);
 
-    (async () => {
-      setProcessingStage("account");
-      const registerRes = await fetch("/api/auth/register", {
+    const registerRes = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // consentAccepted can only be true here because canContinue("account")
+      // is only reachable via the "dataConsent" step's own required checkbox
+      // — this is the proof /api/auth/register's registerSchema checks for.
+      body: JSON.stringify({ email, password, consentAccepted: true }),
+    });
+    if (!registerRes.ok) {
+      const errBody = await registerRes.json().catch(() => ({}));
+      setError(
+        registerRes.status === 409
+          ? "This email can only be used once. If you already have an account, please log in instead."
+          : typeof errBody?.error === "string"
+            ? errBody.error
+            : "Something went wrong creating your account. Please try again.",
+      );
+      setCreatingAccount(false);
+      return;
+    }
+
+    // Establish a session right away — this is the direct analogue of
+    // Supabase's signUp() minting a session immediately, before its own
+    // "email confirmed" state was ever true. Email verification is purely
+    // an app-level gate (requireUser(), see src/lib/auth.ts) checked on
+    // every subsequent request, not a precondition for having a session at
+    // all — that's what lets the send/verify routes below authenticate via
+    // the raw session (auth()) while still being blocked by requireUser()
+        // everywhere else until the code is confirmed.
+    const signInResult = await signIn("credentials", {
+      email,
+      password,
+      turnstileToken: captchaTokenRef.current || undefined,
+      redirect: false,
+    });
+    if (signInResult?.error) {
+      setError("Your account was created, but signing you in failed. Please try logging in.");
+      setCreatingAccount(false);
+      return;
+    }
+
+    // Anything short of an explicit `verificationRequired: false` sends the
+    // user to the code screen. That is the fail-safe direction: if the mail
+    // did go out, skipping the screen would only earn a 403 from
+    // /api/onboarding, and if it did not, the resend button on that screen
+    // gets the definitive answer and moves on by itself.
+    let required = true;
+    try {
+      const res = await fetch("/api/auth/email-verification/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: "{}",
       });
-      if (!registerRes.ok) {
-        const errBody = await registerRes.json().catch(() => ({}));
+      const body = await res.json().catch(() => ({}));
+      if (body?.verificationRequired === false) required = false;
+      else if (!res.ok) {
         setError(
-          registerRes.status === 409
-            ? "This email can only be used once. If you already have an account, please log in instead."
-            : typeof errBody?.error === "string"
-              ? errBody.error
-              : "Something went wrong creating your account. Please try again.",
+          typeof body?.error === "string"
+            ? body.error
+            : "We couldn't send your verification code. Try requesting a new one.",
         );
-        setStep("account");
-        // The account was not created, so let a corrected retry run this again.
-        startedAccount.current = false;
-        return;
       }
+    } catch {
+      setError("We couldn't reach the server to send your code. Try requesting a new one.");
+    }
 
-      // Establish a session right away — this is the direct analogue of
-      // Supabase's signUp() minting a session immediately, before its own
-      // "email confirmed" state was ever true. Email verification is purely
-      // an app-level gate (requireUser(), see src/lib/auth.ts) checked on
-      // every subsequent request, not a precondition for having a session at
-      // all — that's what lets the send/verify routes below authenticate via
-      // the raw session (auth()) while still being blocked by requireUser()
-      // everywhere else until the code is confirmed.
-      const signInResult = await signIn("credentials", {
-        email,
-        password,
-        turnstileToken: captchaTokenRef.current || undefined,
-        redirect: false,
-      });
-      if (signInResult?.error) {
-        setError("Your account was created, but signing you in failed. Please try logging in.");
-        setStep("account");
-        return;
-      }
+    setCreatingAccount(false);
 
-      // Anything short of an explicit `verificationRequired: false` sends the
-      // user to the code screen. That is the fail-safe direction: if the mail
-      // did go out, skipping the screen would only earn a 403 from
-      // /api/onboarding, and if it did not, the resend button on that screen
-      // gets the definitive answer and moves on by itself.
-      let required = true;
-      try {
-        const res = await fetch("/api/auth/email-verification/send", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-        });
-        const body = await res.json().catch(() => ({}));
-        if (body?.verificationRequired === false) required = false;
-        else if (!res.ok) {
-          setError(
-            typeof body?.error === "string"
-              ? body.error
-              : "We couldn't send your verification code. Try requesting a new one.",
-          );
-        }
-      } catch {
-        setError("We couldn't reach the server to send your code. Try requesting a new one.");
-      }
+    if (required) {
+      verifyResumeRef.current = nextAfterAccount();
+      setAccountReady(false);
+      go("verify");
+      return;
+    }
 
-      if (required) {
-        setStep("verify");
-        return;
-      }
+    setAccountReady(true);
+    // Not go(): "account" was already pushed onto historyRef by whichever
+    // call led here (go("verify")'s push, in the code-required path) or,
+    // here, this *is* that push — see resumeAfterVerify() below for why the
+    // code-required path doesn't push again on its way out of "verify".
+    historyRef.current.push("account");
+    setStep(nextAfterAccount());
+  }
 
-      // No second signIn() here: the one above already established a session
-      // (and, when Turnstile is configured, already spent the one-time
-      // token — a Cloudflare token cannot be verified twice). submitCode()
-      // below reaches "profile" the same way, off that same session, once
-      // the emailed code is confirmed instead.
-      setProcessingStage("profile");
-      setAccountReady(true);
-    })();
-  }, [step, email, password]);
+  // Shared by submitCode() and resendCode()'s no-mailer fallback — moves on
+  // from the "verify" screen to wherever createAccount() (or the
+  // profile-save effect below, on its email_unverified retry) pointed
+  // verifyResumeRef at. Deliberately doesn't push onto historyRef itself:
+  // go("verify") already pushed the step "verify" was entered from, so
+  // back() from the resumed step lands correctly without a second push.
+  function resumeAfterVerify() {
+    setError(null);
+    setAccountReady(true);
+    setStep(verifyResumeRef.current);
+  }
 
-  // Stage two: save the profile. Gated on `accountReady` rather than on the
-  // step, so it starts either straight after account creation (no mailer) or
-  // whenever the emailed code is finally accepted.
+  // Stage two: save the profile. Gated on `accountReady` *and* on actually
+  // being on the "processing" step (not just accountReady, now that account
+  // creation happens much earlier in the flow) — otherwise this would fire
+  // the moment createAccount() finishes, before any of orgDetails/industry/
+  // verification/consent has been filled in.
   useEffect(() => {
-    if (!accountReady || startedProfile.current) return;
+    if (!accountReady || step !== "processing" || startedProfile.current) return;
     startedProfile.current = true;
 
     (async () => {
-      const banksSelected = banks.length > 0 && !banks.includes("I don't bank");
-      // Replace the "Other" marker with whatever the user typed, if anything
-      // — otherwise keep "Other" so the selection still round-trips.
-      const finalBanks = banksSelected
-        ? banks
-            .filter((b) => b !== "Other")
-            .concat(otherBank.trim() ? [otherBank.trim()] : banks.includes("Other") ? ["Other"] : [])
-        : banks;
-      // `insuranceSelected` is true when the user picked at least one real
-      // insurer. "I don't have insurance" as the sole selection flips this
-      // to false — same shape as the banks step's "I don't bank" sentinel.
-      const insuranceSelected =
-        insurers.length > 0 && !insurers.includes("I don't have insurance");
-
       const consents = {
         research_use: researchConsent,
         leaderboard_participation: leaderboardConsent,
         health_data_sharing: healthDataConsent,
+      };
+
+      // Only meaningful for the three applicant roles — sent as `undefined`
+      // fields are simply omitted by JSON.stringify, so this is harmless
+      // (and ignored server-side) for consumer, which never spreads it in.
+      const applicantFields = {
+        verificationDocumentUrls: verificationDocs,
+        customInterfaceRequested,
+        customInterfaceNotes: customInterfaceNotes.trim() || undefined,
       };
 
       const body =
@@ -500,6 +435,7 @@ export default function SignupPage() {
               organizationDescription: organizationDescription.trim() || undefined,
               primarySector,
               consents,
+              ...applicantFields,
             }
           : role === "provider"
             ? {
@@ -507,28 +443,21 @@ export default function SignupPage() {
                 businessName: organizationName,
                 businessDescription: organizationDescription.trim() || undefined,
                 consents,
+                ...applicantFields,
               }
             : role === "regulator"
-              ? { role, regulatorName, consents }
+              ? { role, regulatorName, consents, ...applicantFields }
               : {
+                  // Footprint fields (telecom/banking/insurance/healthcare)
+                  // are deliberately omitted, not sent as empty/undefined —
+                  // they're all `.optional()` in onboardingSchema, and that
+                  // data is now only ever collected later via the separate
+                  // /api/footprint editing flow, not at signup.
                   role: "consumer" as const,
                   username,
                   ageRange,
                   occupation,
                   socialPlatforms,
-                  telecomFootprint: { primary_network: network, plan_type: planType, monthly_spend_range: spend },
-                  bankingFootprint: banksSelected
-                    ? { banks: finalBanks, account_types: accountTypes, wallets }
-                    : undefined,
-                  insuranceFootprint: {
-                    providers: insurers,
-                    policy_types: insuranceSelected ? policyTypes : [],
-                    has_insurance: insuranceSelected,
-                  },
-                  healthcareFootprint: {
-                    medical_aid_providers: medicalAids,
-                    chronic_condition_disclosure_opt_in: chronicOptIn,
-                  },
                   consents,
                 };
 
@@ -541,13 +470,16 @@ export default function SignupPage() {
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         // The server refused because this signup never confirmed its code —
-        // reachable if the mailer was switched on between stage one and here,
-        // or if the code was consumed against a different address. Put the
-        // user back on the code screen instead of a dead end, and let stage
-        // two run again once they get through it.
+        // reachable if the mailer was switched on between account creation
+        // and here, or if the code was consumed against a different
+        // address. Put the user back on the code screen instead of a dead
+        // end, and resume straight back to "processing" (not the step after
+        // "account") once they get through it, since the profile answers
+        // are already collected.
         if (errBody?.reason === "email_unverified") {
           startedProfile.current = false;
           setAccountReady(false);
+          verifyResumeRef.current = "processing";
           setStep("verify");
           setError(null);
           return;
@@ -578,6 +510,7 @@ export default function SignupPage() {
     })();
   }, [
     accountReady,
+    step,
     role,
     username,
     organizationName,
@@ -587,20 +520,12 @@ export default function SignupPage() {
     ageRange,
     occupation,
     socialPlatforms,
-    network,
-    planType,
-    spend,
-    banks,
-    otherBank,
-    accountTypes,
-    wallets,
-    insurers,
-    policyTypes,
-    medicalAids,
-    chronicOptIn,
     healthDataConsent,
     researchConsent,
     leaderboardConsent,
+    verificationDocs,
+    customInterfaceRequested,
+    customInterfaceNotes,
     router,
   ]);
 
@@ -615,33 +540,24 @@ export default function SignupPage() {
     };
   }
 
-  function canContinue(s: ConsumerStep | "orgDetails" | "industry") {
+  function canContinue(s: ConsumerStep | "orgDetails" | "industry" | "verification") {
     switch (s) {
+      case "dataConsent":
+        return consentAccepted;
       case "account":
         return !!(
           /^[a-zA-Z0-9_]{3,20}$/.test(username.trim()) &&
           email.trim() &&
           passwordSchema.safeParse(password).success
         );
-      case "personal":
-        return !!(ageRange && occupation);
-      case "telecom":
-        return !!(network && planType && spend);
-      case "banking":
-        return banks.length > 0;
-      case "wallets":
-        // Optional step — picking zero wallets is valid (a user may not
-        // use mobile money at all, or only use it via the bank-linked
-        // services we already capture in the banking step).
-        return true;
-      case "insurance":
-        return insurers.length > 0;
-      case "health":
-        return medicalAids.length > 0 && termsAccepted;
       case "orgDetails":
         return role === "regulator" ? !!regulatorName : !!organizationName.trim();
       case "industry":
         return !!primarySector;
+      case "verification":
+        // Both the document upload and the custom-interface request are
+        // optional — applicationStatus is set to "pending" either way.
+        return true;
       case "consent":
         return true;
     }
@@ -671,9 +587,7 @@ export default function SignupPage() {
         setError(typeof body?.error === "string" ? body.error : "That code isn't right.");
         return;
       }
-      setStep("processing");
-      setProcessingStage("profile");
-      setAccountReady(true);
+      resumeAfterVerify();
     } catch {
       setError("We couldn't reach the server. Please try again.");
     } finally {
@@ -695,9 +609,7 @@ export default function SignupPage() {
       // landed here because it could not get a definitive answer. Carry on
       // rather than leaving the user waiting for mail nobody is sending.
       if (body?.verificationRequired === false) {
-        setStep("processing");
-        setProcessingStage("profile");
-        setAccountReady(true);
+        resumeAfterVerify();
         return;
       }
       if (!res.ok) {
@@ -708,6 +620,29 @@ export default function SignupPage() {
       setResendNotice("We've sent a new code — check your inbox.");
     } catch {
       setError("We couldn't reach the server. Please try again.");
+    }
+  }
+
+  async function handleVerificationDocChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingDoc(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/onboarding/verification-docs", { method: "POST", body: formData });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof body?.error === "string" ? body.error : "Upload failed — please try again.");
+        return;
+      }
+      setVerificationDocs((prev) => [...prev, body.url]);
+    } catch {
+      setError("We couldn't reach the server. Please try again.");
+    } finally {
+      setUploadingDoc(false);
     }
   }
 
@@ -779,8 +714,49 @@ export default function SignupPage() {
                   ? `Selected: ${ROLE_OPTIONS.find((r) => r.id === role)?.title}`
                   : "Select a role to continue"}
               </span>
-              <Button onClick={() => go("account")} disabled={!role}>
+              <Button onClick={() => go("dataConsent")} disabled={!role}>
                 Continue →
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === "dataConsent" && (
+          <div className="mt-8 space-y-5">
+            <h1 className="font-display text-[24px] font-bold">Before you continue</h1>
+            <p className="text-[13px] text-text-secondary">
+              {role === "consumer"
+                ? "A quick check before we set up your account."
+                : "A quick check before we set up and verify your account."}
+            </p>
+            <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <input
+                type="checkbox"
+                checked={consentAccepted}
+                onChange={(e) => setConsentAccepted(e.target.checked)}
+                className="mt-0.5 tap-target"
+              />
+              <span className="text-[13px] text-text-secondary">
+                I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
+              </span>
+            </label>
+            <p className="text-[11px] italic leading-relaxed text-text-muted">
+              By continuing, you agree to let Kuwana process your usage data, product comparisons,
+              and account information to refine our algorithms, personalize recommendations, and
+              improve app performance. You may withdraw your consent at any time in your account
+              settings under the Cyber and Data Protection Act [Chapter 12:07]
+            </p>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" onClick={back} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={() => go("account")}
+                disabled={!canContinue("dataConsent")}
+                className="flex-1"
+              >
+                I Agree &amp; Continue
               </Button>
             </div>
           </div>
@@ -846,6 +822,38 @@ export default function SignupPage() {
                   ? "Use your official institutional email — it must match the regulator you select next."
                   : "We only use this to secure your account — never shared with providers."}
             </p>
+            {role === "consumer" && (
+              <>
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Age range <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup options={AGE_RANGES} value={ageRange} onChange={setAgeRange} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Occupation <span className="text-text-muted">(optional)</span>
+                  </span>
+                  <div className="mt-2">
+                    <ChipGroup options={OCCUPATIONS} value={occupation} onChange={setOccupation} />
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[13px] font-medium text-text-secondary">
+                    Social platforms you use (optional)
+                  </span>
+                  <div className="mt-2">
+                    <MultiChipGroup
+                      options={SOCIAL_PLATFORMS}
+                      values={socialPlatforms}
+                      onToggle={(v) => toggle(socialPlatforms, setSocialPlatforms, v)}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
             {error && <p className="text-[13px] text-accent-coral">{error}</p>}
             {/* Solved here rather than on the final step: the token is
                 short-lived and single-use, so challenging immediately before
@@ -857,11 +865,11 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go(role === "consumer" ? "personal" : "orgDetails")}
-                disabled={!canContinue("account")}
+                onClick={createAccount}
+                disabled={!canContinue("account") || creatingAccount}
                 className="flex-1"
               >
-                Continue
+                {creatingAccount ? "Creating account…" : "Continue"}
               </Button>
             </div>
           </div>
@@ -936,8 +944,7 @@ export default function SignupPage() {
                 </label>
                 {role === "provider" && (
                   <p className="text-[12px] text-text-muted">
-                    Your listings stay unverified until an admin reviews your first submission — this
-                    only creates your account.
+                    Your listings stay unverified until an admin reviews your first submission.
                   </p>
                 )}
               </>
@@ -948,7 +955,7 @@ export default function SignupPage() {
                 Back
               </Button>
               <Button
-                onClick={() => go(role === "corporate" ? "industry" : "consent")}
+                onClick={() => go(role === "corporate" ? "industry" : "verification")}
                 disabled={!canContinue("orgDetails")}
                 className="flex-1"
               >
@@ -1003,289 +1010,71 @@ export default function SignupPage() {
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
-              <Button onClick={() => go("consent")} disabled={!canContinue("industry")} className="flex-1">
+              <Button onClick={() => go("verification")} disabled={!canContinue("industry")} className="flex-1">
                 Continue
               </Button>
             </div>
           </div>
         )}
 
-        {step === "personal" && (
+        {step === "verification" && (
           <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Tell us about yourself</h1>
-            <p className="text-[13px] text-text-secondary">
-              This context helps map your data footprint — never shown publicly.
-            </p>
-            <div>
-              <span className="text-[13px] font-medium text-text-secondary">Age range</span>
-              <div className="mt-2">
-                <ChipGroup options={AGE_RANGES} value={ageRange} onChange={setAgeRange} />
-              </div>
-            </div>
-            <div>
-              <span className="text-[13px] font-medium text-text-secondary">Occupation</span>
-              <div className="mt-2">
-                <ChipGroup options={OCCUPATIONS} value={occupation} onChange={setOccupation} />
-              </div>
-            </div>
-            <div>
-              <span className="text-[13px] font-medium text-text-secondary">
-                Social platforms you use (optional)
-              </span>
-              <div className="mt-2">
-                <MultiChipGroup
-                  options={SOCIAL_PLATFORMS}
-                  values={socialPlatforms}
-                  onToggle={(v) => toggle(socialPlatforms, setSocialPlatforms, v)}
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("telecom")}
-                disabled={!canContinue("personal")}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "telecom" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Who&apos;s your primary network?</h1>
-            <p className="text-[13px] text-text-secondary">
-              This personalizes your telecom comparisons from day one.
-            </p>
-            <ChipGroup
-              options={NETWORKS}
-              value={network}
-              onChange={setNetwork}
-              renderOption={(opt) => <ProviderChipMark name={opt} />}
-            />
-            <div>
-              <span className="text-[13px] font-medium text-text-secondary">Plan type</span>
-              <div className="mt-2">
-                <ChipGroup options={PLAN_TYPES} value={planType} onChange={setPlanType} />
-              </div>
-            </div>
-            <div>
-              <span className="text-[13px] font-medium text-text-secondary">
-                Monthly spend on airtime/data
-              </span>
-              <div className="mt-2">
-                <ChipGroup options={SPEND_RANGES} value={spend} onChange={setSpend} />
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("banking")}
-                disabled={!canContinue("telecom")}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "banking" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Banking relationships</h1>
-            <p className="text-[13px] text-text-secondary">
-              Pick every bank you hold an account with. We&apos;ll personalize your
-              banking comparisons across all of them.
-            </p>
-            <MultiChipGroup
-              options={BANKS}
-              values={banks}
-              onToggle={toggleBank}
-              renderOption={(opt) => <ProviderChipMark name={opt} />}
-            />
-            {banks.includes("Other") && (
-              <div>
-                <span className="text-[13px] font-medium text-text-secondary">Other bank name</span>
-                <input
-                  value={otherBank}
-                  onChange={(e) => setOtherBank(e.target.value)}
-                  placeholder="Other"
-                  autoComplete="off"
-                  className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
-                />
-              </div>
-            )}
-            {banks.length > 0 && !banks.includes("I don't bank") && (
-              <div>
-                <span className="text-[13px] font-medium text-text-secondary">Account types</span>
-                <div className="mt-2">
-                  <MultiChipGroup
-                    options={ACCOUNT_TYPES}
-                    values={accountTypes}
-                    onToggle={(v) => toggle(accountTypes, setAccountTypes, v)}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("wallets")}
-                disabled={!canContinue("banking")}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "wallets" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Mobile wallets</h1>
-            <p className="text-[13px] text-text-secondary">
-              Pick every mobile money or digital wallet you use. We&apos;ll factor
-              these into your banking comparisons and fee alerts. Skip if you
-              don&apos;t use any.
-            </p>
-            <MultiChipGroup
-              options={WALLETS}
-              values={wallets}
-              onToggle={(v) => toggle(wallets, setWallets, v)}
-            />
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("insurance")}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "insurance" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Insurance coverage</h1>
-            <p className="text-[13px] text-text-secondary">
-              Pick every insurer you hold a policy with. We&apos;ll surface their
-              products in your comparisons and notify you on price or benefit
-              changes. Pick &quot;I don&apos;t have insurance&quot; to skip.
-            </p>
-            <MultiChipGroup
-              options={INSURERS}
-              values={insurers}
-              onToggle={toggleInsurer}
-              renderOption={(opt) => <ProviderChipMark name={opt} />}
-            />
-            {insurers.length > 0 && !insurers.includes("I don't have insurance") && (
-              <div>
-                <span className="text-[13px] font-medium text-text-secondary">Policy types</span>
-                <div className="mt-2">
-                  <MultiChipGroup
-                    options={POLICY_TYPES}
-                    values={policyTypes}
-                    onToggle={(v) => toggle(policyTypes, setPolicyTypes, v)}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="flex gap-3 pt-2">
-              <Button variant="secondary" onClick={back} className="flex-1">
-                Back
-              </Button>
-              <Button
-                onClick={() => go("health")}
-                disabled={!canContinue("insurance")}
-                className="flex-1"
-              >
-                Continue
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === "health" && (
-          <div className="mt-8 space-y-5">
-            <h1 className="font-display text-[24px] font-bold">Medical Aid</h1>
+            <h1 className="font-display text-[24px] font-bold">Verify your organization</h1>
             <p className="text-[13px] leading-relaxed text-text-secondary">
-              Select every medical aid scheme you belong to — many Zimbabweans hold more than one
-              (a workplace scheme plus family cover, for example). Pick &quot;None&quot; if you have
-              no coverage.
+              Upload a business registration document or ID so our team can review your account.
+              This is optional, and your account is fully usable right away either way — it only
+              speeds up review.
             </p>
-            <MultiChipGroup
-              options={MEDICAL_AIDS}
-              values={medicalAids}
-              onToggle={toggleMedicalAid}
-              renderOption={(opt) => <ProviderChipMark name={opt} />}
-            />
+            <label className="block">
+              <span className="text-[13px] font-medium text-text-secondary">Verification document</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleVerificationDocChange}
+                disabled={uploadingDoc}
+                className="mt-1.5 w-full rounded-xl border border-border bg-bg-surface px-4 py-3 text-[13px] text-text-secondary outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-accent-sky/15 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-accent-sky"
+              />
+              {uploadingDoc && <span className="mt-1 block text-[12px] text-text-muted">Uploading…</span>}
+            </label>
+            {verificationDocs.length > 0 && (
+              <ul className="space-y-1 text-[12px] text-accent-teal">
+                {verificationDocs.map((url, i) => (
+                  <li key={url}>Document {i + 1} uploaded ✓</li>
+                ))}
+              </ul>
+            )}
             <div>
-              <p className="text-[14px] font-semibold">Allow kuwana Team to:</p>
-              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+              <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
                 <input
                   type="checkbox"
-                  checked={chronicOptIn}
-                  onChange={(e) => setChronicOptIn(e.target.checked)}
+                  checked={customInterfaceRequested}
+                  onChange={(e) => setCustomInterfaceRequested(e.target.checked)}
                   className="mt-0.5 tap-target"
                 />
                 <span className="text-[13px] text-text-secondary">
-                  Selection optional: I have a chronic condition / I&apos;m a Person with a
-                  disability / Prefer not to say.
+                  I&apos;d like to apply for a custom dashboard/interface for my organization.
                 </span>
               </label>
-              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-                <input
-                  type="checkbox"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 tap-target"
+              {customInterfaceRequested && (
+                <textarea
+                  value={customInterfaceNotes}
+                  onChange={(e) => setCustomInterfaceNotes(e.target.value)}
+                  placeholder="Tell us what you'd need — we'll follow up by email."
+                  maxLength={1000}
+                  rows={3}
+                  className="mt-3 w-full resize-none rounded-xl border border-border bg-bg-surface px-4 py-3 text-[15px] outline-none focus:border-accent-sky"
                 />
-                <span className="text-[13px] text-text-secondary">
-                  I&apos;ve read the Terms of Service / Privacy Policy Clause and the Terms of Use
-                </span>
-              </label>
-              <label className="mt-3 flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
-                <input
-                  type="checkbox"
-                  checked={healthDataConsent}
-                  onChange={(e) => setHealthDataConsent(e.target.checked)}
-                  className="mt-0.5 tap-target"
-                />
-                <span className="text-[13px] text-text-secondary">
-                  Separately, allow anonymized use of my data to improve Kuwana&apos;s comparisons
-                  — distinct from the general research consent on the next screen
-                </span>
-              </label>
+              )}
             </div>
+            {error && <p className="text-[13px] text-accent-coral">{error}</p>}
             <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={back} className="flex-1">
                 Back
               </Button>
-              <Button
-                onClick={() => go("consent")}
-                disabled={!canContinue("health")}
-                className="flex-1"
-              >
-                I Agree &amp; Continue
+              <Button onClick={() => go("consent")} disabled={uploadingDoc} className="flex-1">
+                Continue
               </Button>
             </div>
-            <p className="text-[11px] italic leading-relaxed text-text-muted">
-              By continuing, you agree to let Kuwana process your usage data, product comparisons,
-              and account information to refine our algorithms, personalize recommendations, and
-              improve app performance. You may withdraw your consent at any time in your account
-              settings under the Cyber and Data Protection Act [Chapter 12:07]
-            </p>
           </div>
         )}
 
@@ -1317,13 +1106,25 @@ export default function SignupPage() {
                     Join the opt-in XP leaderboard under a nickname (never your real name).
                   </span>
                 </label>
+                <label className="flex items-start gap-3 rounded-xl border border-border bg-bg-surface p-4">
+                  <input
+                    type="checkbox"
+                    checked={healthDataConsent}
+                    onChange={(e) => setHealthDataConsent(e.target.checked)}
+                    className="mt-0.5 tap-target"
+                  />
+                  <span className="text-[13px] text-text-secondary">
+                    Separately, allow anonymized use of any health-related data I add later to
+                    improve Kuwana&apos;s comparisons.
+                  </span>
+                </label>
                 <p className="text-[12px] text-text-muted">
-                  You can change either setting anytime in Settings.
+                  You can change any of these settings anytime in Settings.
                 </p>
               </>
             ) : (
               <>
-                <h1 className="font-display text-[24px] font-bold">Review &amp; create account</h1>
+                <h1 className="font-display text-[24px] font-bold">Review &amp; submit</h1>
                 <div className="rounded-xl border border-border bg-bg-surface p-4 text-[13px]">
                   <p className="text-text-secondary">
                     {role === "regulator" ? "Regulator" : ROLE_OPTIONS.find((r) => r.id === role)?.title}
@@ -1334,11 +1135,16 @@ export default function SignupPage() {
                   {role === "corporate" && primarySector && (
                     <p className="mt-1 text-text-secondary">{SECTORS[primarySector].name}</p>
                   )}
+                  {verificationDocs.length > 0 && (
+                    <p className="mt-1 text-text-secondary">
+                      {verificationDocs.length} verification document(s) uploaded
+                    </p>
+                  )}
                 </div>
                 <p className="text-[12px] text-text-muted">
                   {role === "provider"
-                    ? "We'll create your account now — your first listing still goes through admin review before it's visible to shoppers."
-                    : "We'll verify your email domain and create your account now."}
+                    ? "We'll save your profile now and queue your application for review — your first listing still goes through admin review before it's visible to shoppers."
+                    : "We'll verify your email domain, save your profile, and queue your application for review."}
                 </p>
               </>
             )}
@@ -1348,7 +1154,7 @@ export default function SignupPage() {
               </Button>
               {isDesktop ? (
                 <WaterButton
-                  label={role === "consumer" ? "Save my profile" : "Create account"}
+                  label={role === "consumer" ? "Save my profile" : "Submit application"}
                   onClick={startProcessing}
                   paddingX={0}
                   paddingY={13}
@@ -1363,7 +1169,7 @@ export default function SignupPage() {
                 />
               ) : (
                 <Button onClick={startProcessing} className="flex-1">
-                  {role === "consumer" ? "Save my profile" : "Create account"}
+                  {role === "consumer" ? "Save my profile" : "Submit application"}
                 </Button>
               )}
             </div>
@@ -1424,19 +1230,9 @@ export default function SignupPage() {
               className="mt-6 max-w-[260px]"
               steps={[
                 {
-                  key: "account",
-                  label: "Creating your account",
-                  state: error && processingStage === "account" ? "error" : processingStage === "account" ? "active" : "done",
-                },
-                {
                   key: "profile",
                   label: "Saving your profile",
-                  state:
-                    processingStage !== "profile"
-                      ? "pending"
-                      : error
-                        ? "error"
-                        : "active",
+                  state: error ? "error" : "active",
                 },
               ]}
             />

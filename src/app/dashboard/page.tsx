@@ -11,6 +11,7 @@ import { FeaturedCategories } from "@/components/dashboard/FeaturedCategories";
 import { QuickAccessTabs } from "@/components/dashboard/QuickAccessTabs";
 import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { NeedIntake } from "@/components/explore/NeedIntake";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 const ROLE_DASHBOARD: Partial<Record<string, string>> = {
   corporate: "/corporate",
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
 
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
+      <WelcomeModal userId={user.id} role="consumer" />
       <DailyVisitPing />
       {/* Streak badge lives in the header itself (to the left of the bell),
           so the dashboard passes the current streak through here. */}

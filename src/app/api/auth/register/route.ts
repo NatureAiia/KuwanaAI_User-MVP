@@ -39,7 +39,10 @@ export async function POST(req: Request) {
 
   try {
     await prisma.user.create({
-      data: { id, email, username: placeholderUsername, passwordHash },
+      // consentAccepted was validated as a required `z.literal(true)` above —
+      // this is the server-side stamp of that gate (see the `consentAcceptedAt`
+      // field comment on the User model), not just a UI checkbox.
+      data: { id, email, username: placeholderUsername, passwordHash, consentAcceptedAt: new Date() },
     });
   } catch (err) {
     // The unique constraint, not a pre-check findUnique — a pre-check would

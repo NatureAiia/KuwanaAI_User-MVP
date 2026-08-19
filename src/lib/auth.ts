@@ -108,13 +108,23 @@ export async function requireConsumerOrCorporate(): Promise<
  * through requireAdmin() — stays allowlist-aware too, instead of disagreeing
  * with requireAdmin() about who counts as admin.
  */
-export function isAllowlistedAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const allowlist = (process.env.ADMIN_EMAILS ?? "")
+/**
+ * The raw allowlist, lowercased — exported so callers that need every admin
+ * address (rather than a single yes/no check) can reuse the same parsing
+ * instead of re-reading `process.env.ADMIN_EMAILS` themselves. See
+ * notifyAdminNewApplication in src/lib/notifications.ts, which needs the
+ * whole list to find every admin User row to notify.
+ */
+export function adminEmailAllowlist(): string[] {
+  return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  return allowlist.includes(email.toLowerCase());
+}
+
+export function isAllowlistedAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return adminEmailAllowlist().includes(email.toLowerCase());
 }
 
 export async function requireAdmin(): Promise<

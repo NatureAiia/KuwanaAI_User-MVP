@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { emailDomain } from "@/lib/orgVerification";
 import { CorporateHeader } from "@/components/corporate/CorporateHeader";
 import { CorporatePortalNav } from "@/components/corporate/CorporatePortalNav";
+import { WelcomeModal } from "@/components/WelcomeModal";
 
 // Auth gate + chrome only — the same "layout re-checks for the gate, page
 // re-checks for its own data" split src/app/admin/layout.tsx already uses.
@@ -30,6 +31,7 @@ export default async function CorporateLayout({ children }: { children: React.Re
 
   return (
     <div id="main-content" tabIndex={-1} className="flex min-h-screen flex-1 flex-col">
+      <WelcomeModal userId={user.id} role="corporate" />
       <CorporateHeader companyName={companyName} />
       <div className="flex flex-1 flex-col md:flex-row">
         <CorporatePortalNav companyName={companyName} />

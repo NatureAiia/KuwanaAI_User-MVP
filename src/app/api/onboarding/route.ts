@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth";
 import { privateJson } from "@/lib/apiResponse";
 import { prisma } from "@/lib/prisma";
 import { recordEvent } from "@/lib/gamification/process-event";
+import { notifyAdminNewApplication } from "@/lib/notifications";
 import { onboardingBodySchema as bodySchema } from "@/lib/onboardingSchema";
 import { emailDomain, emailMatchesRegulator, isPersonalEmailDomain } from "@/lib/orgVerification";
 import { enforceRateLimit, RATE_LIMITS } from "@/lib/rateLimit";
@@ -124,10 +125,25 @@ export async function POST(req: Request) {
       async (tx) => {
         const primarySector = data.role === "corporate" ? data.primarySector : undefined;
 
+        // Corporate/provider/regulator each grant elevated access with no
+        // approval gate today — applicationStatus is purely informational,
+        // laid down for a future admin review UI (see the field comment on
+        // User.applicationStatus). Consumers stay at the default
+        // not_applicable, never touched here.
+        const isApplicantRole = data.role !== "consumer";
+        const applicationFields = isApplicantRole
+          ? {
+              applicationStatus: "pending" as const,
+              verificationDocumentUrls: data.verificationDocumentUrls,
+              customInterfaceRequested: data.customInterfaceRequested,
+              customInterfaceNotes: data.customInterfaceNotes,
+            }
+          : {};
+
         await tx.user.upsert({
           where: { id: user.id },
-          update: { email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date() },
-          create: { id: user.id, email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date() },
+          update: { email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date(), ...applicationFields },
+          create: { id: user.id, email, role: data.role, username, primarySector, emailVerifiedAt, onboardingCompletedAt: new Date(), ...applicationFields },
         });
 
         await tx.userProfile.upsert({
@@ -218,6 +234,22 @@ export async function POST(req: Request) {
       { error: "Something went wrong saving your profile. Please try again." },
       { status: 500 },
     );
+  }
+
+  // Best-effort, outside the transaction: a notification failure must never
+  // roll back (or block) a successful signup. Only fires for the three
+  // applicant roles, matching applicationStatus being set above.
+  if (data.role !== "consumer") {
+    try {
+      await notifyAdminNewApplication({
+        applicantUserId: user.id,
+        applicantEmail: email,
+        role: data.role,
+        username,
+      });
+    } catch (err) {
+      console.error("[onboarding] failed to notify admins of new application:", err);
+    }
   }
 
   return privateJson({ gamification });
