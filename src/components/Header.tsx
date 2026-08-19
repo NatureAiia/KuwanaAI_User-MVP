@@ -96,7 +96,7 @@ export function Header({ currentStreak = 0 }: { currentStreak?: number } = {}) {
           <Link
             href="/wallet"
             aria-label="Wallet"
-            className="tap-target flex items-center justify-center rounded-full border border-border bg-bg-surface text-text-secondary"
+            className="tap-target hidden items-center justify-center rounded-full border border-border bg-bg-surface text-text-secondary md:flex"
           >
             <Wallet size={18} />
           </Link>
