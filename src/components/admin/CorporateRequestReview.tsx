@@ -15,18 +15,37 @@ type ProposedData = {
   attributes?: Record<string, unknown>;
 };
 
+// `new_field` requests carry this shape instead — see CorporateRequestType
+// in prisma/schema.prisma and createCorporateRequestSchema's discriminated
+// union in src/lib/corporateRequestSchema.ts.
+type ProposedField = {
+  key: string;
+  label: string;
+  consumerLabel?: string | null;
+  dataType: string;
+  unit?: string | null;
+  qualityAxis?: string | null;
+  sampleValue?: unknown;
+};
+
 export function CorporateRequestReview({
   request,
 }: {
   request: {
     id: string;
-    type: "edit" | "new_listing";
+    type: "edit" | "new_listing" | "new_field";
     reason: string;
     provider: { name: string };
-    proposedData: ProposedData;
+    proposedData: ProposedData | ProposedField;
     listing: { id: string; name: string; price: unknown; currency: string } | null;
     category: { name: string; sector: { name: string } } | null;
     dueAt?: Date | string | null;
+    // `new_field` only.
+    regulatorDecision?: string;
+    regulatorReviewedByEmail?: string | null;
+    regulatorNote?: string | null;
+    changePercent?: number | null;
+    riskLevel?: string | null;
   };
 }) {
   const router = useRouter();
@@ -77,50 +96,115 @@ export function CorporateRequestReview({
     }
   }
 
-  const proposed = request.proposedData;
+  const isFieldProposal = request.type === "new_field";
+  const proposed = isFieldProposal ? null : (request.proposedData as ProposedData);
+  const proposedField = isFieldProposal ? (request.proposedData as ProposedField) : null;
+  // Admin can't approve a field proposal until the regulator has signed off
+  // — mirrors the server-side gate in /api/admin/corporate-requests/[id].
+  const blockedOnRegulator = isFieldProposal && request.regulatorDecision !== "approved";
 
   return (
     <Card className="space-y-2.5">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="sky">{request.provider.name}</Badge>
-        {request.type === "edit" && request.listing ? (
+        {isFieldProposal ? (
+          <Badge tone="neutral">
+            New field{request.category ? ` — ${request.category.sector.name} / ${request.category.name}` : ""}
+          </Badge>
+        ) : request.type === "edit" && request.listing ? (
           <Badge tone="neutral">Edit &quot;{request.listing.name}&quot;</Badge>
         ) : (
           <Badge tone="neutral">
             New product{request.category ? ` — ${request.category.sector.name} / ${request.category.name}` : ""}
           </Badge>
         )}
+        {isFieldProposal && request.riskLevel && (
+          <Badge tone={request.riskLevel === "high" ? "coral" : request.riskLevel === "medium" ? "sky" : "neutral"}>
+            {request.riskLevel} risk
+          </Badge>
+        )}
         <SlaBadge dueAt={request.dueAt ?? null} status="pending" />
       </div>
 
-      <div className="grid gap-2 text-[13px] sm:grid-cols-2">
-        <div>
-          <p className="text-[11px] text-text-muted">Name</p>
-          <p className="font-medium">{proposed.name}</p>
-        </div>
-        <div>
-          <p className="text-[11px] text-text-muted">Price</p>
-          <p className="font-mono">
-            {proposed.currency} {Number(proposed.price).toFixed(2)}
-            {request.type === "edit" && request.listing && (
-              <span className="ml-1.5 text-[11px] text-text-muted">
-                (was {request.listing.currency} {Number(request.listing.price).toFixed(2)})
-              </span>
-            )}
-          </p>
-        </div>
-        {proposed.description && (
-          <div className="sm:col-span-2">
-            <p className="text-[11px] text-text-muted">Description</p>
-            <p className="text-text-secondary">{proposed.description}</p>
+      {isFieldProposal && proposedField ? (
+        <div className="grid gap-2 text-[13px] sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] text-text-muted">Field label (corporate / consumer)</p>
+            <p className="font-medium">
+              {proposedField.label}
+              {proposedField.consumerLabel && ` / ${proposedField.consumerLabel}`}
+            </p>
           </div>
-        )}
-      </div>
+          <div>
+            <p className="text-[11px] text-text-muted">Key / type</p>
+            <p className="font-mono">
+              {proposedField.key} — {proposedField.dataType}
+              {proposedField.unit ? ` (${proposedField.unit})` : ""}
+            </p>
+          </div>
+          {proposedField.qualityAxis && (
+            <div>
+              <p className="text-[11px] text-text-muted">Feeds BCI axis</p>
+              <p>{proposedField.qualityAxis}</p>
+            </div>
+          )}
+          {proposedField.sampleValue != null && (
+            <div>
+              <p className="text-[11px] text-text-muted">Sample value</p>
+              <p className="font-mono">{String(proposedField.sampleValue)}</p>
+            </div>
+          )}
+          {request.changePercent != null && (
+            <div>
+              <p className="text-[11px] text-text-muted">Change</p>
+              <p className="font-mono">{request.changePercent.toFixed(1)}%</p>
+            </div>
+          )}
+          <div className="sm:col-span-2">
+            <p className="text-[11px] text-text-muted">Regulator decision</p>
+            <p>
+              {request.regulatorDecision ?? "not_required"}
+              {request.regulatorReviewedByEmail && ` — ${request.regulatorReviewedByEmail}`}
+              {request.regulatorNote && (
+                <span className="block text-[12px] text-text-secondary">{request.regulatorNote}</span>
+              )}
+            </p>
+          </div>
+        </div>
+      ) : proposed ? (
+        <div className="grid gap-2 text-[13px] sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] text-text-muted">Name</p>
+            <p className="font-medium">{proposed.name}</p>
+          </div>
+          <div>
+            <p className="text-[11px] text-text-muted">Price</p>
+            <p className="font-mono">
+              {proposed.currency} {Number(proposed.price).toFixed(2)}
+              {request.type === "edit" && request.listing && (
+                <span className="ml-1.5 text-[11px] text-text-muted">
+                  (was {request.listing.currency} {Number(request.listing.price).toFixed(2)})
+                </span>
+              )}
+            </p>
+          </div>
+          {proposed.description && (
+            <div className="sm:col-span-2">
+              <p className="text-[11px] text-text-muted">Description</p>
+              <p className="text-text-secondary">{proposed.description}</p>
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div>
         <p className="text-[11px] text-text-muted">Business&apos;s reason</p>
         <p className="text-[13px] text-text-secondary">{request.reason}</p>
       </div>
+
+      {blockedOnRegulator && (
+        <p className="text-[12px] text-accent-coral">Waiting on regulator sign-off before this can be approved.</p>
+      )}
 
       {error && <p className="text-[12px] text-accent-coral">{error}</p>}
 
@@ -166,7 +250,11 @@ export function CorporateRequestReview({
         </div>
       ) : (
         <div className="flex gap-1.5">
-          <Button onClick={() => setSigningOff(true)} disabled={loading} className="!bg-accent-teal">
+          <Button
+            onClick={() => setSigningOff(true)}
+            disabled={loading || blockedOnRegulator}
+            className="!bg-accent-teal"
+          >
             <Check size={14} />
             Approve
           </Button>

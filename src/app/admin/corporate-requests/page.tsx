@@ -78,15 +78,25 @@ export default async function AdminCorporateRequestsPage() {
                   type: r.type,
                   reason: r.reason,
                   provider: r.provider,
-                  proposedData: r.proposedData as {
-                    name: string;
-                    description?: string | null;
-                    price: number;
-                    currency: string;
-                  },
+                  proposedData: r.proposedData as
+                    | { name: string; description?: string | null; price: number; currency: string }
+                    | {
+                        key: string;
+                        label: string;
+                        consumerLabel?: string | null;
+                        dataType: string;
+                        unit?: string | null;
+                        qualityAxis?: string | null;
+                        sampleValue?: unknown;
+                      },
                   listing: r.listing,
                   category: r.category,
                   dueAt: r.dueAt,
+                  regulatorDecision: r.regulatorDecision,
+                  regulatorReviewedByEmail: r.regulatorReviewedByEmail,
+                  regulatorNote: r.regulatorNote,
+                  changePercent: r.changePercent,
+                  riskLevel: r.riskLevel,
                 }}
               />
             </div>

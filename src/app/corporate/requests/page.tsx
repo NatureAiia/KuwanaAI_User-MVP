@@ -32,15 +32,25 @@ export default async function CorporateRequestsPage() {
 
       <div className="mt-4 grid gap-2.5">
         {requests.map((r) => {
-          const proposed = r.proposedData as { name: string; price: number; currency: string };
+          // `new_field` proposals carry {key,label,...}, not the
+          // {name,price,currency} shape edit/new_listing use.
+          const isFieldProposal = r.type === "new_field";
+          const fieldProposed = isFieldProposal ? (r.proposedData as { label: string }) : null;
+          const proposed = isFieldProposal ? null : (r.proposedData as { name: string; price: number; currency: string });
+          const title = isFieldProposal
+            ? `New field "${fieldProposed!.label}"`
+            : r.type === "edit"
+              ? `Edit "${r.listing?.name ?? proposed!.name}"`
+              : `New product "${proposed!.name}"`;
           return (
             <Card key={r.id} className="!p-3.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[13.5px] font-medium">
-                  {r.type === "edit" ? `Edit "${r.listing?.name ?? proposed.name}"` : `New product "${proposed.name}"`}
-                </p>
+                <p className="text-[13.5px] font-medium">{title}</p>
                 <div className="flex items-center gap-1.5">
                   <SlaBadge dueAt={r.dueAt} status={r.status} />
+                  {isFieldProposal && r.regulatorDecision !== "not_required" && (
+                    <CorporateTag tone="sky">regulator: {r.regulatorDecision}</CorporateTag>
+                  )}
                   <CorporateTag tone={STATUS_TONE[r.status]}>{r.status}</CorporateTag>
                 </div>
               </div>
@@ -62,9 +72,9 @@ export default async function CorporateRequestsPage() {
                       id: r.id,
                       type: r.type,
                       providerName: provider.name,
-                      listingName: r.listing?.name ?? proposed.name,
-                      price: proposed.price,
-                      currency: proposed.currency,
+                      listingName: isFieldProposal ? fieldProposed!.label : (r.listing?.name ?? proposed!.name),
+                      price: isFieldProposal ? null : proposed!.price,
+                      currency: isFieldProposal ? null : proposed!.currency,
                       reason: r.reason,
                       status: r.status,
                       reviewedByEmail: r.reviewedByEmail,
@@ -72,6 +82,9 @@ export default async function CorporateRequestsPage() {
                       reviewNote: r.reviewNote,
                       rejectionReason: r.rejectionReason,
                       createdAt: r.createdAt,
+                      regulatorDecision: isFieldProposal ? r.regulatorDecision : null,
+                      regulatorReviewedByEmail: isFieldProposal ? r.regulatorReviewedByEmail : null,
+                      regulatorNote: isFieldProposal ? r.regulatorNote : null,
                     }}
                   />
                 )}

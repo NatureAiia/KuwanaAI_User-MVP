@@ -189,6 +189,7 @@ model User {
   complaints              ConsumerComplaint[]
   adminAlertRulesCreated  AdminAlertRule[]
   notes                   UserNote[]
+  qualityRatings          ListingQualityRating[]
 
   @@map("users")
 }
@@ -258,6 +259,7 @@ enum Sector {
   fashion
   hotels
   retail
+  food
 }
 
 model SectorFootprint {
@@ -272,11 +274,14 @@ model SectorFootprint {
 }
 
 // Free-text "memory" captured from a category-specific clarifying-question
-// prompt (currently shown before an Insurance AI recommendation) — one row
-// per (user, sector, category), overwritten on re-submit rather than kept as
-// a log. Read back by the recommendations route to fold into the AI prompt
-// context whenever a matching sector/category is requested, so it's reusable
-// by any future sector's intake flow, not just Insurance's.
+// prompt — originally just the Insurance AI recommendation's intake, now the
+// general cross-session memory store behind Kuwana's "MAG" (Memory-Augmented
+// Generation): one row per (user, sector, category), overwritten on
+// re-submit rather than kept as a log. Read back by both the recommendations
+// route AND /api/chat (see resolveChatIntent()/buildMemoryContext() in
+// src/lib/ai/) to fold prior answers into the prompt context whenever a
+// matching sector/category comes up again — so a user who already said
+// "youth, low income, Harare" for banking isn't asked again next session.
 model UserNote {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
@@ -337,6 +342,12 @@ model Category {
   sector   SectorConfig @relation(fields: [sectorId], references: [id], onDelete: Cascade)
   name     String
   slug     String
+  // Everyday/casual phrasings a consumer might use for this category beyond
+  // its own name (e.g. category "Nostro FCA Accounts" -> ["USD account",
+  // "foreign currency account"]) — matched (case-insensitively, alongside
+  // name/slug) by classifyIntake()/resolveChatIntent() so jargon-averse free
+  // text still resolves to the right category. See src/lib/terminology.ts.
+  synonyms String[]     @default([])
 
   attributeSchema   AttributeSchemaField[]
   listings          Listing[]
@@ -358,16 +369,60 @@ enum AttributeDataType {
   boolean
 }
 
+// The 5 fixed comparison axes (Value/Trust/Availability/Performance/
+// Resilience) an AttributeSchemaField can feed into for BCI scoring — see
+// QualityAxisConfig and src/lib/bci.ts. A field with no axis simply doesn't
+// contribute to any axis's objective sub-score (falls through to a neutral
+// 50, per src/lib/bci.ts).
+enum QualityAxis {
+  value
+  trust
+  availability
+  performance
+  resilience
+}
+
+// One row per QualityAxis, seeded once (see prisma/seed.ts) — displayName is
+// admin-editable, the enum value is the stable slug. defaultWeight is the
+// BCI composite weight (25/25/20/15/15) unless a caller (flow 2's draggable
+// sliders) supplies a per-request override.
+model QualityAxisConfig {
+  axis           QualityAxis @id
+  displayName    String      @map("display_name")
+  description    String?
+  defaultWeight  Decimal     @default(0) @db.Decimal(4, 3) @map("default_weight")
+  updatedByEmail String?     @map("updated_by_email")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  @@map("quality_axis_config")
+}
+
 model AttributeSchemaField {
   id           String            @id @default(uuid())
   categoryId   String            @map("category_id")
   category     Category          @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   key          String
   label        String
+  // Plain-language override of `label` for consumer-facing surfaces (see
+  // src/lib/fieldLabels.ts resolveFieldLabel()) — e.g. label "RTGS Fee" /
+  // consumerLabel "Sending money fee". Null means "use label as-is"; most
+  // attributes (Brand, Store) don't need a separate consumer phrasing.
+  // Corporate-side rendering always reads `label` directly, unchanged.
+  consumerLabel String?           @map("consumer_label")
   dataType     AttributeDataType @map("data_type")
   unit         String?
   isComparable Boolean           @default(true) @map("is_comparable")
   sortOrder    Int               @default(0) @map("sort_order")
+  // Which BCI axis this field's value feeds into as an objective input, if
+  // any (e.g. a channel_ussd boolean -> availability, claim_turnaround_days
+  // -> performance). Untagged fields don't contribute to any axis.
+  qualityAxis  QualityAxis?      @map("quality_axis")
+  // Same idea as Category.synonyms, at field granularity — casual terms a
+  // consumer might use for this specific field (e.g. label "RTGS Fee" ->
+  // ["transfer fee", "sending money fee", "EFT fee"]). Corporate/regulator
+  // maintained; read by search and resolveChatIntent(), never shown as a
+  // label itself (consumerLabel is the one rendered label).
+  synonyms     String[]          @default([])
 
   @@unique([categoryId, key])
   @@map("attribute_schema")
@@ -495,6 +550,7 @@ model Listing {
   investigations    ListingInvestigation[]
   marketBasketItems MarketBasketItem[]
   complaints        ConsumerComplaint[]
+  qualityRatings    ListingQualityRating[]
 
   // (categoryId, status, price): the consumer-facing hot path — every
   // catalog read filters this combination then orders by price
@@ -519,6 +575,32 @@ model ListingPriceHistory {
   // ordered by time — this is the exact access pattern.
   @@index([listingId, recordedAt])
   @@map("listing_price_history")
+}
+
+// Subjective input to the BCI engine (src/lib/bci.ts) — a 1-5 Likert score a
+// consumer gives one listing on one QualityAxis. Deliberately no denormalized
+// rating_count column: at this scale a grouped count() by (listingId, axis)
+// at read time is simpler and can't drift from the source rows, matching how
+// the rest of this schema computes rather than caches. BCI treats fewer than
+// 5 ratings on an axis as "low confidence" and falls back to the objective
+// score alone (see bci.ts) — the exact rule the docs call rating_count<5.
+model ListingQualityRating {
+  id        String      @id @default(uuid())
+  listingId String      @map("listing_id")
+  listing   Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  userId    String      @map("user_id")
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  axis      QualityAxis
+  score     Int
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  // One rating per user per axis per listing — re-submitting updates it
+  // rather than adding a second row (same upsert-on-unique pattern Consent
+  // and UserNote already use elsewhere in this file).
+  @@unique([listingId, userId, axis])
+  @@index([listingId, axis])
+  @@map("listing_quality_ratings")
 }
 
 /// Append-only "what changed and by whom" trail for a listing — mirrors
@@ -546,12 +628,31 @@ model ListingUpdateLog {
 enum CorporateRequestType {
   edit
   new_listing
+  // A corporate account proposing a brand-new comparable field for its
+  // category (e.g. a bank proposing "nostro_fca_min_balance"). proposedData
+  // carries {key,label,consumerLabel,dataType,unit,qualityAxis?,sampleValue}
+  // instead of the new_listing shape. Goes through the extra regulator hop
+  // below before admin can approve it — see regulatorDecision.
+  new_field
 }
 
 enum CorporateRequestStatus {
   pending
   approved
   rejected
+}
+
+// Regulator sub-stage for `new_field` requests only — every other type stays
+// `not_required` and admin review proceeds exactly as before. `pending`
+// blocks admin approval until a regulator has weighed in; see
+// /regulator/field-proposals and the gate in
+// /api/admin/corporate-requests/[id].
+enum RegulatorReviewDecision {
+  not_required
+  pending
+  approved
+  rejected
+  flagged
 }
 
 /// A "corporate" role account's proposed price/product change, awaiting
@@ -569,10 +670,26 @@ model CorporateRequest {
   // Set for `edit` — the listing this request proposes to change.
   listingId         String?                @map("listing_id")
   listing           Listing?               @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  // Set for `new_listing` — needed to know the attribute schema when
-  // creating the Listing on approval, since there's no existing row yet.
+  // Set for `new_listing`/`new_field` — needed to know the attribute schema
+  // (new_listing) or which category gains the field (new_field) when acting
+  // on approval, since there's no existing Listing row for either case yet.
   categoryId        String?                @map("category_id")
   category          Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // `new_field` only — the regulator sign-off stage, gating admin approval.
+  // Defaults `not_required` so every existing/`edit`/`new_listing` row keeps
+  // its current admin-only behavior unchanged.
+  regulatorDecision        RegulatorReviewDecision @default(not_required) @map("regulator_decision")
+  regulatorReviewedByEmail String?                 @map("regulator_reviewed_by_email")
+  regulatorReviewedAt      DateTime?               @map("regulator_reviewed_at")
+  regulatorNote             String?                @map("regulator_note")
+  // "Old value" shown in the regulator queue — null for a genuinely new
+  // field (new_field), set to the prior value for a value-changing request.
+  previousValueSnapshot    Json?                   @map("previous_value_snapshot")
+  // (new-old)/old * 100 at submission time, feeding the queue's %Change
+  // column and riskLevel below — null when there's no prior value to diff
+  // against (a brand-new field has nothing to compare).
+  changePercent            Float?                  @map("change_percent")
+  riskLevel                RiskLevel?              @map("risk_level")
   // {name, description, price, currency, attributes, images}
   proposedData      Json                   @map("proposed_data")
   // The business's justification for the change — expected here (formal,
@@ -759,6 +876,13 @@ model Message {
   role           ChatRole
   content        String
   listingIds     String[]     @default([]) @map("listing_ids")
+  // { fields: [{ key, question, options? }] } — set only on an assistant
+  // message that asked a clarifying question instead of answering (see
+  // STREAM_CLARIFY_MARKER in src/lib/chatStream.ts and resolveChatIntent()
+  // in src/lib/ai/intakeClassifier.ts). Persisted so reloading a
+  // conversation mid-clarification re-renders the same quick-reply chips
+  // instead of losing them. Null for every ordinary message.
+  clarify        Json?
   createdAt      DateTime     @default(now()) @map("created_at")
 
   feedback ChatFeedback[]
@@ -786,6 +910,7 @@ enum EventType {
   // same generic UserXp/UserBadge/UserStreak engine.
   listing_submitted
   listing_approved
+  listing_rated
 }
 
 model UserEvent {

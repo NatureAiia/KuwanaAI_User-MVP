@@ -76,6 +76,21 @@ export default async function CorporateReportsPage() {
           <DownloadChangeRequestSummaryButton
             providerName={provider.name}
             rows={requests.map((r) => {
+              // `new_field` proposals carry {key,label,...}, not the
+              // {name,price,currency} shape edit/new_listing use — a field
+              // proposal has no price of its own, so this row shows 0.
+              if (r.type === "new_field") {
+                const proposed = r.proposedData as { label: string };
+                return {
+                  listingName: proposed.label,
+                  type: r.type,
+                  status: r.status,
+                  price: 0,
+                  currency: "",
+                  createdAt: r.createdAt,
+                  reviewedAt: r.reviewedAt,
+                };
+              }
               const proposed = r.proposedData as { name: string; price: number; currency: string };
               return {
                 listingName: r.listing?.name ?? proposed.name,
