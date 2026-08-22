@@ -31,7 +31,18 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // one feature that takes images, and routing a photo to a non-vision model
   // would silently degrade the answer. "llama-3.2-vision" stays in the
   // catalog so /admin/llm can still select it manually.
-  chat: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5", "claude-opus-5"],
+  // A second free OpenRouter rung (GPT-OSS 20B) sits right after Nemotron's
+  // in every ladder below — each free model has its own separate per-model
+  // daily cap on OpenRouter, so trying a second one before escalating to a
+  // paid rung roughly doubles the free budget for no cost, and gives a
+  // rate-limited/timed-out Nemotron call somewhere free to fail over to
+  // first. See models.ts's "openai/gpt-oss-20b:free" entry.
+  chat: [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openai/gpt-oss-20b:free",
+    "claude-haiku-4-5",
+    "claude-opus-5",
+  ],
   // Text-only, so the self-hosted rung sits between the OpenRouter free tier
   // and Anthropic: OpenRouter's free queue is the primary path, but it can
   // time out, and Anthropic/paid-OpenRouter rungs are only reachable once
@@ -40,26 +51,33 @@ export const DEFAULT_TIERS: Record<AiFeature, string[]> = {
   // work as long as Ollama is running.
   recommendations: [
     "nvidia/nemotron-3-super-120b-a12b:free",
+    "openai/gpt-oss-20b:free",
     "llama-3.2-vision",
     "claude-haiku-4-5",
     "claude-sonnet-5",
   ],
   // Intake is a closed-list classifier — the cheapest rung handles nearly all
   // of it, and a wrong answer degrades to "no confident match" rather than
-  // showing a user something false.
-  intake: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  // showing a user something false. High call volume (every free-text
+  // comparison question now also runs resolveChatIntent() on this tier, see
+  // intakeClassifier.ts), so the second free rung matters most here.
+  intake: ["nvidia/nemotron-3-super-120b-a12b:free", "openai/gpt-oss-20b:free", "claude-haiku-4-5"],
   // Every extraction lands in an admin review queue before it touches a
   // listing, so a wrong answer costs a reviewer a click rather than showing a
   // user something false — the cheap rung is the right default here too.
-  scrape_extract: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  scrape_extract: ["nvidia/nemotron-3-super-120b-a12b:free", "openai/gpt-oss-20b:free", "claude-haiku-4-5"],
   // A narrative explaining outliers the heuristic already found — never the
   // decision itself, so a weak-but-free rung is the right default; escalation
   // only kicks in if that rung actually fails to produce usable prose.
-  pricing_intelligence_narrative: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  pricing_intelligence_narrative: [
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "openai/gpt-oss-20b:free",
+    "claude-haiku-4-5",
+  ],
   // A closed 3-way classification of a short social post — the cheapest rung
   // handles this the same way it handles `intake`, and a wrong label costs
   // nothing worse than a mis-colored badge in an admin triage queue.
-  sentiment_analysis: ["nvidia/nemotron-3-super-120b-a12b:free", "claude-haiku-4-5"],
+  sentiment_analysis: ["nvidia/nemotron-3-super-120b-a12b:free", "openai/gpt-oss-20b:free", "claude-haiku-4-5"],
 };
 
 /** Signals available at each call site without extra work or extra calls. */

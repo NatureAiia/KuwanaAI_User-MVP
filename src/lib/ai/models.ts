@@ -82,6 +82,16 @@ export const MODEL_CATALOG: ModelSpec[] = [
     note: "Free tier — shared queue, so latency is unpredictable (measured 69s for a 30-token call) and the daily request cap is low. No image support.",
   },
   {
+    id: "openai/gpt-oss-20b:free",
+    provider: "openrouter",
+    label: "GPT-OSS 20B (free)",
+    inputPrice: 0,
+    outputPrice: 0,
+    contextWindow: 131_072,
+    vision: false,
+    note: "A second OpenRouter free-tier rung (per-model daily caps are separate, so this and Nemotron's free rung don't share one budget) — used as the fallback free model when Nemotron's free rung is rate-limited or times out, before escalating to a paid tier. No image support.",
+  },
+  {
     id: "nvidia/nemotron-3-super-120b-a12b",
     provider: "openrouter",
     label: "Nemotron 3 Super 120B",

@@ -721,6 +721,35 @@ export const getListingsByIds = cache(async (ids: string[]): Promise<ListingDTO[
   return [...new Set(ids)].map((id) => byId.get(id)).filter((l): l is ListingDTO => !!l);
 });
 
+/**
+ * Flow 3 (Product vs Product via Prompt) — matches the entity names
+ * resolveChatIntent() extracted from a free-text question (e.g. "CBZ",
+ * "FBC") against real published listings in the resolved category, by
+ * provider name or listing name (case-insensitive substring, same
+ * "no true fuzzy matching, just a forgiving exact-ish match" spirit as
+ * scrape/match.ts's suggestMatch()). A name with no match is silently
+ * dropped rather than guessed at — the caller ends up with however many of
+ * the 2-5 named things actually resolved to something real.
+ */
+export async function resolveNamedListings(categoryId: string, names: string[]): Promise<string[]> {
+  if (names.length === 0) return [];
+  const listings = await prisma.listing.findMany({
+    where: { categoryId, status: "published" },
+    include: { provider: { select: { name: true } } },
+  });
+
+  const resolvedIds: string[] = [];
+  for (const name of names) {
+    const needle = name.trim().toLowerCase();
+    if (!needle) continue;
+    const match = listings.find(
+      (l) => l.provider.name.toLowerCase().includes(needle) || l.name.toLowerCase().includes(needle),
+    );
+    if (match && !resolvedIds.includes(match.id)) resolvedIds.push(match.id);
+  }
+  return resolvedIds.slice(0, 5);
+}
+
 export type RecentlyViewedListing = { listing: ListingDTO; viewedAt: string; pinned: boolean };
 
 /**

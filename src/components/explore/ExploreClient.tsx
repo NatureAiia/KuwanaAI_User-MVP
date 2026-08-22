@@ -8,6 +8,7 @@ import { Skeleton } from "boneyard-js/react";
 import { ListingCard } from "@/components/ListingCard";
 import { ListingCardFixture } from "@/components/explore/ListingCardFixture";
 import { CompareTrayBar } from "@/components/explore/CompareTrayBar";
+import { QuickSearchPanel } from "@/components/explore/QuickSearchPanel";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingRequirements } from "@/lib/eligibility";
 import { useCompareTray } from "@/lib/useCompareTray";
@@ -132,6 +133,15 @@ export function ExploreClient({
           </button>
         ))}
       </div>
+
+      {data && (
+        <QuickSearchPanel
+          sectorSlug={sectorSlug}
+          categorySlug={activeCategorySlug}
+          attributeSchema={data.attributeSchema}
+          listings={data.listings}
+        />
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] text-text-muted">

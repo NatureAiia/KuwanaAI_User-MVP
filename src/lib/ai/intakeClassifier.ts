@@ -142,6 +142,17 @@ const CHAT_INTENT_SCHEMA = {
     sector_slug: { type: ["string", "null"], description: "Best-matching sector slug from the provided list, or null." },
     category_slug: { type: ["string", "null"], description: "Best-matching category slug within that sector, or null." },
     confidence: { type: "number", description: "0 to 1." },
+    // Flow 3 (Product vs Product via Prompt) — populated only when the user
+    // named 2-5 specific things to compare (a provider, product, or brand
+    // name), e.g. "Compare CBZ vs FBC" or "NetOne vs Econet 1GB bundles".
+    // Never invented — only names actually present in the question.
+    entity_names: {
+      type: "array",
+      maxItems: 5,
+      items: { type: "string" },
+      description:
+        "2-5 provider/product names the user explicitly named to compare against each other, in their own words. Empty array if the question doesn't name specific things to compare (e.g. it's a general 'what's cheapest' question).",
+    },
     // A closed list keeps this genuinely resolvable server-side (bounded
     // count, no free-form field name the client has to render blind).
     missing_context: {
@@ -165,7 +176,7 @@ const CHAT_INTENT_SCHEMA = {
         "Up to 3 follow-up questions for whatever's missing to give a grounded, specific answer instead of a generic one. Empty array if the question already has enough to proceed.",
     },
   },
-  required: ["sector_slug", "category_slug", "confidence", "missing_context"],
+  required: ["sector_slug", "category_slug", "confidence", "entity_names", "missing_context"],
   additionalProperties: false,
 };
 
@@ -173,6 +184,8 @@ const CHAT_INTENT_SYSTEM_PROMPT =
   "You route a Zimbabwean consumer's plain-language comparison question to the single best-matching sector and " +
   "category from a closed list, the same way an intake classifier would — never invent a slug not present in the " +
   "list.\n\n" +
+  "If the question names 2-5 specific providers/products to compare against each other (e.g. \"Compare CBZ vs FBC\", " +
+  "\"NetOne vs Econet 1GB\"), capture those names verbatim in entity_names — otherwise leave it empty.\n\n" +
   "Then decide if the question already has enough specifics to give a grounded, specific answer (province/city, " +
   "budget or price ceiling, customer type, a named provider or two, a concrete need like data amount or account " +
   "type) — if so, leave missing_context empty. If it's too generic to answer well (e.g. \"what's the cheapest data " +
@@ -180,15 +193,17 @@ const CHAT_INTENT_SYSTEM_PROMPT =
   "up to 3 short, concrete follow-up questions that would actually narrow the answer — never ask something that " +
   "doesn't change the outcome. Give quick-reply options when there's an obvious small closed set (e.g. province: " +
   "Harare/Bulawayo/Gweru/Mutare), otherwise leave options null for free text. Prefer resolving with 1 question over " +
-  "3 when one genuinely covers it.\n\n" +
+  "3 when one genuinely covers it. A question that already names specific things to compare (entity_names non-empty) " +
+  "rarely needs more clarification.\n\n" +
   'Reply with JSON only, no prose and no markdown fence: {"sector_slug": string|null, "category_slug": ' +
-  'string|null, "confidence": number, "missing_context": [{"field": string, "question": string, "options": ' +
-  'string[]|null}]}.';
+  'string|null, "confidence": number, "entity_names": string[], "missing_context": [{"field": string, "question": ' +
+  'string, "options": string[]|null}]}.';
 
 export type ChatIntentResult = {
   sectorSlug: string | null;
   categorySlug: string | null;
   confidence: number;
+  entityNames: string[];
   missingContext: { field: string; question: string; options: string[] | null }[];
 };
 
@@ -204,6 +219,7 @@ export async function resolveChatIntent(query: string): Promise<ChatIntentResult
     sector_slug: string | null;
     category_slug: string | null;
     confidence: number;
+    entity_names: string[];
     missing_context: { field: string; question: string; options: string[] | null }[];
   };
   try {
@@ -221,7 +237,7 @@ export async function resolveChatIntent(query: string): Promise<ChatIntentResult
     // A failed clarification check must never block the chat — fall through
     // to "resolvable" so the caller proceeds with today's ungated answer.
     console.error("[chat-intent] resolution failed:", err);
-    return { sectorSlug: null, categorySlug: null, confidence: 0, missingContext: [] };
+    return { sectorSlug: null, categorySlug: null, confidence: 0, entityNames: [], missingContext: [] };
   }
 
   const matchedSector = sectorsWithCategories.find((s) => s.slug === result.sector_slug);
@@ -232,6 +248,9 @@ export async function resolveChatIntent(query: string): Promise<ChatIntentResult
     sectorSlug: matchedSector?.slug ?? null,
     categorySlug: matchedCategory?.slug ?? null,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
+    entityNames: Array.isArray(result.entity_names)
+      ? result.entity_names.map((n) => String(n).trim()).filter(Boolean).slice(0, 5).map((n) => n.slice(0, 60))
+      : [],
     missingContext: Array.isArray(result.missing_context)
       ? result.missing_context
           .slice(0, 3)

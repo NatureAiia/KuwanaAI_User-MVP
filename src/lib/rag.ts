@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { computeDecisionScores } from "@/lib/scoring";
-import { computeBciForListings } from "@/lib/bci";
+import { computeBciForListings } from "@/lib/bciServer";
 import { getListingPriceTrends } from "@/lib/catalog";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 

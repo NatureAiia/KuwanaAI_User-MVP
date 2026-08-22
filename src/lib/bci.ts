@@ -1,5 +1,4 @@
 import type { QualityAxis } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import { normalize, computeDecisionScores } from "@/lib/scoring";
 import { isLowerBetterAttribute } from "@/lib/attributeDirection";
@@ -14,6 +13,13 @@ import type { PriceTrend } from "@/lib/priceTrend";
  * export) rather than replacing it: BCI is additive, used specifically by
  * the Ranking Engine (Quick Search) and the weighted product-vs-product
  * comparison flow.
+ *
+ * Deliberately no `@/lib/prisma` import here — this file is pure/sync and
+ * safe to import from a client component (CompareClient.tsx does, for the
+ * weight sliders). The DB-backed pieces (rating fetch, the async
+ * orchestrator) live in bciServer.ts instead; importing prisma (which pulls
+ * in the `pg` driver) from here would leak a server-only dependency into the
+ * client bundle.
  */
 
 export const QUALITY_AXES: QualityAxis[] = ["value", "trust", "availability", "performance", "resilience"];
@@ -136,40 +142,6 @@ export function computeAxisObjectiveScores(
 
 export type AxisRatingStats = { avg: number | null; count: number };
 
-/**
- * Batched subjective-input fetch — one grouped query for every listing in
- * the set, not N+1 per listing. Rescales the 1-5 Likert average to 0-100 so
- * it's directly comparable to (and blendable with) the objective score.
- */
-export async function fetchAxisRatingStats(
-  listingIds: string[],
-): Promise<Record<string, Record<QualityAxis, AxisRatingStats>>> {
-  const empty = () =>
-    Object.fromEntries(QUALITY_AXES.map((axis) => [axis, { avg: null, count: 0 }])) as Record<
-      QualityAxis,
-      AxisRatingStats
-    >;
-  const result: Record<string, Record<QualityAxis, AxisRatingStats>> = Object.fromEntries(
-    listingIds.map((id) => [id, empty()]),
-  );
-  if (listingIds.length === 0) return result;
-
-  const grouped = await prisma.listingQualityRating.groupBy({
-    by: ["listingId", "axis"],
-    where: { listingId: { in: listingIds } },
-    _avg: { score: true },
-    _count: { score: true },
-  });
-
-  for (const row of grouped) {
-    result[row.listingId][row.axis] = {
-      avg: row._avg.score !== null ? ((row._avg.score - 1) / 4) * 100 : null,
-      count: row._count.score,
-    };
-  }
-  return result;
-}
-
 /** Pure per-listing composite — testable without a DB given precomputed axis inputs. */
 export function computeBci(
   objectiveByAxis: Record<QualityAxis, number>,
@@ -194,31 +166,4 @@ export function computeBci(
   }
 
   return { total: Math.round(Math.max(0, Math.min(100, total))), axisBreakdown, version: BCI_VERSION };
-}
-
-/**
- * Orchestrates the full BCI computation for a set of listings within one
- * category: objective scores (sync), a single batched ratings query, then
- * the per-listing composite. `weights` lets flow 2's draggable 0-100
- * sliders override the seeded QualityAxisConfig defaults for one request
- * without persisting anything.
- */
-export async function computeBciForListings(
-  listings: ListingDTO[],
-  schema: AttributeSchemaFieldDTO[],
-  options: { trends?: Record<string, PriceTrend | null>; weights?: Record<QualityAxis, number> } = {},
-): Promise<Record<string, BciResult>> {
-  if (listings.length === 0) return {};
-
-  const objectiveByAxisByListing = computeAxisObjectiveScores(listings, schema, options.trends ?? {});
-  const ratingStats = await fetchAxisRatingStats(listings.map((l) => l.id));
-
-  const results: Record<string, BciResult> = {};
-  for (const listing of listings) {
-    const objectiveByAxis = Object.fromEntries(
-      QUALITY_AXES.map((axis) => [axis, objectiveByAxisByListing[axis][listing.id] ?? NEUTRAL_SCORE]),
-    ) as Record<QualityAxis, number>;
-    results[listing.id] = computeBci(objectiveByAxis, ratingStats[listing.id], options.weights ?? DEFAULT_AXIS_WEIGHTS);
-  }
-  return results;
 }

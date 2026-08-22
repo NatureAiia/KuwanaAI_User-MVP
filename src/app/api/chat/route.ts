@@ -5,6 +5,8 @@ import { requireConsumerOrCorporate } from "@/lib/auth";
 import { privateJson } from "@/lib/apiResponse";
 import { emailDomain } from "@/lib/orgVerification";
 import { streamAiText } from "@/lib/ai/provider";
+import { computeDecisionScores } from "@/lib/scoring";
+import { getCategoryWithListings, getListingPriceTrends, resolveNamedListings } from "@/lib/catalog";
 import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
 import { getCorporatePortalConfig } from "@/lib/corporatePortalConfig";
 import type { SectorSlug } from "@/lib/sectors";
@@ -298,8 +300,31 @@ export async function POST(req: Request) {
     system += `\n\nYour account snapshot — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`;
   }
 
-  if (listingIds && listingIds.length > 0) {
-    const retrieval = await retrieveListingGrounding(listingIds);
+  let effectiveListingIds = listingIds;
+  // Flow 1 (User vs Product via Prompt) and Flow 3 (Product vs Product via
+  // Prompt): no explicit selection, but the Context Router above resolved a
+  // category — either resolve the 2-5 things the user actually named
+  // (Flow 3), or auto-select the category's top-ranked listings (Flow 1,
+  // same 5-item cap as Flow 2's selection), so a free-text question gets a
+  // directly grounded answer instead of only a deep-link suggestion.
+  if ((!effectiveListingIds || effectiveListingIds.length === 0) && resolvedIntent?.sectorSlug && resolvedIntent.categorySlug) {
+    const category = await getCategoryWithListings(resolvedIntent.sectorSlug, resolvedIntent.categorySlug);
+    if (category && category.listings.length > 0) {
+      if (resolvedIntent.entityNames.length >= 2) {
+        effectiveListingIds = await resolveNamedListings(category.id, resolvedIntent.entityNames);
+      }
+      if (!effectiveListingIds || effectiveListingIds.length === 0) {
+        const trends = await getListingPriceTrends(category.listings.map((l) => l.id));
+        const ranked = Object.entries(computeDecisionScores(category.listings, category.attributeSchema, trends))
+          .sort(([, a], [, b]) => b.total - a.total)
+          .map(([id]) => id);
+        effectiveListingIds = ranked.slice(0, 5);
+      }
+    }
+  }
+
+  if (effectiveListingIds && effectiveListingIds.length > 0) {
+    const retrieval = await retrieveListingGrounding(effectiveListingIds);
     if (retrieval) {
       system += `\n\nGrounding data for the listing(s) the user is asking about — only reference numbers from here, never invent any:\n${JSON.stringify(retrieval.listings, null, 2)}`;
     }
