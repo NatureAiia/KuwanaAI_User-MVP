@@ -16,6 +16,7 @@ import { ListingCoverArt } from "@/components/ListingCoverArt";
 import { Badge } from "@/components/ui/Card";
 import { ProviderLogo } from "@/components/ProviderLogo";
 import { RatingStars } from "@/components/RatingStars";
+import { ListingRatingWidget } from "@/components/ListingRatingWidget";
 import { ListingActions } from "@/components/ListingActions";
 import { ReportPriceButton } from "@/components/ReportPriceButton";
 import { CompareToggleButton } from "@/components/explore/CompareToggleButton";
@@ -90,6 +91,13 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
         where: { userId_listingId: { userId: user.id, listingId: listing.id } },
       })) !== null
     : false;
+  const existingRatingRows = user
+    ? await prisma.listingQualityRating.findMany({
+        where: { listingId: listing.id, userId: user.id },
+        select: { axis: true, score: true },
+      })
+    : [];
+  const existingRatings = Object.fromEntries(existingRatingRows.map((r) => [r.axis, r.score]));
 
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
@@ -174,6 +182,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
                 })}
             </dl>
           </div>
+
+          <ListingRatingWidget listingId={listing.id} isSignedIn={!!user} existingRatings={existingRatings} />
 
           {alsoCompared.length > 0 && (
             <div className="mt-6">
