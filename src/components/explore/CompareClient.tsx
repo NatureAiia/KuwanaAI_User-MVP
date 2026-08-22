@@ -25,6 +25,7 @@ import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import { TREND_TONE, TREND_ARROW, resolveProviderLink, NOT_A_RESELLER_NOTICE } from "@/lib/listingDisplay";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
+import { resolveFieldLabel } from "@/lib/fieldLabels";
 import { ExternalLink } from "lucide-react";
 import { CategoryIntakeModal } from "@/components/explore/CategoryIntakeModal";
 import { getIntakeQuestions } from "@/lib/insuranceIntake";
@@ -471,7 +472,7 @@ export function CompareClient({
                     </div>
                     {requirements.length > 0 && (
                       <Badge tone="coral" className="mt-1.5">
-                        {requirements.map((r) => r.label).join(" · ")} required
+                        {requirements.map((r) => resolveFieldLabel(r, "consumer")).join(" · ")} required
                       </Badge>
                     )}
                     <button
@@ -510,7 +511,7 @@ export function CompareClient({
                     <td key={l.id} className="p-3">
                       {requirements.map((r) => (
                         <Badge key={r.key} tone="sky">
-                          {r.label} {String(r.value)}
+                          {resolveFieldLabel(r, "consumer")} {String(r.value)}
                           {r.unit ? ` ${r.unit}` : ""}
                         </Badge>
                       ))}
@@ -573,7 +574,7 @@ export function CompareClient({
               .filter((a) => a.isComparable && !isRequirementAttribute(a.key))
               .map((attr) => (
                 <tr key={attr.key} className="border-b border-border last:border-0">
-                  <td className="p-3 font-medium text-text-secondary">{attr.label}</td>
+                  <td className="p-3 font-medium text-text-secondary">{resolveFieldLabel(attr, "consumer")}</td>
                   {listings.map((l) => (
                     <td key={l.id} className="p-3">
                       {formatValue(l.attributes[attr.key], attr.dataType, attr.unit)}

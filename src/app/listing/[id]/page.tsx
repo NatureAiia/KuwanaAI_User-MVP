@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { computePriceForecast } from "@/lib/priceTrend";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
 import { describeMarketPosition } from "@/lib/attributeDirection";
+import { resolveFieldLabel } from "@/lib/fieldLabels";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { BackButton } from "@/components/ui/BackButton";
@@ -65,6 +66,9 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
     label: a.label,
     dataType: a.dataType as "number" | "string" | "enum" | "boolean",
     unit: a.unit,
+    consumerLabel: a.consumerLabel,
+    qualityAxis: a.qualityAxis,
+    synonyms: a.synonyms,
     isComparable: a.isComparable,
     sortOrder: a.sortOrder,
   }));
@@ -136,7 +140,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {requirements.map((r) => (
                   <Badge key={r.key} tone="sky">
-                    {r.label} {String(r.value)}
+                    {resolveFieldLabel(r, "consumer")} {String(r.value)}
                     {r.unit ? ` ${r.unit}` : ""}
                   </Badge>
                 ))}
@@ -158,7 +162,7 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
                       : null;
                   return (
                     <div key={attr.key} className="flex items-center justify-between text-[13px]">
-                      <dt className="text-text-secondary">{attr.label}</dt>
+                      <dt className="text-text-secondary">{resolveFieldLabel(attr, "consumer")}</dt>
                       <dd className="flex items-center gap-1.5 font-medium">
                         {position && position.tone !== "neutral" && (
                           <Badge tone={position.tone}>{position.label}</Badge>

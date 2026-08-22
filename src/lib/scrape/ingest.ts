@@ -28,6 +28,9 @@ export async function ingestUrl(params: {
     label: a.label,
     dataType: a.dataType as CategoryDTO["attributeSchema"][number]["dataType"],
     unit: a.unit,
+    consumerLabel: a.consumerLabel,
+    qualityAxis: a.qualityAxis,
+    synonyms: a.synonyms,
     isComparable: a.isComparable,
     sortOrder: a.sortOrder,
   }));
