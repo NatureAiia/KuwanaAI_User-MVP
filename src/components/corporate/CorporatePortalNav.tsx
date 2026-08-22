@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { LineChart, Package, ClipboardList, Building2, BarChart2, FileText, Bell, Activity, Search, UploadCloud, ChevronsLeft, ChevronsRight, MessageCircle, Wallet, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 import { PortalMobileNav } from "@/components/PortalMobileNav";
+import { resolveNavLabel } from "@/lib/corporatePortalConfig";
+import type { SectorSlug } from "@/lib/sectors";
 
 const COLLAPSE_KEY = "corporate-nav-collapsed";
 
@@ -59,11 +61,16 @@ function isActive(pathname: string, href: string) {
   return href === "/corporate" ? pathname === "/corporate" : pathname.startsWith(href);
 }
 
-/** Mobile: fixed bottom nav (see PortalMobileNav) — a few quick tabs plus a "Menu" sheet listing every group. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, grouped under muted section headers, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. */
-export function CorporatePortalNav({ companyName }: { companyName: string }) {
+/** Mobile: fixed bottom nav (see PortalMobileNav) — a few quick tabs plus a "Menu" sheet listing every group. Desktop: a left sidebar — icon chip + label, active marked with a colored chip and a left accent bar, grouped under muted section headers, plus a company identity card pinned to the bottom. Collapsible to an icon-only rail; the choice is remembered per-browser via localStorage. `sector` swaps a handful of link labels to that sector's own terms (see corporatePortalConfig.ts) — same routes, same groups, just wording; null/unmapped sectors render identically to before. */
+export function CorporatePortalNav({ companyName, sector }: { companyName: string; sector?: SectorSlug | null }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const initial = companyName.trim().charAt(0).toUpperCase() || "K";
+
+  const navGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    links: group.links.map((link) => ({ ...link, label: resolveNavLabel(sector, link.href, link.label) })),
+  }));
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reading a one-time user preference from localStorage, not deriving render output
@@ -80,7 +87,7 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
 
   return (
     <>
-      <PortalMobileNav groups={NAV_GROUPS} />
+      <PortalMobileNav groups={navGroups} />
 
       <nav
         className={clsx(
@@ -94,7 +101,7 @@ export function CorporatePortalNav({ companyName }: { companyName: string }) {
             collapsed ? "items-center px-2" : "px-3",
           )}
         >
-          {NAV_GROUPS.map((group, groupIndex) => (
+          {navGroups.map((group, groupIndex) => (
             <div key={group.label} className={clsx(groupIndex > 0 && "mt-3")}>
               {!collapsed && (
                 <p className="px-3 pb-1 text-[10.5px] font-semibold uppercase tracking-wide text-text-muted">

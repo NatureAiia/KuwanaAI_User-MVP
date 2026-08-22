@@ -11,6 +11,7 @@ import {
   Shirt,
   Hotel,
   ShoppingCart,
+  UtensilsCrossed,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -26,7 +27,8 @@ export type SectorSlug =
   | "electronics"
   | "fashion"
   | "hotels"
-  | "retail";
+  | "retail"
+  | "food";
 
 export const SECTORS: Record<
   SectorSlug,
@@ -116,6 +118,13 @@ export const SECTORS: Record<
     status: "live",
     blurb: "Groceries & staples",
   },
+  food: {
+    name: "Food & Drink",
+    slug: "food",
+    icon: UtensilsCrossed,
+    status: "live",
+    blurb: "Restaurants, fast food & delivery",
+  },
 };
 
 export const LIVE_SECTORS: SectorSlug[] = [
@@ -127,4 +136,5 @@ export const LIVE_SECTORS: SectorSlug[] = [
   "utilities",
   "hotels",
   "retail",
+  "food",
 ];

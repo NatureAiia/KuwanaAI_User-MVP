@@ -8,6 +8,8 @@ import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
 import { getListingPriceTrends } from "@/lib/catalog";
 import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
+import { getCorporatePortalConfig } from "@/lib/corporatePortalConfig";
+import type { SectorSlug } from "@/lib/sectors";
 import { recordEvent } from "@/lib/gamification/process-event";
 import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
 import {
@@ -188,6 +190,13 @@ export async function POST(req: Request) {
     system += context
       ? `\n\nYour account snapshot (${provider!.name}) — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`
       : "\n\nThis account isn't linked to a provider catalog yet — tell the user to ask an admin to link it before you can answer catalog-specific questions.";
+
+    // Sector-specific jargon fragment (see corporatePortalConfig.ts) — a
+    // banking account gets "RTGS/Nostro" phrasing, a school gets "SDA/
+    // boarding fees", etc. Unmapped sectors/no primarySector: no change.
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { primarySector: true } });
+    const sectorConfig = getCorporatePortalConfig(dbUser?.primarySector as SectorSlug | null);
+    if (sectorConfig) system += `\n\n${sectorConfig.chatPromptFragment}`;
   } else {
     const context = await getConsumerChatContext(user.id);
     system += `\n\nYour account snapshot — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`;
