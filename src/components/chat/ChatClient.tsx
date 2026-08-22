@@ -11,13 +11,18 @@ import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { DateDivider } from "@/components/chat/DateDivider";
 import { MessageBubble, type ChatMessage } from "@/components/chat/MessageBubble";
 import { notifyGamification } from "@/lib/gamification/client";
-import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
+import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER, STREAM_CLARIFY_MARKER } from "@/lib/chatStream";
 import { takePendingChatImage } from "@/lib/chatHandoff";
 
 const ERROR_REPLY = "Sorry, I couldn't reach the assistant just now. Please try again.";
 // Covers a marker split across two chunk reads at the boundary.
 const SAFETY_MARGIN =
-  Math.max(STREAM_META_MARKER.length, STREAM_ERROR_MARKER.length, STREAM_STATUS_MARKER.length) - 1;
+  Math.max(
+    STREAM_META_MARKER.length,
+    STREAM_ERROR_MARKER.length,
+    STREAM_STATUS_MARKER.length,
+    STREAM_CLARIFY_MARKER.length,
+  ) - 1;
 
 const STATUS_LABELS: Record<string, string> = {
   escalating: "Trying a smarter model…",
@@ -206,10 +211,21 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
 
         const errIdx = buffer.indexOf(STREAM_ERROR_MARKER);
         const metaIdx = buffer.indexOf(STREAM_META_MARKER);
+        const clarifyIdx = buffer.indexOf(STREAM_CLARIFY_MARKER);
 
         if (errIdx !== -1) {
           appendDelta(buffer.slice(shown, errIdx));
           throw new Error("assistant stream reported failure");
+        }
+        if (clarifyIdx !== -1) {
+          // A clarify response has no streamed prose before it — it's sent
+          // as one atomic reply, never appendDelta'd like a normal answer.
+          const meta = JSON.parse(buffer.slice(clarifyIdx + STREAM_CLARIFY_MARKER.length));
+          setMessages((prev) => [...prev.map((m) => (m.id === pendingId ? { ...m, status: undefined } : m)), meta.message]);
+          assistantId = meta.message.id;
+          setActiveConversationId(meta.conversationId);
+          loadThreads();
+          break;
         }
         if (metaIdx !== -1) {
           appendDelta(buffer.slice(shown, metaIdx));
@@ -281,7 +297,7 @@ export function ChatClient({ variant = "consumer" }: { variant?: "consumer" | "c
             <div key={group.key} className="flex flex-col gap-3">
               {group.date && <DateDivider date={group.date} stickyTop={dividerTop} />}
               {group.messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+                <MessageBubble key={m.id} message={m} onQuickReply={sendMessage} />
               ))}
             </div>
           ))

@@ -57,6 +57,12 @@ type AttrDef = {
   dataType: "number" | "string" | "enum" | "boolean";
   unit?: string;
   isComparable?: boolean;
+  // Plain-language override for consumer-facing surfaces (see resolveFieldLabel).
+  consumerLabel?: string;
+  // Which BCI axis this field feeds as an objective input, if any (see src/lib/bci.ts).
+  qualityAxis?: "value" | "trust" | "availability" | "performance" | "resilience";
+  // Casual/alternate phrasings for search and intake matching.
+  synonyms?: string[];
 };
 
 // A provider is usually just a name; give it a websiteUrl when the source
@@ -71,6 +77,9 @@ type SectorSeed = {
   categories: {
     slug: string;
     name: string;
+    // Everyday phrasings a consumer might use for this category beyond its
+    // own name — matched by classifyIntake()/resolveChatIntent().
+    synonyms?: string[];
     attributes: AttrDef[];
     providers: ProviderSeed[];
     listings: {
@@ -103,6 +112,10 @@ const SECTORS: SectorSeed[] = [
         ],
         providers: ["Econet", "NetOne", "Telecel"],
         listings: [
+          // NetOne 1GB $4 vs Econet 1GB $5 — the exact reference figures from
+          // the uploaded docs (validity approximated at 30 days, not stated there).
+          { name: "OneFusion Monthly 1GB", provider: "NetOne", price: 4, attrs: { data_amount: 1, validity_days: 30, network: "NetOne", speed: "4G" }, freshnessStatus: "unverified" },
+          { name: "PowerBundle Monthly 1GB", provider: "Econet", price: 5, attrs: { data_amount: 1, validity_days: 30, network: "Econet", speed: "4G" }, freshnessStatus: "unverified" },
           { name: "Weekly Bundle 1GB", provider: "Econet", price: 1.5, attrs: { data_amount: 1, validity_days: 7, network: "Econet", speed: "4G" } },
           { name: "PowerBundle 5GB", provider: "Econet", price: 5, attrs: { data_amount: 5, validity_days: 30, network: "Econet", speed: "4G" } },
           { name: "NightBundle 10GB", provider: "Econet", price: 3, attrs: { data_amount: 10, validity_days: 1, network: "Econet", speed: "4G" } },
@@ -181,6 +194,81 @@ const SECTORS: SectorSeed[] = [
           { name: "FBC Current Account", provider: "FBC", price: 4, attrs: { monthly_fee: 4, min_balance: 20, transaction_fee: 0.25, overdraft: true, branch_count: 18 } },
           { name: "Nedbank Current Account", provider: "Nedbank", price: 5, attrs: { monthly_fee: 5, min_balance: 30, transaction_fee: 0.35, overdraft: true, branch_count: 15 } },
           { name: "Nedbank Student Current", provider: "Nedbank", price: 0, attrs: { monthly_fee: 0, min_balance: 0, transaction_fee: 0.1, overdraft: false, branch_count: 15 } },
+        ],
+      },
+      {
+        // Real reference figures from the uploaded docs: a channel-based RTGS
+        // fee differential — app ~$2 vs manual/branch $5.20 for a $500 RTGS
+        // transfer on a low-cost Nostro FCA (USD) youth account.
+        slug: "nostro-fca-accounts",
+        name: "Nostro FCA (USD) accounts",
+        synonyms: ["usd account", "foreign currency account", "dollar account"],
+        attributes: [
+          { key: "monthly_fee", label: "Monthly fee", dataType: "number", unit: "USD" },
+          { key: "min_balance", label: "Min. balance", dataType: "number", unit: "USD", consumerLabel: "Minimum balance to open" },
+          {
+            key: "rtgs_fee_app",
+            label: "RTGS Fee (App)",
+            consumerLabel: "Sending money via app",
+            dataType: "number",
+            unit: "USD",
+          },
+          {
+            key: "rtgs_fee_manual",
+            label: "RTGS Fee (Manual/Branch)",
+            consumerLabel: "Sending money at a branch",
+            dataType: "number",
+            unit: "USD",
+          },
+          { key: "channel_ussd", label: "USSD Channel", dataType: "boolean", qualityAxis: "availability", synonyms: ["*230#", "dial code"] },
+          { key: "channel_agency", label: "Agency Banking", dataType: "boolean", qualityAxis: "availability" },
+          { key: "customer_type", label: "Customer type", dataType: "enum" },
+        ],
+        providers: ["CBZ", "Steward Bank", "FBC"],
+        listings: [
+          {
+            name: "CBZ Youth Nostro FCA",
+            provider: "CBZ",
+            price: 0,
+            attrs: {
+              monthly_fee: 0,
+              min_balance: 0,
+              rtgs_fee_app: 2,
+              rtgs_fee_manual: 5.2,
+              channel_ussd: true,
+              channel_agency: true,
+              customer_type: "Youth",
+            },
+            freshnessStatus: "unverified",
+          },
+          {
+            name: "Steward Bank Youth Nostro FCA",
+            provider: "Steward Bank",
+            price: 0,
+            attrs: {
+              monthly_fee: 0,
+              min_balance: 0,
+              rtgs_fee_app: 2.5,
+              rtgs_fee_manual: 5,
+              channel_ussd: true,
+              channel_agency: true,
+              customer_type: "Youth",
+            },
+          },
+          {
+            name: "FBC Individual Nostro FCA",
+            provider: "FBC",
+            price: 2,
+            attrs: {
+              monthly_fee: 2,
+              min_balance: 20,
+              rtgs_fee_app: 3,
+              rtgs_fee_manual: 6,
+              channel_ussd: false,
+              channel_agency: true,
+              customer_type: "Individual",
+            },
+          },
         ],
       },
     ],
@@ -674,6 +762,89 @@ const SECTORS: SectorSeed[] = [
           { name: "Yummy Rice 5kg", provider: "Choppies", price: 8.9, attrs: { brand: "Yummy", pack_size: "5kg", store: "Choppies" } },
         ],
       },
+      {
+        // Real reference figures from the uploaded 7-sector docs: cement
+        // "$11-14" and solar "$0.31/W (Jinko 550W $170) vs $0.50/W (generic
+        // 100W $50)" — spread within the stated ranges, not invented beyond
+        // them; per-retailer prices otherwise unverified.
+        slug: "building-materials",
+        name: "Building materials",
+        synonyms: ["cement", "bricks", "building supplies"],
+        attributes: [
+          { key: "material", label: "Material", dataType: "enum" },
+          { key: "pack_size", label: "Pack size", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["OK Zimbabwe", "N Richards Wholesale", "Halsteds"],
+        listings: [
+          { name: "PPC Cement 50kg", provider: "OK Zimbabwe", price: 14, attrs: { material: "Cement", pack_size: "50kg", store: "OK Zimbabwe" }, freshnessStatus: "unverified" },
+          { name: "PPC Cement 50kg", provider: "N Richards Wholesale", price: 11, attrs: { material: "Cement", pack_size: "50kg", store: "N Richards Wholesale" }, freshnessStatus: "unverified" },
+          { name: "PPC Cement 50kg", provider: "Halsteds", price: 12.5, attrs: { material: "Cement", pack_size: "50kg", store: "Halsteds" }, freshnessStatus: "unverified" },
+        ],
+      },
+      {
+        slug: "solar-equipment",
+        name: "Solar equipment",
+        synonyms: ["solar panel", "solar power", "off-grid power"],
+        attributes: [
+          { key: "watts", label: "Wattage", dataType: "number", unit: "W" },
+          { key: "cost_per_watt", label: "Cost per watt", dataType: "number", unit: "USD/W", qualityAxis: "value" },
+          { key: "brand", label: "Brand", dataType: "string" },
+          { key: "store", label: "Store", dataType: "enum" },
+        ],
+        providers: ["OK Zimbabwe", "N Richards Wholesale"],
+        listings: [
+          { name: "Jinko 550W Solar Panel", provider: "N Richards Wholesale", price: 170, attrs: { watts: 550, cost_per_watt: 0.31, brand: "Jinko", store: "N Richards Wholesale" }, freshnessStatus: "unverified" },
+          { name: "Generic 100W Solar Panel", provider: "OK Zimbabwe", price: 50, attrs: { watts: 100, cost_per_watt: 0.5, brand: "Generic", store: "OK Zimbabwe" }, freshnessStatus: "unverified" },
+        ],
+      },
+    ],
+  },
+  {
+    // Net-new sector (see src/lib/sectors.ts) — the 7th of the uploaded
+    // docs' 7 sectors. One real cited figure (Chicken Inn's "2-piecer"),
+    // the rest are illustrative placeholders in the same synthetic-but-
+    // plausible style the Banking/Telecom sectors above already use.
+    slug: "food",
+    name: "Food & Drink",
+    status: "live",
+    categories: [
+      {
+        slug: "fast-food",
+        name: "Fast food",
+        synonyms: ["takeaway", "quick meal", "fast food chains"],
+        attributes: [
+          { key: "meal", label: "Meal", dataType: "string" },
+          { key: "delivery", label: "Delivery available", dataType: "boolean", qualityAxis: "availability" },
+          { key: "halal", label: "Halal", dataType: "boolean" },
+        ],
+        providers: ["Chicken Inn", "Pizza Inn", "Nando's"],
+        listings: [
+          {
+            name: "2-Piece Chicken Combo",
+            provider: "Chicken Inn",
+            price: 3,
+            attrs: { meal: "2-piece chicken + chips", delivery: true, halal: false },
+            freshnessStatus: "unverified",
+          },
+          { name: "Medium Pepperoni Pizza", provider: "Pizza Inn", price: 8, attrs: { meal: "Medium pizza", delivery: true, halal: false }, freshnessStatus: "unverified" },
+          { name: "Quarter Chicken Meal", provider: "Nando's", price: 7, attrs: { meal: "Quarter chicken + side", delivery: true, halal: true }, freshnessStatus: "unverified" },
+        ],
+      },
+      {
+        slug: "casual-dining",
+        name: "Casual dining",
+        synonyms: ["restaurant", "sit-down meal"],
+        attributes: [
+          { key: "cuisine", label: "Cuisine", dataType: "string" },
+          { key: "seating", label: "Seating available", dataType: "boolean", qualityAxis: "availability" },
+        ],
+        providers: ["Victoria 22", "Cafe Nush"],
+        listings: [
+          { name: "Steak & Chips", provider: "Victoria 22", price: 25, attrs: { cuisine: "Zimbabwean/International", seating: true }, freshnessStatus: "unverified" },
+          { name: "Breakfast Platter", provider: "Cafe Nush", price: 8, attrs: { cuisine: "Cafe", seating: true }, freshnessStatus: "unverified" },
+        ],
+      },
     ],
   },
 ];
@@ -689,8 +860,8 @@ async function main() {
     for (const catSeed of sectorSeed.categories) {
       const category = await prisma.category.upsert({
         where: { sectorId_slug: { sectorId: sector.id, slug: catSeed.slug } },
-        update: { name: catSeed.name },
-        create: { sectorId: sector.id, slug: catSeed.slug, name: catSeed.name },
+        update: { name: catSeed.name, synonyms: catSeed.synonyms ?? [] },
+        create: { sectorId: sector.id, slug: catSeed.slug, name: catSeed.name, synonyms: catSeed.synonyms ?? [] },
       });
 
       for (const [i, attr] of catSeed.attributes.entries()) {
@@ -702,7 +873,15 @@ async function main() {
         }
         await prisma.attributeSchemaField.upsert({
           where: { categoryId_key: { categoryId: category.id, key: attr.key } },
-          update: { label: attr.label, dataType: attr.dataType, unit: attr.unit, sortOrder: i },
+          update: {
+            label: attr.label,
+            dataType: attr.dataType,
+            unit: attr.unit,
+            sortOrder: i,
+            consumerLabel: attr.consumerLabel ?? null,
+            qualityAxis: attr.qualityAxis ?? null,
+            synonyms: attr.synonyms ?? [],
+          },
           create: {
             categoryId: category.id,
             key: attr.key,
@@ -711,6 +890,9 @@ async function main() {
             unit: attr.unit,
             isComparable: attr.isComparable ?? true,
             sortOrder: i,
+            consumerLabel: attr.consumerLabel ?? null,
+            qualityAxis: attr.qualityAxis ?? null,
+            synonyms: attr.synonyms ?? [],
           },
         });
       }
@@ -765,6 +947,49 @@ async function main() {
   // common in this market) so the provider-trust signal (Decision Score, compare/regulator views)
   // has a real example to surface instead of every seeded provider being verified.
   await prisma.provider.update({ where: { id: "electronics-Electromart" }, data: { verified: false } });
+
+  // The 5 fixed BCI axes (see src/lib/bci.ts) — display names are
+  // admin-editable afterwards, the axis enum value is the stable slug.
+  // Weights match the docs' own default split: Value 25 / Trust 25 /
+  // Availability 20 / Performance 15 / Resilience 15.
+  const AXIS_SEEDS: { axis: "value" | "trust" | "availability" | "performance" | "resilience"; displayName: string; description: string; defaultWeight: number }[] = [
+    { axis: "value", displayName: "Value for Money", description: "Price and fees relative to peers.", defaultWeight: 0.25 },
+    { axis: "trust", displayName: "Trust & Safety", description: "Regulator standing and verification.", defaultWeight: 0.25 },
+    { axis: "availability", displayName: "Availability", description: "Channel/branch/service coverage.", defaultWeight: 0.2 },
+    { axis: "performance", displayName: "Performance", description: "Speed and quality of service.", defaultWeight: 0.15 },
+    { axis: "resilience", displayName: "Resilience", description: "Backup channels and outage recovery.", defaultWeight: 0.15 },
+  ];
+  for (const a of AXIS_SEEDS) {
+    await prisma.qualityAxisConfig.upsert({
+      where: { axis: a.axis },
+      update: { displayName: a.displayName, description: a.description, defaultWeight: a.defaultWeight },
+      create: { axis: a.axis, displayName: a.displayName, description: a.description, defaultWeight: a.defaultWeight },
+    });
+  }
+
+  // A handful of real, publicly known homepages as scrape-pipeline targets
+  // for the sectors this round added/extended — ready for Firecrawl to crawl
+  // once a real instance is configured (FIRECRAWL_API_URL/KEY in production;
+  // none is running in dev, so these are registered but not run here). Not
+  // an exhaustive source list — a starting point per sector, added to over
+  // time via /admin/scraper same as any other source.
+  const SCRAPE_SOURCE_SEEDS: { name: string; url: string; sectorSlug: string; categorySlug: string }[] = [
+    { name: "Econet Zimbabwe", url: "https://www.econet.co.zw/", sectorSlug: "telecom", categorySlug: "data-bundles" },
+    { name: "NetOne Zimbabwe", url: "https://www.netone.co.zw/", sectorSlug: "telecom", categorySlug: "data-bundles" },
+    { name: "CBZ Bank", url: "https://www.cbz.co.zw/", sectorSlug: "banking", categorySlug: "nostro-fca-accounts" },
+    { name: "ZUPCO", url: "https://www.zupco.co.zw/", sectorSlug: "transport", categorySlug: "bus-fares" },
+  ];
+  for (const s of SCRAPE_SOURCE_SEEDS) {
+    const category = await prisma.category.findFirst({
+      where: { slug: s.categorySlug, sector: { slug: s.sectorSlug } },
+      select: { id: true },
+    });
+    if (!category) continue;
+    const existing = await prisma.scrapeSource.findFirst({ where: { url: s.url, categoryId: category.id } });
+    if (!existing) {
+      await prisma.scrapeSource.create({ data: { name: s.name, url: s.url, categoryId: category.id } });
+    }
+  }
 
   for (const [eventType, xpValue] of Object.entries(XP_RULES)) {
     const badgeTrigger = BADGE_TRIGGERS[eventType as keyof typeof BADGE_TRIGGERS] as

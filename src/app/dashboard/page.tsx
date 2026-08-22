@@ -12,6 +12,7 @@ import { QuickAccessTabs } from "@/components/dashboard/QuickAccessTabs";
 import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { NeedIntake } from "@/components/explore/NeedIntake";
 import { WelcomeModal } from "@/components/WelcomeModal";
+import { ProfileNudge } from "@/components/ProfileNudge";
 
 const ROLE_DASHBOARD: Partial<Record<string, string>> = {
   corporate: "/corporate",
@@ -84,6 +85,15 @@ export default async function DashboardPage() {
       <Header currentStreak={streak?.currentStreak ?? 0} />
 
       <WelcomeBanner firstName={firstName ?? null} />
+
+      <ProfileNudge
+        userId={user.id}
+        profile={{
+          ageRange: profile?.ageRange ?? null,
+          occupation: profile?.occupation ?? null,
+          location: profile?.location ?? null,
+        }}
+      />
 
       <NeedIntake enableImageSearch />
 

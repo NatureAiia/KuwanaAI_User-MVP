@@ -16,6 +16,7 @@ export const XP_RULES: Record<EventType, number> = {
   advert_opened: 2,
   listing_submitted: 15,
   listing_approved: 40,
+  listing_rated: 8,
 };
 
 export const XP_PER_LEVEL = 100;

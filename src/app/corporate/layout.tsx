@@ -17,7 +17,7 @@ export default async function CorporateLayout({ children }: { children: React.Re
 
   const dbUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { role: true, profile: { select: { fullName: true } } },
+    select: { role: true, primarySector: true, profile: { select: { fullName: true } } },
   });
   if (dbUser?.role !== "corporate") redirect("/dashboard");
 
@@ -32,9 +32,9 @@ export default async function CorporateLayout({ children }: { children: React.Re
   return (
     <div id="main-content" tabIndex={-1} className="flex min-h-screen flex-1 flex-col">
       <WelcomeModal userId={user.id} role="corporate" />
-      <CorporateHeader companyName={companyName} />
+      <CorporateHeader companyName={companyName} sector={dbUser.primarySector} />
       <div className="flex flex-1 flex-col md:flex-row">
-        <CorporatePortalNav companyName={companyName} />
+        <CorporatePortalNav companyName={companyName} sector={dbUser.primarySector} />
         {/* pb-24 clears the fixed PortalMobileNav bar on mobile (see CorporatePortalNav); md drops back to pb-12 since that nav is desktop-sidebar-only above md. */}
         <main className="flex-1 bg-bg-base px-5 pb-24 pt-4 md:px-8 md:pb-12 md:pt-6">{children}</main>
       </div>

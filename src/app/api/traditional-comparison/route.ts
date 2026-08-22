@@ -60,6 +60,9 @@ export async function POST(req: Request) {
     label: a.label,
     dataType: a.dataType as AttributeSchemaFieldDTO["dataType"],
     unit: a.unit,
+    consumerLabel: a.consumerLabel,
+    qualityAxis: a.qualityAxis,
+    synonyms: a.synonyms,
     isComparable: a.isComparable,
     sortOrder: a.sortOrder,
   }));

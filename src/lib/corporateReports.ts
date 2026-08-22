@@ -39,12 +39,18 @@ export function downloadMarketIntelligencePdf(data: MarketIntelligenceReportData
 
 export type ChangeRequestSummaryRow = {
   listingName: string;
-  type: "edit" | "new_listing";
+  type: "edit" | "new_listing" | "new_field";
   status: "pending" | "approved" | "rejected";
   price: number;
   currency: string;
   createdAt: Date | string;
   reviewedAt?: Date | string | null;
+};
+
+const REQUEST_TYPE_LABEL: Record<ChangeRequestSummaryRow["type"], string> = {
+  edit: "Edit",
+  new_listing: "New product",
+  new_field: "New field",
 };
 
 export function downloadChangeRequestSummaryPdf(providerName: string, rows: ChangeRequestSummaryRow[]) {
@@ -56,7 +62,7 @@ export function downloadChangeRequestSummaryPdf(providerName: string, rows: Chan
     ["Listing", "Type", "Price", "Status", "Submitted", "Reviewed"],
     rows.map((r) => [
       r.listingName,
-      r.type === "edit" ? "Edit" : "New product",
+      REQUEST_TYPE_LABEL[r.type],
       `${r.currency} ${r.price.toFixed(2)}`,
       r.status,
       new Date(r.createdAt).toLocaleDateString("en-ZW"),

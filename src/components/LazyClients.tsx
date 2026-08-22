@@ -60,6 +60,12 @@ export const CorporateProductRequestFormLazy = dynamic(
   { loading: () => <Skeleton height={420} /> },
 );
 
+/** Corporate's "propose a new comparable field" request — see CorporateFieldRequestForm. */
+export const CorporateFieldRequestFormLazy = dynamic(
+  () => import("@/components/corporate/CorporateFieldRequestForm").then((m) => m.CorporateFieldRequestForm),
+  { loading: () => <Skeleton height={420} /> },
+);
+
 /** Admin-only forms — never worth shipping to a consumer's bundle. */
 export const NewListingFormLazy = dynamic(
   () => import("@/components/admin/NewListingForm").then((m) => m.NewListingForm),

@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getListingsByIds, getListingPriceTrends, getCategorySchema } from "@/lib/catalog";
 import { requireUser } from "@/lib/auth";
+import { computeAxisObjectiveScores, QUALITY_AXES } from "@/lib/bci";
+import { fetchAxisRatingStats } from "@/lib/bciServer";
+import type { QualityAxis } from "@prisma/client";
 import { BottomTabBar } from "@/components/BottomTabBar";
 import { Header } from "@/components/Header";
 import { CompareClientLazy } from "@/components/LazyClients";
@@ -59,9 +62,32 @@ export default async function ComparePage({
     label: a.label,
     dataType: a.dataType as AttributeSchemaFieldDTO["dataType"],
     unit: a.unit,
+    consumerLabel: a.consumerLabel,
+    qualityAxis: a.qualityAxis,
+    synonyms: a.synonyms,
     isComparable: a.isComparable,
     sortOrder: a.sortOrder,
   }));
+
+  // Precomputed BCI inputs (Flow 2's weighted comparison — see
+  // CompareClient's axis sliders) — objective scores are cheap/sync, the
+  // ratings query is the only async part, both computed once here so the
+  // client can freely recompute the weighted composite on every slider drag
+  // with no further network round-trip.
+  const axisObjectiveByListing = computeAxisObjectiveScores(listings, attributeSchema, trends);
+  const ratingStatsByListing = await fetchAxisRatingStats(listingIds);
+  const bciInputs = Object.fromEntries(
+    listings.map((l) => [
+      l.id,
+      {
+        objective: Object.fromEntries(QUALITY_AXES.map((axis) => [axis, axisObjectiveByListing[axis][l.id] ?? 50])) as Record<
+          QualityAxis,
+          number
+        >,
+        ratings: ratingStatsByListing[l.id],
+      },
+    ]),
+  );
 
   return (
     <div id="main-content" tabIndex={-1} className="flex flex-1 flex-col px-5 pb-24 pt-6 md:px-10">
@@ -75,6 +101,7 @@ export default async function ComparePage({
         listings={listings}
         attributeSchema={attributeSchema}
         trends={trends}
+        bciInputs={bciInputs}
         initialSavedIds={initialSavedIds}
         budgetFlexibility={budgetFlexibility}
         constraints={constraints}

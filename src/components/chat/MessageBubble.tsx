@@ -2,6 +2,7 @@ import { clsx } from "clsx";
 import { Clock } from "lucide-react";
 import Markdown from "react-markdown";
 import { ChatListingPreview } from "@/components/chat/ChatListingPreview";
+import { ClarifyingQuestionCard, type ClarifyField } from "@/components/chat/ClarifyingQuestionCard";
 
 export type ChatListingSummary = {
   id: string;
@@ -20,6 +21,10 @@ export type ChatMessage = {
   createdAt?: string;
   listings?: ChatListingSummary[];
   status?: "sending";
+  // Set when this assistant turn asked a clarifying question instead of
+  // answering (see STREAM_CLARIFY_MARKER) — renders quick-reply chips below
+  // the message instead of (or alongside) its markdown content.
+  clarify?: { fields: ClarifyField[] } | null;
 };
 
 /* eslint-disable @typescript-eslint/no-unused-vars -- each override destructures `node` only to keep it out of the DOM spread below */
@@ -43,7 +48,14 @@ const MARKDOWN_COMPONENTS = {
 } satisfies import("react-markdown").Components;
 /* eslint-enable @typescript-eslint/no-unused-vars */
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+export function MessageBubble({
+  message,
+  onQuickReply,
+}: {
+  message: ChatMessage;
+  /** Sends a chip's value as the next user message — same path as typing it in (see ChatClient.sendMessage). */
+  onQuickReply?: (text: string) => void;
+}) {
   const isUser = message.role === "user";
 
   return (
@@ -64,6 +76,9 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
       </div>
       {!isUser && message.listings && message.listings.length > 0 && (
         <ChatListingPreview listings={message.listings} />
+      )}
+      {!isUser && message.clarify && message.clarify.fields.length > 0 && (
+        <ClarifyingQuestionCard fields={message.clarify.fields} onReply={onQuickReply} />
       )}
       {!isUser && message.content && (
         <p className="mt-1 text-center text-[10.5px] italic text-text-muted">

@@ -6,10 +6,16 @@ import { privateJson } from "@/lib/apiResponse";
 import { emailDomain } from "@/lib/orgVerification";
 import { streamAiText } from "@/lib/ai/provider";
 import { computeDecisionScores } from "@/lib/scoring";
-import { getListingPriceTrends } from "@/lib/catalog";
+import { getCategoryWithListings, getListingPriceTrends, resolveNamedListings } from "@/lib/catalog";
 import { getConsumerChatContext, getCorporateChatContext } from "@/lib/chatContext";
+import { getCorporatePortalConfig } from "@/lib/corporatePortalConfig";
+import type { SectorSlug } from "@/lib/sectors";
 import { recordEvent } from "@/lib/gamification/process-event";
-import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER } from "@/lib/chatStream";
+import { STREAM_META_MARKER, STREAM_ERROR_MARKER, STREAM_STATUS_MARKER, STREAM_CLARIFY_MARKER } from "@/lib/chatStream";
+import { resolveChatIntent } from "@/lib/ai/intakeClassifier";
+import { retrieveListingGrounding } from "@/lib/rag";
+import { getUserNote, saveUserNote } from "@/lib/userNotes";
+import type { Sector } from "@prisma/client";
 import {
   enforceRateLimit,
   acquireConcurrencySlot,
@@ -19,6 +25,23 @@ import {
 import type { NormalizedMessage } from "@/lib/ai/types";
 
 const CHAT_HISTORY_LIMIT = 20;
+
+// After this many consecutive clarifying turns with no real answer, stop
+// asking and force a best-effort reply with whatever context exists — never
+// loop a user through follow-up questions indefinitely.
+const MAX_CONSECUTIVE_CLARIFY_TURNS = 2;
+
+/** Walks backward from the most recent message counting consecutive assistant turns that were clarifying questions (Message.clarify set), stopping at the first real answer. */
+function countTrailingClarifyTurns(messages: { role: string; clarify: unknown }[]): number {
+  let count = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "assistant") continue;
+    if (!m.clarify) break;
+    count++;
+  }
+  return count;
+}
 
 /**
  * Wall-clock ceiling on a single generation. Well past a normal 700-token
@@ -140,6 +163,7 @@ export async function GET(req: Request) {
         content: m.content,
         createdAt: m.createdAt.toISOString(),
         listings: m.listingIds.map((id) => summaryById.get(id)).filter((s) => !!s),
+        clarify: m.clarify as { fields: { field: string; question: string; options: string[] | null }[] } | null,
       })) ?? [],
   });
 }
@@ -180,7 +204,83 @@ export async function POST(req: Request) {
   const isNewConversation = !conversation;
   const priorMessages = conversation ? [...conversation.messages].reverse() : [];
 
+  // Context Router: for a consumer's fresh free-text question (no
+  // listingIds/image already pinning what it's about), check whether it has
+  // enough specifics to answer well before spending a full generation on it
+  // — if not, ask instead of guessing. Capped at 2 consecutive clarifying
+  // turns (countTrailingClarifyTurns) so a user is never stuck in a loop;
+  // past that, fall through to the normal answer with whatever's known.
+  // `resolvedIntent` stays in scope past this block — the MAG memory
+  // read/write below (findUserNote/saveUserNote) reuses whichever
+  // sector/category it resolved, rather than a second model call.
+  let resolvedIntent: Awaited<ReturnType<typeof resolveChatIntent>> | null = null;
+  const previousTurnWasClarify = Boolean(priorMessages.at(-1)?.role === "assistant" && priorMessages.at(-1)?.clarify);
+
+  if (role === "consumer" && (!listingIds || listingIds.length === 0) && !image && content) {
+    if (countTrailingClarifyTurns(priorMessages) < MAX_CONSECUTIVE_CLARIFY_TURNS) {
+      const recentContext = [...priorMessages.slice(-4).map((m) => m.content), content].join("\n");
+      const intent = await resolveChatIntent(recentContext);
+      resolvedIntent = intent;
+      if (intent.missingContext.length > 0) {
+        const clarify = { fields: intent.missingContext };
+        const clarifyText =
+          "I need a bit more info to give you a solid answer:\n" +
+          intent.missingContext.map((f) => `- ${f.question}`).join("\n");
+
+        const { assistantMessage, conversationId: convId } = await prisma.$transaction(async (tx) => {
+          const conv = conversation ?? (await tx.conversation.create({ data: { userId: user.id } }));
+          await tx.message.create({
+            data: { conversationId: conv.id, role: "user", content, listingIds: [] },
+          });
+          const assistant = await tx.message.create({
+            data: { conversationId: conv.id, role: "assistant", content: clarifyText, listingIds: [], clarify },
+          });
+          await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date() } });
+          return { assistantMessage: assistant, conversationId: conv.id };
+        });
+
+        const payload = JSON.stringify({
+          conversationId: convId,
+          message: {
+            id: assistantMessage.id,
+            role: "assistant" as const,
+            content: clarifyText,
+            createdAt: assistantMessage.createdAt.toISOString(),
+            clarify,
+          },
+        });
+        return new Response(STREAM_CLARIFY_MARKER + payload, {
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache" },
+        });
+      }
+    }
+  }
+
+  // MAG (memory-augmented generation): UserNote already persists per-(user,
+  // sector,category) context across sessions for Insurance's intake flow —
+  // reused here so chat gets the same "don't ask twice" behavior. If this
+  // reply is answering a clarifying round from the turn before, save what
+  // was just said against the resolved sector/category; on every resolved
+  // turn, fold back in whatever was saved last time.
+  let memoryContext: string | null = null;
+  if (role === "consumer" && resolvedIntent?.sectorSlug) {
+    const sector = resolvedIntent.sectorSlug as Sector;
+    const category = resolvedIntent.categorySlug;
+    if (previousTurnWasClarify) {
+      await saveUserNote(user.id, sector, category, [{ question: "Recent context", answer: content }], "chat");
+    } else {
+      const existing = await getUserNote(user.id, sector, category);
+      if (existing?.content && Array.isArray(existing.content) && existing.content.length > 0) {
+        const answers = existing.content as { question: string; answer: string }[];
+        memoryContext = answers.map((a) => a.answer).join("; ");
+      }
+    }
+  }
+
   let system = role === "corporate" ? CORPORATE_SYSTEM_PROMPT : CONSUMER_SYSTEM_PROMPT;
+  if (memoryContext) {
+    system += `\n\nReturning context from a previous session in this sector — use it so the user doesn't have to repeat themselves, but don't state it back verbatim unless relevant: ${memoryContext}`;
+  }
 
   if (role === "corporate") {
     const provider = await resolveCorporateProvider(user.email);
@@ -188,61 +288,45 @@ export async function POST(req: Request) {
     system += context
       ? `\n\nYour account snapshot (${provider!.name}) — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`
       : "\n\nThis account isn't linked to a provider catalog yet — tell the user to ask an admin to link it before you can answer catalog-specific questions.";
+
+    // Sector-specific jargon fragment (see corporatePortalConfig.ts) — a
+    // banking account gets "RTGS/Nostro" phrasing, a school gets "SDA/
+    // boarding fees", etc. Unmapped sectors/no primarySector: no change.
+    const dbUser = await prisma.user.findUnique({ where: { id: user.id }, select: { primarySector: true } });
+    const sectorConfig = getCorporatePortalConfig(dbUser?.primarySector as SectorSlug | null);
+    if (sectorConfig) system += `\n\n${sectorConfig.chatPromptFragment}`;
   } else {
     const context = await getConsumerChatContext(user.id);
     system += `\n\nYour account snapshot — only reference figures from here, never invent any:\n${JSON.stringify(context, null, 2)}`;
   }
 
-  if (listingIds && listingIds.length > 0) {
-    const listings = await prisma.listing.findMany({
-      where: { id: { in: listingIds }, status: "published" },
-      include: { provider: true, category: { include: { attributeSchema: true } } },
-    });
-    if (listings.length > 0) {
-      const trends = await getListingPriceTrends(listingIds);
-      const sameCategory = listings.every((l) => l.categoryId === listings[0].categoryId);
-      const scores = sameCategory
-        ? computeDecisionScores(
-            listings.map((l) => ({
-              id: l.id,
-              name: l.name,
-              price: Number(l.price),
-              currency: l.currency,
-              attributes: l.attributes as Record<string, unknown>,
-              freshnessStatus: l.freshnessStatus,
-              lastVerifiedAt: l.lastVerifiedAt.toISOString(),
-              sourceUrl: l.sourceUrl,
-              images: l.images,
-              description: l.description ?? null,
-              rating: l.rating === null || l.rating === undefined ? null : Number(l.rating),
-              reviewCount: l.reviewCount ?? 0,
-              provider: l.provider,
-            })),
-            listings[0].category.attributeSchema.map((a) => ({
-              key: a.key,
-              label: a.label,
-              dataType: a.dataType,
-              unit: a.unit,
-              isComparable: a.isComparable,
-              sortOrder: a.sortOrder,
-            })),
-            trends,
-          )
-        : {};
+  let effectiveListingIds = listingIds;
+  // Flow 1 (User vs Product via Prompt) and Flow 3 (Product vs Product via
+  // Prompt): no explicit selection, but the Context Router above resolved a
+  // category — either resolve the 2-5 things the user actually named
+  // (Flow 3), or auto-select the category's top-ranked listings (Flow 1,
+  // same 5-item cap as Flow 2's selection), so a free-text question gets a
+  // directly grounded answer instead of only a deep-link suggestion.
+  if ((!effectiveListingIds || effectiveListingIds.length === 0) && resolvedIntent?.sectorSlug && resolvedIntent.categorySlug) {
+    const category = await getCategoryWithListings(resolvedIntent.sectorSlug, resolvedIntent.categorySlug);
+    if (category && category.listings.length > 0) {
+      if (resolvedIntent.entityNames.length >= 2) {
+        effectiveListingIds = await resolveNamedListings(category.id, resolvedIntent.entityNames);
+      }
+      if (!effectiveListingIds || effectiveListingIds.length === 0) {
+        const trends = await getListingPriceTrends(category.listings.map((l) => l.id));
+        const ranked = Object.entries(computeDecisionScores(category.listings, category.attributeSchema, trends))
+          .sort(([, a], [, b]) => b.total - a.total)
+          .map(([id]) => id);
+        effectiveListingIds = ranked.slice(0, 5);
+      }
+    }
+  }
 
-      const grounding = listings.map((l) => ({
-        name: l.name,
-        provider: l.provider.name,
-        provider_verified: l.provider.verified,
-        price: Number(l.price),
-        currency: l.currency,
-        freshness: l.freshnessStatus,
-        decision_score: scores[l.id]?.total ?? null,
-        price_trend: trends[l.id]
-          ? { direction: trends[l.id]!.direction, change_percent: trends[l.id]!.changePercent }
-          : null,
-      }));
-      system += `\n\nGrounding data for the listing(s) the user is asking about — only reference numbers from here, never invent any:\n${JSON.stringify(grounding, null, 2)}`;
+  if (effectiveListingIds && effectiveListingIds.length > 0) {
+    const retrieval = await retrieveListingGrounding(effectiveListingIds);
+    if (retrieval) {
+      system += `\n\nGrounding data for the listing(s) the user is asking about — only reference numbers from here, never invent any:\n${JSON.stringify(retrieval.listings, null, 2)}`;
     }
   }
 

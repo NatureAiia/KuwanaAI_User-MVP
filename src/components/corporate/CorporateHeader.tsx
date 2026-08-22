@@ -7,18 +7,22 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft, Bell } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoutButton } from "@/components/LogoutButton";
+import { getCorporatePortalConfig } from "@/lib/corporatePortalConfig";
+import type { SectorSlug } from "@/lib/sectors";
 
 // Deliberately not the consumer Header: no StreakBadge or cart icon — the
 // gamification concepts don't apply to a corporate account. The bell does
 // apply here now (triggered alert rules are real, actionable information),
 // same idea AdminHeader already uses ("a header built for this section, not
 // the shared consumer one"), just carrying the business's own name instead
-// of "Admin".
-export function CorporateHeader({ companyName }: { companyName: string }) {
+// of "Admin". `sector` swaps the "Kuwana for Business" eyebrow for a
+// sector-specific one (see corporatePortalConfig.ts) when one exists.
+export function CorporateHeader({ companyName, sector }: { companyName: string; sector?: SectorSlug | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const isHub = pathname === "/corporate";
   const [unreadCount, setUnreadCount] = useState(0);
+  const eyebrow = getCorporatePortalConfig(sector)?.headline ?? "Kuwana for Business";
 
   useEffect(() => {
     fetch("/api/notifications")
@@ -43,7 +47,7 @@ export function CorporateHeader({ companyName }: { companyName: string }) {
         <Link href="/corporate" className="flex items-center gap-2.5">
           <Image src="/kuwana-mark.png" alt="" width={26} height={26} className="rounded-full" />
           <div className="leading-tight">
-            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-sky">Kuwana for Business</p>
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent-sky">{eyebrow}</p>
             <p className="font-display text-[14px] font-bold text-text-primary">{companyName}</p>
           </div>
         </Link>

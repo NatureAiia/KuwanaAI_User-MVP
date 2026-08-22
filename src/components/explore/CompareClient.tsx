@@ -19,12 +19,15 @@ import { SignalBloom } from "@/components/SignalBloom";
 import { FormattedPrice } from "@/components/FormattedPrice";
 import { CompareShareButton } from "@/components/explore/CompareShareButton";
 import { computeDecisionScores } from "@/lib/scoring";
+import { computeBci, DEFAULT_AXIS_WEIGHTS, QUALITY_AXES, type AxisRatingStats } from "@/lib/bci";
+import type { QualityAxis } from "@prisma/client";
 import { notifyGamification, type GamificationUpdate } from "@/lib/gamification/client";
 import type { CompareShareData } from "@/lib/comparePdf";
 import type { AttributeSchemaFieldDTO, ListingDTO } from "@/types/catalog";
 import type { PriceTrend } from "@/lib/priceTrend";
 import { TREND_TONE, TREND_ARROW, resolveProviderLink, NOT_A_RESELLER_NOTICE } from "@/lib/listingDisplay";
 import { getListingRequirements, isRequirementAttribute } from "@/lib/eligibility";
+import { resolveFieldLabel } from "@/lib/fieldLabels";
 import { ExternalLink } from "lucide-react";
 import { CategoryIntakeModal } from "@/components/explore/CategoryIntakeModal";
 import { getIntakeQuestions } from "@/lib/insuranceIntake";
@@ -94,6 +97,17 @@ type TraditionalResult = {
 
 type KnownItem = { id: string; name: string; provider: string };
 
+// Matches QualityAxisConfig's seeded displayName values (prisma/seed.ts) —
+// hardcoded here rather than fetched, since these are the stable slugs'
+// stock labels, not something this page needs to reflect a live admin edit of.
+const AXIS_LABELS: Record<QualityAxis, string> = {
+  value: "Value for money",
+  trust: "Trust & safety",
+  availability: "Availability",
+  performance: "Performance",
+  resilience: "Resilience",
+};
+
 let knownItemCounter = 0;
 
 export function CompareClient({
@@ -104,6 +118,7 @@ export function CompareClient({
   listings,
   attributeSchema,
   trends,
+  bciInputs,
   initialSavedIds,
   budgetFlexibility,
   constraints,
@@ -115,6 +130,10 @@ export function CompareClient({
   listings: ListingDTO[];
   attributeSchema: AttributeSchemaFieldDTO[];
   trends: Record<string, PriceTrend | null>;
+  // Precomputed server-side (see explore/[sector]/compare/page.tsx) so the
+  // weighted BCI composite below can be recomputed client-side on every
+  // slider drag with no network round-trip.
+  bciInputs?: Record<string, { objective: Record<QualityAxis, number>; ratings: Record<QualityAxis, AxisRatingStats> }>;
   initialSavedIds?: string[];
   budgetFlexibility?: string | null;
   constraints?: string[];
@@ -149,6 +168,24 @@ export function CompareClient({
   const [knownProvider, setKnownProvider] = useState("");
 
   const scores = computeDecisionScores(listings, attributeSchema, trends);
+
+  // Flow 2 (Product vs Product via Selection): draggable 0-100 weight per
+  // axis, live re-ranking the BCI composite below — pure/sync, no API call,
+  // since bciInputs' objective/rating pieces were already computed server-side.
+  const [axisWeights, setAxisWeights] = useState<Record<QualityAxis, number>>(
+    Object.fromEntries(QUALITY_AXES.map((axis) => [axis, Math.round(DEFAULT_AXIS_WEIGHTS[axis] * 100)])) as Record<
+      QualityAxis,
+      number
+    >,
+  );
+  const bciScores = bciInputs
+    ? Object.fromEntries(
+        listings.map((l) => [
+          l.id,
+          bciInputs[l.id] ? computeBci(bciInputs[l.id].objective, bciInputs[l.id].ratings, axisWeights) : null,
+        ]),
+      )
+    : null;
 
   useEffect(() => {
     if (loggedComparison.current) return;
@@ -450,6 +487,32 @@ export function CompareClient({
         </div>
       )}
 
+      {bciScores && (
+        <div className="mt-3 rounded-[var(--radius-card)] border border-border bg-bg-surface p-3.5">
+          <p className="text-[12.5px] font-medium text-text-secondary">
+            Tune what matters to you — drag to re-rank instantly, no need to save anything.
+          </p>
+          <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+            {QUALITY_AXES.map((axis) => (
+              <label key={axis} className="flex flex-col gap-1 text-[11.5px] text-text-muted">
+                <span className="flex items-center justify-between">
+                  <span className="capitalize">{AXIS_LABELS[axis]}</span>
+                  <span className="font-mono">{axisWeights[axis]}</span>
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={axisWeights[axis]}
+                  onChange={(e) => setAxisWeights((prev) => ({ ...prev, [axis]: Number(e.target.value) }))}
+                  className="accent-accent-sky"
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-3 overflow-x-auto rounded-[var(--radius-card)] border border-border">
         <table className="w-full min-w-[560px] border-collapse text-[13px]">
           <thead>
@@ -471,7 +534,7 @@ export function CompareClient({
                     </div>
                     {requirements.length > 0 && (
                       <Badge tone="coral" className="mt-1.5">
-                        {requirements.map((r) => r.label).join(" · ")} required
+                        {requirements.map((r) => resolveFieldLabel(r, "consumer")).join(" · ")} required
                       </Badge>
                     )}
                     <button
@@ -510,7 +573,7 @@ export function CompareClient({
                     <td key={l.id} className="p-3">
                       {requirements.map((r) => (
                         <Badge key={r.key} tone="sky">
-                          {r.label} {String(r.value)}
+                          {resolveFieldLabel(r, "consumer")} {String(r.value)}
                           {r.unit ? ` ${r.unit}` : ""}
                         </Badge>
                       ))}
@@ -569,11 +632,29 @@ export function CompareClient({
                 );
               })}
             </tr>
+            {bciScores && (
+              <tr className="border-b border-border bg-accent-sky/5">
+                <td className="p-3 font-medium text-text-secondary">Weighted ranking (BCI)</td>
+                {listings.map((l) => {
+                  const bci = bciScores[l.id];
+                  return (
+                    <td key={l.id} className="p-3">
+                      <SignalBloom value={bci?.total ?? 0} size={44} />
+                      {bci && (
+                        <p className="mt-1 text-[10px] leading-tight text-text-muted">
+                          {QUALITY_AXES.map((axis) => `${AXIS_LABELS[axis].split(" ")[0]} ${Math.round(bci.axisBreakdown[axis].blended)}`).join(" · ")}
+                        </p>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            )}
             {attributeSchema
               .filter((a) => a.isComparable && !isRequirementAttribute(a.key))
               .map((attr) => (
                 <tr key={attr.key} className="border-b border-border last:border-0">
-                  <td className="p-3 font-medium text-text-secondary">{attr.label}</td>
+                  <td className="p-3 font-medium text-text-secondary">{resolveFieldLabel(attr, "consumer")}</td>
                   {listings.map((l) => (
                     <td key={l.id} className="p-3">
                       {formatValue(l.attributes[attr.key], attr.dataType, attr.unit)}

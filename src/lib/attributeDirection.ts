@@ -25,6 +25,9 @@ export const LOWER_IS_BETTER_ATTRIBUTE_KEYS = new Set([
   "claim_turnaround_days",
   "payout_speed_days",
   "student_teacher_ratio",
+  "rtgs_fee_app",
+  "rtgs_fee_manual",
+  "cost_per_watt",
 ]);
 
 export function isLowerBetterAttribute(key: string): boolean {

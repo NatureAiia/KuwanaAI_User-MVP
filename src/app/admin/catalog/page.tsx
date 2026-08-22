@@ -9,6 +9,7 @@ import { ProviderOwnerLink } from "@/components/admin/ProviderOwnerLink";
 import { ProviderWebsiteLink } from "@/components/admin/ProviderWebsiteLink";
 import { CorporateDomainLink } from "@/components/admin/CorporateDomainLink";
 import { SearchableSection } from "@/components/admin/SearchableSection";
+import { AttributeFieldVisibilityToggle } from "@/components/admin/AttributeFieldVisibilityToggle";
 import { FRESHNESS_TONE } from "@/lib/listingDisplay";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -157,6 +158,60 @@ export default async function AdminCatalogPage({
         </table>
       </div>
       </SearchableSection>
+      </div>
+
+      <div className="mt-8">
+        <h2 className="font-display text-[16px] font-semibold">Fields</h2>
+        <p className="mt-1 text-[12.5px] text-text-secondary">
+          Every comparable/hidden attribute across all categories — a field created via a corporate&apos;s field
+          proposal lands here as &quot;Hidden&quot; until you flip it to &quot;Comparable&quot;, the moment it
+          actually reaches consumer comparisons.
+        </p>
+        <div className="mt-3">
+        <SearchableSection placeholder="Search fields…">
+        <div className="max-h-[50vh] overflow-auto rounded-[var(--radius-card)] border border-border">
+          <table className="w-full min-w-[720px] border-collapse text-[13px]">
+            <thead>
+              <tr className="sticky top-0 z-[1] border-b border-border bg-bg-surface-raised text-left">
+                <th className="p-3 font-medium text-text-muted">Sector / Category</th>
+                <th className="p-3 font-medium text-text-muted">Label</th>
+                <th className="p-3 font-medium text-text-muted">Key</th>
+                <th className="p-3 font-medium text-text-muted">Axis</th>
+                <th className="p-3 font-medium text-text-muted">Visibility</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.flatMap((c) =>
+                c.attributeSchema.map((a) => (
+                  <tr key={a.id} data-search-row className="border-b border-border last:border-0">
+                    <td className="p-3 text-text-secondary">
+                      {c.sector.name}
+                      <span className="text-text-muted"> / {c.name}</span>
+                    </td>
+                    <td className="p-3 font-medium">
+                      {a.label}
+                      {a.consumerLabel && <span className="text-text-muted"> / {a.consumerLabel}</span>}
+                    </td>
+                    <td className="p-3 font-mono text-text-secondary">{a.key}</td>
+                    <td className="p-3 text-text-secondary">{a.qualityAxis ?? "—"}</td>
+                    <td className="p-3">
+                      <AttributeFieldVisibilityToggle id={a.id} isComparable={a.isComparable} />
+                    </td>
+                  </tr>
+                )),
+              )}
+              {categories.every((c) => c.attributeSchema.length === 0) && (
+                <tr>
+                  <td colSpan={5} className="p-6">
+                    <EmptyState variant="inline" title="No fields yet." description="Fields are seeded per category, or added via a corporate field proposal." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        </SearchableSection>
+        </div>
       </div>
 
       <div className="mt-8">

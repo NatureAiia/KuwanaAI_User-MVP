@@ -21,6 +21,7 @@ const REQUIREMENT_ATTRIBUTE_KEYS = new Set(["min_balance"]);
 export type Requirement = {
   key: string;
   label: string;
+  consumerLabel: string | null;
   value: unknown;
   unit: string | null;
 };
@@ -35,7 +36,7 @@ export function getListingRequirements(
 ): Requirement[] {
   return attributeSchema
     .filter((a) => REQUIREMENT_ATTRIBUTE_KEYS.has(a.key))
-    .map((a) => ({ key: a.key, label: a.label, value: listing.attributes[a.key], unit: a.unit }))
+    .map((a) => ({ key: a.key, label: a.label, consumerLabel: a.consumerLabel, value: listing.attributes[a.key], unit: a.unit }))
     .filter((r) => r.value !== undefined && r.value !== null);
 }
 

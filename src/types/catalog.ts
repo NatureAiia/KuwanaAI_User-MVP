@@ -1,10 +1,19 @@
 export type AttributeSchemaFieldDTO = {
   key: string;
   label: string;
+  // Plain-language override of `label` for consumer-facing surfaces — see
+  // resolveFieldLabel() in src/lib/fieldLabels.ts. Null means "use label".
+  consumerLabel: string | null;
   dataType: "number" | "string" | "enum" | "boolean";
   unit: string | null;
   isComparable: boolean;
   sortOrder: number;
+  // Which BCI axis this field feeds as an objective input, if any — see
+  // src/lib/bci.ts.
+  qualityAxis: "value" | "trust" | "availability" | "performance" | "resilience" | null;
+  // Casual/alternate phrasings for search and intake matching — see
+  // src/lib/terminology.ts.
+  synonyms: string[];
 };
 
 export type ListingDTO = {
