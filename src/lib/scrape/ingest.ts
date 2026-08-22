@@ -6,9 +6,32 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma, type ScrapeTrigger } from "@prisma/client";
 import type { CategoryDTO } from "@/types/catalog";
-import { scrapeUrl } from "./firecrawl";
+import { scrapeUrl, type ScrapedPage } from "./firecrawl";
+import { scrapeUrlWithPlaywright } from "./playwright";
 import { extractListingCandidate } from "./extract";
 import { suggestMatch } from "./match";
+
+/**
+ * Firecrawl first (its own extraction/blocking-handling is generally better
+ * for a plain content page); Playwright as the fallback when Firecrawl
+ * isn't configured or its request fails, and for pages that need real JS
+ * rendering Firecrawl's fetch couldn't handle. Errors from both are thrown
+ * together so a caller sees the full picture, not just whichever failed last.
+ */
+async function fetchPage(url: string): Promise<ScrapedPage> {
+  try {
+    return await scrapeUrl(url);
+  } catch (firecrawlErr) {
+    try {
+      return await scrapeUrlWithPlaywright(url);
+    } catch (playwrightErr) {
+      throw new Error(
+        `Both fetch engines failed for ${url} — Firecrawl: ${firecrawlErr instanceof Error ? firecrawlErr.message : String(firecrawlErr)}; ` +
+          `Playwright: ${playwrightErr instanceof Error ? playwrightErr.message : String(playwrightErr)}`,
+      );
+    }
+  }
+}
 
 export async function ingestUrl(params: {
   url: string;
@@ -35,7 +58,7 @@ export async function ingestUrl(params: {
     sortOrder: a.sortOrder,
   }));
 
-  const page = await scrapeUrl(params.url);
+  const page = await fetchPage(params.url);
   const { data, confidence } = await extractListingCandidate({
     markdown: page.markdown,
     sourceUrl: page.url,
