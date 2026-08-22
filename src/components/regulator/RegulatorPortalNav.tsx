@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LineChart, Search, TrendingUp, ClipboardCheck, ShieldAlert, MessageSquareWarning, Wallet, type LucideIcon } from "lucide-react";
+import { LineChart, Search, TrendingUp, ClipboardCheck, ShieldAlert, MessageSquareWarning, Wallet, ListPlus, type LucideIcon } from "lucide-react";
 import { clsx } from "clsx";
 import { PortalMobileNav } from "@/components/PortalMobileNav";
 
@@ -13,6 +13,7 @@ type NavLink = { href: string; label: string; icon: LucideIcon };
 const NAV_LINKS: NavLink[] = [
   { href: "/regulator", label: "Overview", icon: LineChart },
   { href: "/regulator/investigations", label: "Investigations", icon: Search },
+  { href: "/regulator/field-proposals", label: "Field proposals", icon: ListPlus },
   { href: "/regulator/price-index", label: "Price Index", icon: TrendingUp },
   { href: "/regulator/scorecard", label: "Scorecard", icon: ClipboardCheck },
   { href: "/regulator/alerts", label: "Price Caps", icon: ShieldAlert },

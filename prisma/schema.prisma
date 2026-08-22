@@ -1143,6 +1143,13 @@ enum AdminAuditAction {
   advert_deleted
   corporate_request_approved
   corporate_request_rejected
+  // Regulator's own decision on a new_field proposal — distinct from the
+  // admin actions above since it's a separate reviewer/stage (see
+  // RegulatorReviewDecision on CorporateRequest).
+  corporate_field_proposal_regulator_reviewed
+  // Admin flipping AttributeSchemaField.isComparable on/off — the final gate
+  // between a field existing and it actually reaching consumer comparisons.
+  attribute_field_visibility_changed
   corporate_domain_linked
   discount_rule_created
   discount_rule_deleted

@@ -41,7 +41,9 @@ type AdminAuditAction =
   | "complaint_promoted"
   | "user_suspended"
   | "user_reactivated"
-  | "provider_listings_removed";
+  | "provider_listings_removed"
+  | "corporate_field_proposal_regulator_reviewed"
+  | "attribute_field_visibility_changed";
 
 /**
  * Records who did what to which row — despite the field name, not admin-only:
@@ -74,7 +76,8 @@ export async function logAdminAction(params: {
     | "market_basket_item"
     | "investigation"
     | "price_cap_rule"
-    | "complaint";
+    | "complaint"
+    | "attribute_schema_field";
   targetId: string;
   detail: string;
 }): Promise<void> {

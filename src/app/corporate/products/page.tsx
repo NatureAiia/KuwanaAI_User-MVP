@@ -23,9 +23,14 @@ export default async function CorporateProductsPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[20px] font-bold">Products</h1>
-        <LinkButton href="/corporate/products/new" size="md">
-          + Request new product
-        </LinkButton>
+        <div className="flex gap-2">
+          <LinkButton href="/corporate/products/new-field" size="md" variant="secondary">
+            + Propose field
+          </LinkButton>
+          <LinkButton href="/corporate/products/new" size="md">
+            + Request new product
+          </LinkButton>
+        </div>
       </div>
 
       <DividedList
