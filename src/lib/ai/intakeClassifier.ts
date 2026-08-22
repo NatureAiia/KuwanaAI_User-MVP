@@ -2,6 +2,17 @@ import { generateAiJson } from "@/lib/ai/provider";
 import { getSectorCategories } from "@/lib/catalog";
 import { SECTORS, LIVE_SECTORS } from "@/lib/sectors";
 
+/** Shared by classifyIntake() and resolveChatIntent() — the closed sector/category list both route free text against. */
+async function loadSectorCatalog() {
+  return Promise.all(
+    LIVE_SECTORS.map(async (slug) => ({
+      slug,
+      name: SECTORS[slug].name,
+      categories: await getSectorCategories(slug),
+    })),
+  );
+}
+
 const INTAKE_SCHEMA = {
   type: "object",
   properties: {
@@ -57,13 +68,7 @@ export type IntakeResult = {
 const BUDGET_FLEXIBILITY = new Set(["low", "medium", "high"]);
 
 export async function classifyIntake(query: string): Promise<IntakeResult> {
-  const sectorsWithCategories = await Promise.all(
-    LIVE_SECTORS.map(async (slug) => ({
-      slug,
-      name: SECTORS[slug].name,
-      categories: await getSectorCategories(slug),
-    })),
-  );
+  const sectorsWithCategories = await loadSectorCatalog();
 
   const catalogForModel = sectorsWithCategories.map((s) => ({
     sector_slug: s.slug,
@@ -118,6 +123,124 @@ export async function classifyIntake(query: string): Promise<IntakeResult> {
           .filter(Boolean)
           .slice(0, 3)
           .map((c) => c.slice(0, 80))
+      : [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chat intent resolution — the "Context Router" from the uploaded 7-sector
+// docs, adapted onto this app's chat surface. Runs on the same cheap
+// `intake` tier as classifyIntake() above; the caller (/api/chat) only
+// invokes this for a consumer's fresh free-text question with no
+// listingIds already attached — a follow-up about already-selected
+// listings skips straight to the normal grounded-answer path.
+// ---------------------------------------------------------------------------
+
+const CHAT_INTENT_SCHEMA = {
+  type: "object",
+  properties: {
+    sector_slug: { type: ["string", "null"], description: "Best-matching sector slug from the provided list, or null." },
+    category_slug: { type: ["string", "null"], description: "Best-matching category slug within that sector, or null." },
+    confidence: { type: "number", description: "0 to 1." },
+    // A closed list keeps this genuinely resolvable server-side (bounded
+    // count, no free-form field name the client has to render blind).
+    missing_context: {
+      type: "array",
+      maxItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          field: { type: "string", description: "Short internal key for this piece of context, e.g. 'province', 'budget', 'customer_type'." },
+          question: { type: "string", description: "The follow-up question to show the user, in plain everyday language." },
+          options: {
+            type: ["array", "null"],
+            items: { type: "string" },
+            description: "Up to 4 short quick-reply options if there's an obvious closed set (e.g. provinces); null for free text.",
+          },
+        },
+        required: ["field", "question", "options"],
+        additionalProperties: false,
+      },
+      description:
+        "Up to 3 follow-up questions for whatever's missing to give a grounded, specific answer instead of a generic one. Empty array if the question already has enough to proceed.",
+    },
+  },
+  required: ["sector_slug", "category_slug", "confidence", "missing_context"],
+  additionalProperties: false,
+};
+
+const CHAT_INTENT_SYSTEM_PROMPT =
+  "You route a Zimbabwean consumer's plain-language comparison question to the single best-matching sector and " +
+  "category from a closed list, the same way an intake classifier would — never invent a slug not present in the " +
+  "list.\n\n" +
+  "Then decide if the question already has enough specifics to give a grounded, specific answer (province/city, " +
+  "budget or price ceiling, customer type, a named provider or two, a concrete need like data amount or account " +
+  "type) — if so, leave missing_context empty. If it's too generic to answer well (e.g. \"what's the cheapest data " +
+  "bundle\" with no province or usage need, or \"best bank\" with no idea what for), populate missing_context with " +
+  "up to 3 short, concrete follow-up questions that would actually narrow the answer — never ask something that " +
+  "doesn't change the outcome. Give quick-reply options when there's an obvious small closed set (e.g. province: " +
+  "Harare/Bulawayo/Gweru/Mutare), otherwise leave options null for free text. Prefer resolving with 1 question over " +
+  "3 when one genuinely covers it.\n\n" +
+  'Reply with JSON only, no prose and no markdown fence: {"sector_slug": string|null, "category_slug": ' +
+  'string|null, "confidence": number, "missing_context": [{"field": string, "question": string, "options": ' +
+  'string[]|null}]}.';
+
+export type ChatIntentResult = {
+  sectorSlug: string | null;
+  categorySlug: string | null;
+  confidence: number;
+  missingContext: { field: string; question: string; options: string[] | null }[];
+};
+
+export async function resolveChatIntent(query: string): Promise<ChatIntentResult> {
+  const sectorsWithCategories = await loadSectorCatalog();
+  const catalogForModel = sectorsWithCategories.map((s) => ({
+    sector_slug: s.slug,
+    sector_name: s.name,
+    categories: s.categories.map((c) => ({ category_slug: c.slug, category_name: c.name })),
+  }));
+
+  let result: {
+    sector_slug: string | null;
+    category_slug: string | null;
+    confidence: number;
+    missing_context: { field: string; question: string; options: string[] | null }[];
+  };
+  try {
+    result = await generateAiJson({
+      feature: "intake",
+      signals: { feature: "intake", query },
+      system: CHAT_INTENT_SYSTEM_PROMPT,
+      prompt: `Available sectors and categories:\n${JSON.stringify(catalogForModel, null, 2)}\n\nUser's question: "${query}"`,
+      schema: CHAT_INTENT_SCHEMA,
+      schemaName: "chat_intent_route",
+      maxTokens: 400,
+      effort: "low",
+    });
+  } catch (err) {
+    // A failed clarification check must never block the chat — fall through
+    // to "resolvable" so the caller proceeds with today's ungated answer.
+    console.error("[chat-intent] resolution failed:", err);
+    return { sectorSlug: null, categorySlug: null, confidence: 0, missingContext: [] };
+  }
+
+  const matchedSector = sectorsWithCategories.find((s) => s.slug === result.sector_slug);
+  const matchedCategory = matchedSector?.categories.find((c) => c.slug === result.category_slug);
+  const confidence = Number(result.confidence);
+
+  return {
+    sectorSlug: matchedSector?.slug ?? null,
+    categorySlug: matchedCategory?.slug ?? null,
+    confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : 0,
+    missingContext: Array.isArray(result.missing_context)
+      ? result.missing_context
+          .slice(0, 3)
+          .filter((m) => m && typeof m.field === "string" && typeof m.question === "string")
+          .map((m) => ({
+            field: m.field.slice(0, 40),
+            question: m.question.slice(0, 200),
+            options: Array.isArray(m.options) ? m.options.map((o) => String(o).slice(0, 40)).slice(0, 4) : null,
+          }))
       : [],
   };
 }
